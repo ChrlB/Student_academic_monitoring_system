@@ -99,7 +99,7 @@ class PHPDAO{
 }
 
 $conn = new PDO("mysql:host=localhost;port=3306;dbname=business_inventory_db","root","John_Chrl@2006;");
-//$conn = new PDO("mysql:host=localhost;port=3306;dbname=student_academic_monitoring_db","root","");
+//$conn = new PDO("mysql:host=localhost;port=3306;dbname=student_academic_monitoring_system_db","root","");
 
 $studentDAO = new PHPDAO($conn);
 $gradesDAO = new PHPDAO($conn);
@@ -108,4 +108,3 @@ $studentDAO->prepareStatement("getAllStudents",
   "SELECT * FROM tbl_users;",
   "get all users records"
 );
-

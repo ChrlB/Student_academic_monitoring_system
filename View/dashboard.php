@@ -1,4 +1,6 @@
-
+<?php
+  require_once __DIR__."/../PageLogic/dashboard_logic.php";
+?>
 
 <!DOCTYPE html>
 <html lang="en">

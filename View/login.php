@@ -1,5 +1,5 @@
 <?php
- require __DIR__.'/PageLogic/login_logic.php';
+ require_once __DIR__.'/../PageLogic/login_logic.php';
 ?>
 
 <!DOCTYPE html>
@@ -10,7 +10,7 @@
   <title>Document</title>
 </head>
 <body>
-  this is lohin page
+  this is login page
   <a href="/dashboard">
     <input type="button" value="Go to dashboard">
   </a>
