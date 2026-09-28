@@ -1,6 +1,6 @@
 <?php
   require_once __DIR__."/../Services/session.php";
-  require_once __DIR__."/../PageLogic/dashboard_logic.php";
+  require_once __DIR__."/../PageLogic/account_logic.php";
 ?>
 
 <!DOCTYPE html>

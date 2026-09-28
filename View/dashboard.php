@@ -12,5 +12,17 @@
 </head>
 <body>
   this is dashboard
+
+  <a href="/dashboard">
+    <input type="button" value="Go to dashboard">
+  </a>
+
+  <a href="/class-sched">
+    <input type="button" value="Go to class-scheds">
+  </a>
+
+  <a href="/account">
+    <input type="button" value="Go to account">
+  </a>
 </body>
 </html>

@@ -44,5 +44,13 @@ $router->get('/dashboard', function() {
     require __DIR__ . '/../View/dashboard.php';
 });
 
+$router->get('/class-sched', function() {
+    require __DIR__ . '/../View/class_sched.php';
+});
+
+$router->get('/account', function() {
+    require __DIR__ . '/../View/account.php';
+});
+
 // Run the router
 $router->dispatch();
