@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../PageLogic/login_logic.php';
+require_once __DIR__."/../Services/session.php";
 
 class Router {
     private array $routes = [];
@@ -36,30 +37,14 @@ $router->get('/index.php', function(){
 });
 
 
-$router->get('/login', function() {
-    require __DIR__ . '/../View/login.php';
-});
-
-$router->get('/dashboard', function() {
-    require __DIR__ . '/../View/dashboard.php';
-});
-
-$router->get('/class-sched', function() {
-    require __DIR__ . '/../View/class_sched.php';
-});
-
-$router->get('/account', function() {
-    require __DIR__ . '/../View/account.php';
-});
+$router->get('/login',  fn() => require __DIR__ . '/../View/login.php');
+$router->get('/dashboard', fn() => require __DIR__ . '/../View/dashboard.php');
+$router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
+$router->get('/account',  fn() => require __DIR__ . '/../View/account.php');
 
 
-$router->post('/login', function() {
-    login();
-});
+$router->post('/login', fn() => login());
+$router->post('/logout', fn() => logout());
 
-$router->post('/logout', function() {
-    logout();
-});
 
-// Run the router
 $router->dispatch();

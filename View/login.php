@@ -1,5 +1,4 @@
 <?php
-  require_once __DIR__."/../Services/session.php";
   require_once __DIR__.'/../PageLogic/login_logic.php';
 ?>
 

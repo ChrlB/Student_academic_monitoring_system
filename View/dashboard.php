@@ -1,5 +1,4 @@
 <?php
-  require_once __DIR__."/../Services/session.php";
   require_once __DIR__."/../PageLogic/dashboard_logic.php";
 ?>
 
@@ -11,7 +10,7 @@
   <title>SACAD</title>
 </head>
 <body>
-  this is dashboard
+  this is dashboard, Hi <?= $_SESSION['user'] ?>
 
   <form method="post" action="/logout">
     <button type="submit" name="">log out</button>
