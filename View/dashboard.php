@@ -1,4 +1,5 @@
 <?php
+  require_once __DIR__."/../Services/session.php";
   require_once __DIR__."/../PageLogic/dashboard_logic.php";
 ?>
 
@@ -7,7 +8,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>SACAD</title>
 </head>
 <body>
   this is dashboard
