@@ -13,9 +13,9 @@
 <body>
   this is dashboard
 
-  <a href="/dashboard">
-    <input type="button" value="Go to dashboard">
-  </a>
+  <form method="post" action="/logout">
+    <button type="submit" name="">log out</button>
+  </form>
 
   <a href="/class-sched">
     <input type="button" value="Go to class-scheds">

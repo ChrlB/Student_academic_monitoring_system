@@ -12,8 +12,8 @@
 </head>
 <body>
   this is login page
-  <a href="/dashboard">
-    <input type="button" value="Go to dashboard">
-  </a>
+  <form action="/login" method="post">
+    <button type="submit">login</button>
+  </form>
 </body>
 </html>

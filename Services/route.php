@@ -1,4 +1,6 @@
 <?php
+require_once __DIR__.'/../PageLogic/login_logic.php';
+
 class Router {
     private array $routes = [];
 
@@ -25,16 +27,14 @@ class Router {
 
 $router = new Router();
 
-// Define routes
+
 $router->get('/', function(){
-    header('Location: /login');
-    exit;
+    header('Location: /login'); exit;
+});
+$router->get('/index.php', function(){
+    header('Location: /login'); exit;
 });
 
-$router->get('/index.php', function(){
-    header('Location: /login');
-    exit;
-});
 
 $router->get('/login', function() {
     require __DIR__ . '/../View/login.php';
@@ -50,6 +50,15 @@ $router->get('/class-sched', function() {
 
 $router->get('/account', function() {
     require __DIR__ . '/../View/account.php';
+});
+
+
+$router->post('/login', function() {
+    login();
+});
+
+$router->post('/logout', function() {
+    logout();
 });
 
 // Run the router
