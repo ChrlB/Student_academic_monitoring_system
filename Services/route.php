@@ -42,7 +42,6 @@ $router->get('/dashboard', fn() => require __DIR__ . '/../View/dashboard.php');
 $router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
 $router->get('/account',  fn() => require __DIR__ . '/../View/account.php');
 
-
 $router->post('/login', fn() => login());
 $router->post('/logout', fn() => logout());
 
