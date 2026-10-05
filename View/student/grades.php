@@ -1,5 +1,5 @@
 <?php
-  require_once __DIR__."/../PageLogic/grades_logic.php";
+  require_once __DIR__."/../../PageLogic/grades_logic.php";
 ?>
 
 <!DOCTYPE html>

@@ -1,5 +1,5 @@
 <?php
-  require_once __DIR__."/../PageLogic/attendance_logic.php";
+  require_once __DIR__."/../../PageLogic/attendance_logic.php";
 ?>
 
 <!DOCTYPE html>

@@ -1,5 +1,5 @@
 <?php
-  require_once __DIR__."/../PageLogic/dashboard_logic.php";
+  require_once __DIR__."/../../PageLogic/dashboard_logic.php";
 ?>
 
 <!DOCTYPE html>
