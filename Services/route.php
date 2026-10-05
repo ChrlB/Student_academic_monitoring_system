@@ -37,7 +37,7 @@ $router->get('/index.php', function(){
 });
 
 
-$router->get('/login',  fn() => require __DIR__ . '/../View/login.php');
+$router->get('/login',  fn() => require __DIR__ . '/../View/student/login.php');
 $router->get('/dashboard', fn() => require __DIR__ . '/../View/dashboard.php');
 $router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
 $router->get('/account',  fn() => require __DIR__ . '/../View/account.php');
