@@ -16,11 +16,11 @@
     <button type="submit" name="">log out</button>
   </form>
 
-  <a href="/class-sched">
+  <a href="/student/class-sched">
     <input type="button" value="Go to class-scheds">
   </a>
 
-  <a href="/account">
+  <a href="/student/account">
     <input type="button" value="Go to account">
   </a>
 </body>

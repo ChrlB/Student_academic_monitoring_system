@@ -1,6 +1,6 @@
 <?php
 
   if(!isLoggedIn()){
-    header('Location: /login');
+    header('Location: /student/login');
     exit;
   }

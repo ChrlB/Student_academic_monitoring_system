@@ -2,13 +2,16 @@
 
   function logout(){
     terminateSession();
-    header('Location: /login');
+    header('Location: /student/login');
     exit;
   }
 
-  function login(){
-    $_SESSION["user"] = "john";
-    header('Location: /dashboard');
+  function login($login_info){
+    
+    $_SESSION["user"] = $login_info['username'] ?? "null";
+    $_SESSION["role"] = "student";
+
+    header('Location: /student/dashboard');
     exit;
   }
 ?>
