@@ -8,5 +8,7 @@
 
   function navigateToDashboard(){
     if($_SESSION['role'] == "student") require __DIR__ . '/../View/student/dashboard.php';
-    else require __DIR__ . '/../View/faculty/faculty_dashboard.php';
+    else if($_SESSION['role'] == "faculty"){
+      require __DIR__ . '/../View/faculty/faculty_dashboard.php';
+    }
   }
