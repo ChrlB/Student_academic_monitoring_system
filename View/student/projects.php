@@ -1,5 +1,5 @@
 <?php
-  require_once __DIR__."/../../PageLogic/announcement_logic.php";
+  require_once __DIR__."/../../PageLogic/projects_logic.php";
 ?>
 
 <!DOCTYPE html>
@@ -7,7 +7,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SACAD</title>
+  <title>AMS</title>
 </head>
 <body>
   this is announcement page
