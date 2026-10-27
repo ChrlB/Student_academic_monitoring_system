@@ -11,6 +11,7 @@
 </head>
 <body>
   this is dashboard, Hi <?= $_SESSION['user'] ?>
+  <?php require_once __DIR__."/../components/navigation.php"; ?>
 
   <form method="post" action="/logout">
     <button type="submit" name="">log out</button>

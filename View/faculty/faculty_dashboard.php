@@ -7,7 +7,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SACAD</title>
+  <title>AMS</title>
 </head>
 <body>
   this is faculty dashboard, Hi <?= $_SESSION['user'] ?>

@@ -11,10 +11,14 @@
 </head>
 
 <body> 
-  
+  <?php if(isset($_SESSION["error"])){ echo $_SESSION["error"]."<br>"?>
+
+  <?php } ?>
+
   this is login page
   <form action="/login" method="post">
     <input type="text" name="username">
+    <input type="password" name="password">
     <button type="submit">login</button>
   </form>
 
