@@ -17,8 +17,8 @@
 
   this is login page
   <form action="/login" method="post">
-    <input type="text" name="username">
-    <input type="password" name="password">
+    <input type="text" name="username" required>
+    <input type="password" name="password" required>
     <button type="submit">login</button>
   </form>
 

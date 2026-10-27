@@ -6,19 +6,17 @@ require_once __DIR__.'/../Services/auth.php';
 //   exit;
 // };
 
-// global $studentDAO;
+// // global $studentDAO;
+// global $userDAO;
 
-// $records = $studentDAO->executeQuery("getAllStudents");
-
-// var_dump($records);
-
+// // $records = $userDAO->executeQuery("getUsers");
+// $records = $userDAO->executeQuery("getUserByID",[$_SESSION["userID"]]);
 
 // foreach($records as $student){
 //   echo "<br>";
-//   echo $student["userID"]."<br>";
-//   echo $student["username"]."<br>";
-//   echo $student["password"]."<br>";
-//   echo $student["fullname"]."<br>"."<br>";
+//   echo "ID: ".$student["userID"]."<br>";
+//   echo "Lastname: ".$student["last_name"]."<br>";
+//   echo "password: ".$student["password"]."<br>";
 // }
 
 
