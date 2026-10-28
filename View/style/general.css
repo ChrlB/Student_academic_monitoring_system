@@ -109,8 +109,11 @@
   
   transition: linear 0.1s;
 }
-.nav_buttons:hover{
-    border: 2px solid #D9D9D9;
+.nav_buttons:hover {
+  border-radius: 10px;
+  border-top: 2cm solid #D9D9D9;
+  border-bottom: 2px solid #D9D9D9;
+  border: 2px solid #D9D9D9;
     /* width: 177px; */
 }
 
@@ -132,6 +135,21 @@ body {
 
   overflow-x: hidden;            
 }
+
+body[data-page="DASHBOARD"]  .DASHBOARD,
+body[data-page="SCHEDULE"]   .SCHEDULE,
+body[data-page="GRADES"]     .GRADES,
+body[data-page="ATTENDANCE"] .ATTENDANCE,
+body[data-page="CLEARANCE"]     .CLEARANCE,
+body[data-page="PROJECTS"] .PROJECTS,
+body[data-page="SYLLABUS"]     .SYLLABUS,
+body[data-page="ACCOUNT"] .ACCOUNT,
+body[data-page="ENROLLMENT"] .ENROLLMENT {
+  border-radius: 10px;
+  border-top: 2px solid #D9D9D9;
+  border-bottom: 2px solid #D9D9D9;
+}
+
 header{
   border-radius: 20px;
   border: 3px solid #D9D9D9;
