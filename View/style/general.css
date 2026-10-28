@@ -11,44 +11,83 @@
 }
 
 .navbar{
-  border: 1px solid black;
-  width: 180px;
-  height: 92vh;
-  padding: 10px 10px;
+  border-radius: 20px;
+  border: 3px solid #D9D9D9;
+  /* width: 200px; */
+  width: 60px;
+  height: 95vh;
+  overflow-x: hidden;
+  background-color: rgba(0, 0,0, 0.2);
+
+  
 
   .nav_logo{
-    width: 180px;
-    height: 60px;
-    margin-bottom: 20px;
+    /* border: 1px solid black; */
+    width: 150px;
+    /* width: 200px; */
+    /* height: 60px; */
+    margin-bottom: 29px;
+  }
+
+  .buttons_section{
+    padding: 10px 10px;
   }
 
   .nav_buttons{
-    border: 1px solid black;
+    border-radius: 10px;
+    /* border: 1px solid black; */
     margin-bottom: 10px;
     height: 40px;
     text-decoration:none;
+    border: 2px solid transparent;
+    
     
 
     .nav_button_icons{
       border: 0;
       width: 40px;
-      height: 40px;
+      /* height: 40px; */
     }
 
     input[type='button']{
+      color: #D9D9D9;
       border: 0;
       text-align: left;
       padding-left: 15px;
       width: 140px;
       height: 40px;
+      background-color: transparent;
     }
   }
+
+  
+}
+.navbar:hover{
+  width: 200px;
+  height: 95vh;
+  .nav_logo{
+    /* width: 150px; */
+    width: 200px;
+    margin-bottom: 10px;
+  }
+  .nav_buttons{
+    background-color: rgba(0, 0,0, 0.44);
+    /* width: 177px; */
+  }
+  
+  transition: linear 0.1s;
+}
+.nav_buttons:hover{
+    border: 2px solid #D9D9D9;
+    /* width: 177px; */
 }
 
 body{
   margin: 0;
   padding: 15px 50px ;
-  background-color: bisque;
+  background-image: linear-gradient(#D3B8DB,#B568CC,#20062B) ;
+  background-repeat: no-repeat ;
+  min-height: 100dvh; 
 }
 
 .popup {
