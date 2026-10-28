@@ -1,4 +1,28 @@
 
+
+.row{
+  display: flex;
+  flex-direction: row;
+}
+
+.column{
+  display: flex;
+  flex-direction: column;
+}
+
+.navbar{
+  border: 1px solid black;
+  width: 200px;
+  height: 90vh;
+  padding: 10px;
+
+}
+
+body{
+  margin: 0;
+  padding: 0 50px ;
+}
+
 .popup {
   background: #22c525; 
   position: fixed;
@@ -11,7 +35,6 @@
   font-size: 23px;
   color: white;
 }
-
 .error{
   background: #c52d22; 
 }

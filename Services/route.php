@@ -14,15 +14,6 @@ class Router {
     }
 
     public function dispatch() {
-        // $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-        // $method = $_SERVER['REQUEST_METHOD'];
-
-        // if (isset($this->routes[$method][$path])) {
-        //     call_user_func($this->routes[$method][$path]);
-        // } else {
-        //     http_response_code(404);
-        //     echo "404 - Page Not Found";
-        // }
 
         $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $method = $_SERVER['REQUEST_METHOD'];
@@ -48,14 +39,21 @@ $router->get('/index.php', function(){
 
 
 $router->get('/login',  fn() => require __DIR__ . '/../View/login.php');
-$router->get('/dashboard', fn() => require __DIR__ . '/../View/dashboard.php');
-$router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
+
 $router->get('/account',  fn() => require __DIR__ . '/../View/account.php');
+$router->get('/attendance', fn() => require __DIR__ . '/../View/attendance.php');
+$router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
+
+$router->get('/clearance',  fn() => require __DIR__ . '/../View/clearance.php');
+$router->get('/dashboard', fn() => require __DIR__ . '/../View/dashboard.php');
+$router->get('/enrollment',  fn() => require __DIR__ . '/../View/enrollment.php');
+
+$router->get('/grades', fn() => require __DIR__ . '/../View/grades.php');
+$router->get('/projects',  fn() => require __DIR__ . '/../View/projects.php');
+$router->get('/syllabus',  fn() => require __DIR__ . '/../View/syllabus.php');
 
 
-$router->post('/login', fn($request) => login($request));        
-
-
+$router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    
  
 
