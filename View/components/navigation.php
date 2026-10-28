@@ -1,4 +1,6 @@
 
+<div style="display: flex; flex-direction:row; ">
+
 
 <div class="column navbar">
 
@@ -31,4 +33,5 @@
   <form method="post" action="/logout">
     <button type="submit" name="">log out</button>
   </form>
+</div>
 </div>

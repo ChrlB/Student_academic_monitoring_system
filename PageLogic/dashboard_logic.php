@@ -1,6 +1,8 @@
 <?php 
 require_once __DIR__.'/../Services/auth.php';
 
+$_SESSION["page"] = "DASHBOARD";
+
 // if($_SESSION["role"] == "student"){
 //   header('Location: /student/dashboard');
 //   exit;

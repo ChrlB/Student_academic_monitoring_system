@@ -13,7 +13,35 @@
 <body>
   
   <?php require_once __DIR__."/components/popup_message.php"; ?>
-  <?php require_once __DIR__."/components/navigation.php"; ?>
+  <div class="row main_box">
+    <?php require_once __DIR__."/components/navigation.php"; ?>
+    <div class="column" style="flex: 1;">
+      <?php require_once __DIR__."/components/header.php"; ?>
+      <main class="column scrollbar" >
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+        <div class="box"></div>
+      </main>
+    </div>
+  </div>
+  
 
   
 </body>
