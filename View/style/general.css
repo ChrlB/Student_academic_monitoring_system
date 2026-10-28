@@ -12,15 +12,43 @@
 
 .navbar{
   border: 1px solid black;
-  width: 200px;
-  height: 90vh;
-  padding: 10px;
+  width: 180px;
+  height: 92vh;
+  padding: 10px 10px;
 
+  .nav_logo{
+    width: 180px;
+    height: 60px;
+    margin-bottom: 20px;
+  }
+
+  .nav_buttons{
+    border: 1px solid black;
+    margin-bottom: 10px;
+    height: 40px;
+    text-decoration:none;
+    
+
+    .nav_button_icons{
+      border: 0;
+      width: 40px;
+      height: 40px;
+    }
+
+    input[type='button']{
+      border: 0;
+      text-align: left;
+      padding-left: 15px;
+      width: 140px;
+      height: 40px;
+    }
+  }
 }
 
 body{
   margin: 0;
-  padding: 0 50px ;
+  padding: 15px 50px ;
+  background-color: bisque;
 }
 
 .popup {

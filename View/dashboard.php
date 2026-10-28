@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/View/style/general.css">
 </head>
 <body>
-  this is dashboard, Hi <?= $_SESSION['user'] ?>
+  
   <?php require_once __DIR__."/components/popup_message.php"; ?>
   <?php require_once __DIR__."/components/navigation.php"; ?>
 
