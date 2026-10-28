@@ -1,0 +1,24 @@
+
+.popup {
+  background: #22c525; 
+  position: fixed;
+  top: 20px;
+  right:45%;
+  padding: 10px 15px;
+  border-radius: 6px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  animation: fadeOut 3s forwards;
+  font-size: 23px;
+  color: white;
+}
+
+.error{
+  background: #c52d22; 
+}
+
+@keyframes fadeOut {
+    0% { opacity: 1; top: -20px;}
+    8% { top: 20px;}
+    80% { opacity: 1;}
+    100% { opacity: 0; pointer-events: none; }
+}

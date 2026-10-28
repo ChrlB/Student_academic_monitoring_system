@@ -11,11 +11,10 @@
     global $userDAO;
 
     $records = $userDAO->executeQuery("getUserByID",[$login_info["username"]]);
-    $hased_password = password_hash("123", PASSWORD_DEFAULT);
 
     $password =  trim($login_info['password']);
     
-    if(password_verify($password, $hased_password)){
+    if(password_verify($password, $records[0]['password'])){
       $_SESSION["userID"] = trim($login_info['username']);
       $_SESSION['user'] = $records[0]["last_name"];
       $_SESSION["role"] = $records[0]["role"];

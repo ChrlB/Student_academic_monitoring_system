@@ -8,12 +8,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS</title>
+  <link rel="stylesheet" href="/View/style/general.css">
 </head>
 
 <body> 
+  
   <?php if(isset($_SESSION["error"])){ echo $_SESSION["error"]."<br>"?>
 
   <?php } ?>
+  <?php require_once __DIR__."/components/popup_message.php"; ?>
 
   this is login page
   <form action="/login" method="post">

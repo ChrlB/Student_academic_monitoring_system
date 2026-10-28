@@ -53,16 +53,7 @@ $router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.ph
 $router->get('/account',  fn() => require __DIR__ . '/../View/account.php');
 
 
-// $router->get('/student/login',        function(){ require __DIR__ . '/../View/student/login.php';});
-// $router->get('/dashboard',            function(){require_once __DIR__.'/auth.php'; navigateToDashboard();});
-// $router->get('/student/class-sched',  function(){require_once __DIR__.'/auth.php'; require __DIR__ . '/../View/student/class_sched.php';});
-// $router->get('/student/account',      function(){require_once __DIR__.'/auth.php'; require __DIR__ . '/../View/student/account.php';});
-
-$router->get('/faculty/login',  fn() => require __DIR__ . '/../View/faculty_login.php');
-
-
 $router->post('/login', fn($request) => login($request));        
-$router->post('/faculty/login', fn($request) => login($request));
 
 
 $router->post('/logout', fn() => logout());    
