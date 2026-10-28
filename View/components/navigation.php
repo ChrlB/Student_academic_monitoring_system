@@ -26,12 +26,16 @@
       <img src="/View/resources/View Quilt.png" alt="" class="nav_button_icons"> <input type="button" value="CLEARANCE"></a>
     <a class="nav_buttons row" href="/account">
       <img src="/View/resources/View Quilt.png" alt="" class="nav_button_icons"> <input type="button" value="ACCOUNT"></a>
+
+    <form method="post" action="/logout" style="padding: 0px;">
+      <button type="submit" name="" class="nav_buttons row logout_button"> 
+        <img src="/View/resources/View Quilt.png" alt="" class="nav_button_icons"> LOG OUT
+      </button>
+    </form>
   </div>
 
 
 
-  <form method="post" action="/logout">
-    <button type="submit" name="">log out</button>
-  </form>
+  
 </div>
 </div>
