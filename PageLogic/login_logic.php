@@ -3,7 +3,7 @@
 
   function logout(){
     terminateSession();
-    header('Location: /student/login');
+    header('Location: /login');
     exit;
   }
 
@@ -22,7 +22,7 @@
 
       $_SESSION["message"] = "login sucsessful";
 
-      header('Location: /student/dashboard');
+      header('Location: /dashboard');
       exit;
     }
     

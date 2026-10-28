@@ -1,5 +1,5 @@
 <?php
-  require_once __DIR__."/../../PageLogic/account_logic.php";
+  require_once __DIR__."/../PageLogic/grades_logic.php";
 ?>
 
 <!DOCTYPE html>
@@ -10,6 +10,6 @@
   <title>AMS</title>
 </head>
 <body>
-  this is user account page
+  this is grades page
 </body>
 </html>

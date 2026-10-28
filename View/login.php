@@ -1,5 +1,5 @@
 <?php
-  require_once __DIR__.'/../../PageLogic/login_logic.php';
+  require_once __DIR__.'/../PageLogic/login_logic.php';
 ?>
 
 <!DOCTYPE html>
@@ -22,9 +22,9 @@
     <button type="submit">login</button>
   </form>
 
-  <a href="/faculty/login">
+  <!-- <a href="/faculty/login">
     <input type="button" value="login as faculty">
-  </a>
+  </a> -->
 
 </body>
 

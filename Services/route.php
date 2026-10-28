@@ -40,17 +40,17 @@ $router = new Router();
 
 
 $router->get('/', function(){
-    header('Location: /student/login'); exit;
+    header('Location: /login'); exit;
 });
 $router->get('/index.php', function(){
-    header('Location: /student/login'); exit;
+    header('Location: /login'); exit;
 });
 
 
-$router->get('/student/login',  fn() => require __DIR__ . '/../View/student/login.php');
-$router->get('/student/dashboard', fn() => require __DIR__ . '/../View/student/dashboard.php');
-$router->get('/student/class-sched',  fn() => require __DIR__ . '/../View/student/class_sched.php');
-$router->get('/student/account',  fn() => require __DIR__ . '/../View/student/account.php');
+$router->get('/login',  fn() => require __DIR__ . '/../View/login.php');
+$router->get('/dashboard', fn() => require __DIR__ . '/../View/dashboard.php');
+$router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
+$router->get('/account',  fn() => require __DIR__ . '/../View/account.php');
 
 
 // $router->get('/student/login',        function(){ require __DIR__ . '/../View/student/login.php';});
@@ -58,7 +58,7 @@ $router->get('/student/account',  fn() => require __DIR__ . '/../View/student/ac
 // $router->get('/student/class-sched',  function(){require_once __DIR__.'/auth.php'; require __DIR__ . '/../View/student/class_sched.php';});
 // $router->get('/student/account',      function(){require_once __DIR__.'/auth.php'; require __DIR__ . '/../View/student/account.php';});
 
-$router->get('/faculty/login',  fn() => require __DIR__ . '/../View/faculty/faculty_login.php');
+$router->get('/faculty/login',  fn() => require __DIR__ . '/../View/faculty_login.php');
 
 
 $router->post('/login', fn($request) => login($request));        

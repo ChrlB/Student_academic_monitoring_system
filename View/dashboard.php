@@ -1,5 +1,5 @@
 <?php
-  require_once __DIR__.'/../../PageLogic/login_logic.php';
+  require_once __DIR__."/../PageLogic/dashboard_logic.php";
 ?>
 
 <!DOCTYPE html>
@@ -10,9 +10,9 @@
   <title>AMS</title>
 </head>
 <body>
-  this is faculty login page
-  <form action="/faculty/login" method="post">
-    <button type="submit">login</button>
-  </form>
+  this is dashboard, Hi <?= $_SESSION['user'] ?>
+  <?php require_once __DIR__."/components/navigation.php"; ?>
+
+  
 </body>
 </html>

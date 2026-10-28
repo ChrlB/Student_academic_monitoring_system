@@ -1,5 +1,5 @@
 <?php
-  require_once __DIR__."/../../PageLogic/class_sched_logic.php";
+  require_once __DIR__."/../PageLogic/account_logic.php";
 ?>
 
 <!DOCTYPE html>
@@ -7,9 +7,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AMS-Schedule</title>
+  <title>AMS</title>
 </head>
 <body>
-  this is class sched page
+  this is user account page
 </body>
 </html>
