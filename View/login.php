@@ -9,6 +9,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS</title>
   <link rel="stylesheet" href="/View/style/general.css">
+  <link rel="stylesheet" href="/View/style/login.css">
 </head>
 
 <body> 
@@ -19,9 +20,10 @@
   <?php require_once __DIR__."/components/popup_message.php"; ?>
 
   this is login page
-  <form action="/login" method="post">
-    <input type="text" name="username" required>
-    <input type="password" name="password" required>
+  <form action="/login" method="post" class="column login_form border3" >
+    <div class="row">ID:<input type="text" name="username" required></div>
+    <div class="row">Password<input type="password" name="password" required></div>
+    
     <button type="submit">login</button>
   </form>
 

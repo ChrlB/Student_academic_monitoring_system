@@ -19,7 +19,7 @@
       $_SESSION['user'] = $records[0]["last_name"];
       $_SESSION["role"] = $records[0]["role"];
 
-      $_SESSION["message"] = "login sucsessful";
+      $_SESSION["message"] = "Account verification sucsessful";
 
       header('Location: /dashboard');
       exit;

@@ -2,6 +2,7 @@
   require_once __DIR__."/session.php";
 
   if(!isLoggedIn()){
+    $_SESSION["error"] = "Account verification required";
     header('Location: /login');
     exit;
   }

@@ -15,6 +15,16 @@
   scrollbar-color: #D9D9D9 transparent;
 }
 
+.border3{
+  border: 3px solid #D9D9D9;
+}
+
+.border2{
+  border: 2px solid #D9D9D9;
+}
+
+
+
 .navbar{
   border-radius: 20px;
   border: 3px solid #D9D9D9;
@@ -211,7 +221,7 @@ html {
   padding: 10px 15px;
   border-radius: 6px;
   box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-  animation: fadeOut 3s forwards;
+  animation: fadeOut 5s forwards;
   font-size: 23px;
   color: white;
 }
