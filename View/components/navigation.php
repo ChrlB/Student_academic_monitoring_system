@@ -7,7 +7,7 @@ $page = $_SESSION["page"] ?? "";
 
 <div style="display: flex; flex-direction:row; ">
  
-<div class="column navbar">
+<div class="column navbar scrollbar">
 
   <img src="/View/resources/logo1.png" alt="" class="nav_logo">
   <div class="buttons_section">

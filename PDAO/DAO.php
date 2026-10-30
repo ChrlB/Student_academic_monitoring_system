@@ -8,7 +8,7 @@ $options = [
     PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
 ];
 
-$db_connection = new PDO("mysql:host=localhost;port=3306;dbname=Student_academic_monitoring_db","root","",$options);
+$db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db","root","",$options);
 
 
 $userDAO = new \Chrlb\PhpDao\PHPDAO($db_connection);
