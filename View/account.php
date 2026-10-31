@@ -18,26 +18,16 @@
     <div class="column" style="flex: 1;">
       <?php require_once __DIR__."/components/header.php"; ?>
       <main class="column scrollbar" >
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
-        <div class="box"></div>
+         <img src="/get-profile" width="150" height="150" alt="No profile picture yet">
+
+        <?php if (!empty($uploadStatusMessage)): ?>
+          <p><?= htmlspecialchars($uploadStatusMessage) ?></p>
+        <?php endif; ?>
+
+        <form method="post" enctype="multipart/form-data" action="/upload-profile">
+          <input type="file" name="profile_picture" accept="image/jpeg,image/png,image/webp" required>
+          <button type="submit">Upload</button>
+        </form>
       </main>
     </div>
   </div>

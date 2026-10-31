@@ -12,6 +12,7 @@ $db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db","root","
 
 
 $userDAO = new \Chrlb\PhpDao\PHPDAO($db_connection);
+$studentDAO = new \Chrlb\PhpDao\PHPDAO($db_connection);
 
 $userDAO->prepareStatement("getUsers", 
   "SELECT * FROM users;"
@@ -19,7 +20,33 @@ $userDAO->prepareStatement("getUsers",
 
 $userDAO->prepareStatement("getUserByID", 
   "SELECT * FROM users WHERE userID = ?;"
-);   
+);
+
+$userDAO->prepareStatement("uploadStudentProfile", 
+  "UPDATE students
+    SET image_data       = ?,
+        mime_type        = ?
+  WHERE concat(year(date_created),lpad(facultyID,5,0)) = ?"
+);
+
+$userDAO->prepareStatement("uploadFacultyProfile", 
+  "UPDATE faculty
+    SET image_data       = ?,
+        mime_type        = ?
+  WHERE concat('F',year(date_created),lpad(facultyID,5,0)) = ?"
+);  
+
+$userDAO->prepareStatement("getStudentProfile", 
+  $findProfilePictureSql = "SELECT image_data, mime_type
+                          FROM students
+  WHERE concat(year(date_created),lpad(studentID,5,0)) = ?"
+);
+
+$userDAO->prepareStatement("getFacultyProfile", 
+  $findProfilePictureSql = "SELECT image_data, mime_type
+                          FROM faculty
+  WHERE concat('F',year(date_created),lpad(facultyID,5,0)) = ?"
+);  
 
 
 // $studentDAO = new \Chrlb\PhpDao\PHPDAO($db_connection);

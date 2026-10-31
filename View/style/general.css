@@ -179,8 +179,9 @@ header{
   justify-content: space-between;
 
   .profile_icon{
-    border: 1px solid red;
-    width: 30px;
+    border: 1.5px solid #D9D9D9;
+    width: 40px;
+    border-radius: 50%;
   }
 }
 

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/../PageLogic/login_logic.php';
 require_once __DIR__."/../Services/session.php";
+require_once __DIR__."/../Services/imageHandler.php";
 
 class Router {
     private array $routes = [];
@@ -56,5 +57,7 @@ $router->get('/syllabus',  fn() => require __DIR__ . '/../View/syllabus.php');
 $router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    
  
+$router->post('/upload-profile', fn() => uploadProfile());
+$router->get('/get-profile', fn() => getProfilePic());
 
 $router->dispatch();
