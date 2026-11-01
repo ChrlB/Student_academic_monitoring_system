@@ -1,22 +1,7 @@
 <?php
   require_once __DIR__."/../PageLogic/clearance_logic.php";
 
-// 1. Simulate data coming from a MySQL database, API, or local array
-$browser_data = [
-    "Chrome"  => 65.5,
-    "Safari"  => 18.2,
-    "Edge"    => 5.2,
-    "Firefox" => 3.1,
-    "Opera"   => 2.3
-];
-
-// 2. Separate keys (labels) and values (data) into separate arrays
-$labels = array_keys($browser_data);
-$data   = array_values($browser_data);
-
-// 3. Convert arrays into JSON strings so JavaScript can safely read them
-$js_labels = json_encode($labels);
-$js_data   = json_encode($data);
+  
 ?>
 
 <!DOCTYPE html>
@@ -26,6 +11,7 @@ $js_data   = json_encode($data);
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS</title>
 <link rel="stylesheet" href="/View/style/general.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
   
@@ -56,8 +42,13 @@ $js_data   = json_encode($data);
           <input type="file" name="profile_picture" accept="image/jpeg,image/png,image/webp" required>
           <button type="submit">change profile</button>
         </form>
+
+        <div style="width:150px; height:400px; border:3px solid #fffdfd; border-radius:30px; padding:20px; color:aliceblue; background-color: rgba(40,40,40,0.2);">
+          <canvas id="pie"></canvas>
+        </div>
       </main>
     </div>
   </div>
+  <?= require_once __DIR__."/script/clearance.php"; ?>
 </body>
 </html>

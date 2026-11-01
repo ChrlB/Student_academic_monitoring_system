@@ -41,5 +41,6 @@
       </main>
     </div>
   </div>
+  <script src="/View/script/clearance.php"></script>
 </body>
 </html>
