@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../vendor/autoload.php';
+// require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/DriveStorageService.php';
 require_once __DIR__ . '/DocumentUploadService.php';
 
@@ -51,14 +51,14 @@ function uploadDocument(): void
             $savedMimeType
         );
 
-        $userDAO->executeUpdate('saveDocument', [
-            $_SESSION['userID'],
-            $_SESSION['role'],
-            $driveFileId,
-            $validation['originalName'],
-            $savedMimeType,
-            (int) $uploadedFile['size'],
-        ]);
+        // $userDAO->executeUpdate('saveDocument', [
+        //     $_SESSION['userID'],
+        //     $_SESSION['role'],
+        //     $driveFileId,
+        //     $validation['originalName'],
+        //     $savedMimeType,
+        //     (int) $uploadedFile['size'],
+        // ]);
 
         $_SESSION['message'] = 'Document uploaded!';
     } catch (Throwable $error) {
