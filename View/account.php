@@ -9,6 +9,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS</title>
 <link rel="stylesheet" href="/View/style/general.css">
+<link rel="stylesheet" href="/View/style/account.css">
 </head>
 <body>
   
@@ -18,7 +19,7 @@
     <div class="column" style="flex: 1;">
       <?php require_once __DIR__."/components/header.php"; ?>
       <main class="column scrollbar" >
-        <img src="/get-profile" width="150" height="150" alt="No profile picture yet">
+        <img src="/get-profile"  alt="No profile picture yet" class="profile_pic">
         <?php getUserInfo(); ?>
       </main>
     </div>

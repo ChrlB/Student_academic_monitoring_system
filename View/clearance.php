@@ -1,5 +1,22 @@
 <?php
   require_once __DIR__."/../PageLogic/clearance_logic.php";
+
+// 1. Simulate data coming from a MySQL database, API, or local array
+$browser_data = [
+    "Chrome"  => 65.5,
+    "Safari"  => 18.2,
+    "Edge"    => 5.2,
+    "Firefox" => 3.1,
+    "Opera"   => 2.3
+];
+
+// 2. Separate keys (labels) and values (data) into separate arrays
+$labels = array_keys($browser_data);
+$data   = array_values($browser_data);
+
+// 3. Convert arrays into JSON strings so JavaScript can safely read them
+$js_labels = json_encode($labels);
+$js_data   = json_encode($data);
 ?>
 
 <!DOCTYPE html>

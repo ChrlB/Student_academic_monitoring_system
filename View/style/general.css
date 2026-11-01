@@ -63,8 +63,14 @@
 
     .nav_button_icons{
       border: 0;
-      width: 40px;
+      height: 40px;
+      flex-shrink: 0;
       /* height: 40px; */
+    }
+    .nav_icon_holder{
+      width: 40px;
+      justify-content: center;
+      flex-shrink: 0;
     }
 
     input[type='button']{

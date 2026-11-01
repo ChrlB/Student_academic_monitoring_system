@@ -17,7 +17,6 @@ $userDAO = new PHPDAO($db_connection);
 $studentDAO = new PHPDAO($db_connection);
 
 $userDAO->prepareStatement("getUsers",  "SELECT * FROM users;");
-
 $userDAO->prepareStatement("getUserByID",  "SELECT * FROM users WHERE userID = ?;");
 
 $userDAO->prepareStatement(
@@ -27,7 +26,6 @@ $userDAO->prepareStatement(
         mime_type        = ?
   WHERE concat(year(date_created),lpad(facultyID,5,0)) = ?"
 );
-
 $userDAO->prepareStatement(
   "uploadFacultyProfile",
   "UPDATE faculty
@@ -35,24 +33,18 @@ $userDAO->prepareStatement(
         mime_type        = ?
   WHERE concat('F',year(date_created),lpad(facultyID,5,0)) = ?"
 );
-
-
-
-
 $userDAO->prepareStatement(
   "getStudentProfile",
   "SELECT image_data, mime_type
                           FROM students
   WHERE concat(year(date_created),lpad(studentID,5,0)) = ?"
 );
-
 $userDAO->prepareStatement(
   "getFacultyProfile",
   "SELECT image_data, mime_type
                           FROM faculty
   WHERE concat('F',year(date_created),lpad(facultyID,5,0)) = ?"
 );
-
 $userDAO->prepareStatement(
   "getStudentInfo",
   "SELECT 
@@ -73,7 +65,6 @@ $userDAO->prepareStatement(
       FROM students
       WHERE  concat(year(date_created),lpad(studentID,5,0)) = ?"
 );
-
 $userDAO->prepareStatement(
   "getFacultyInfo",
   "SELECT 
@@ -96,13 +87,3 @@ $userDAO->prepareStatement(
 
 
 
-
-
-
-// $studentDAO = new \Chrlb\PhpDao\PHPDAO($db_connection);
-// $gradesDAO = new \Chrlb\PhpDao\PHPDAO($db_connection);
-
-// $studentDAO->prepareStatement("getAllStudents",
-//   "SELECT * FROM tbl_users;",
-//   "get all users records"
-// );

@@ -144,7 +144,7 @@ function getProfilePic(){
     header('Cache-Control: private, no-cache');
 
     if ($imageBinaryData === null || $imageBinaryData === '' || $storedMimeType === null) {
-        $defaultPicturePath = __DIR__ . '/../View/resources/View Quilt.png';
+        $defaultPicturePath = __DIR__ . '/../View/resources/User.png';
 
         if (!is_file($defaultPicturePath)) {
             http_response_code(404);
