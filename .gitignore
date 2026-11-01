@@ -1,0 +1,14 @@
+# Google credentials
+/credentials/
+*.json.key
+service-account*.json
+*-service-account.json
+
+# Dependencies
+/vendor/
+
+# Local config with secrets
+/config.local.php
+.env
+test_drive.php
+*_token.php

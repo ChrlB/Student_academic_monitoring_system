@@ -18,7 +18,7 @@
     <div class="column" style="flex: 1;">
       <?php require_once __DIR__."/components/header.php"; ?>
       <main class="column scrollbar" >
-
+        
         
       </main>
     </div>
