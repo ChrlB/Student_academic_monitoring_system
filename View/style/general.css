@@ -63,13 +63,14 @@
 
     .nav_button_icons{
       border: 0;
-      height: 40px;
+      height: 30px;
       flex-shrink: 0;
       /* height: 40px; */
     }
     .nav_icon_holder{
       width: 40px;
       justify-content: center;
+      align-items: center;
       flex-shrink: 0;
     }
 
@@ -88,6 +89,7 @@
 
   .logout_button{
     padding: 0;
+    padding-left: 10px;
     color: #D9D9D9;
     border: 0;
     text-align: left;

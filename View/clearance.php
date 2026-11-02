@@ -43,7 +43,7 @@
           <button type="submit">change profile</button>
         </form>
 
-        <div style="width:150px; height:400px; border:3px solid #fffdfd; border-radius:30px; padding:20px; color:aliceblue; background-color: rgba(40,40,40,0.2);">
+        <div style="width:150px; height:400px; border:3px solid #fffdfd; border-radius:30px; padding:20px; color:aliceblue; background-color: rgba(40,40,40,0.3);">
           <canvas id="pie"></canvas>
         </div>
       </main>

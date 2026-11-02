@@ -10,6 +10,7 @@ $page = $_SESSION["page"] ?? "";
 <div class="column navbar scrollbar">
 
   <img src="/View/resources/logo1.png" alt="" class="nav_logo">
+  
   <div class="buttons_section">
     
     
@@ -42,10 +43,10 @@ $page = $_SESSION["page"] ?? "";
     <a class="nav_buttons row ACCOUNT" href="/account">
       <div class="nav_icon_holder row"><img src="/View/resources/User.png" alt="" class="nav_button_icons"> </div>
       <input type="button" value="ACCOUNT"></a>
-
-    <form method="post" action="/logout" style="padding: 0px;">
+    <hr>
+    <form method="post" action="/logout" >
       <button type="submit" name="" class="nav_buttons row logout_button"> 
-        <img src="/View/resources/Logout.png" alt="" class="nav_button_icons"> LOG OUT
+        <div class="nav_icon_holder row"><img src="/View/resources/Logout.png" alt="" class="nav_button_icons"></div><div>LOG OUT</div> 
       </button>
     </form>
   </div>
