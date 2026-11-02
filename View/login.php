@@ -8,8 +8,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS</title>
-  <link rel="stylesheet" href="/View/style/general.css">
-  <link rel="stylesheet" href="/View/style/login.css">
+  <link rel="stylesheet" href="<?= BASE_PATH?>/View/style/general.css">
+  <link rel="stylesheet" href="<?= BASE_PATH?>/View/style/login.css">
 </head>
 
 <body> 
@@ -20,7 +20,7 @@
   <?php require_once __DIR__."/components/popup_message.php"; ?>
 
   this is login page
-  <form action="/login" method="post" class="column login_form border3" >
+  <form action="<?= BASE_PATH?>/login" method="post" class="column login_form border3" >
     <div class="row">ID:<input type="text" name="username" required></div>
     <div class="row">Password<input type="password" name="password" required></div>
     

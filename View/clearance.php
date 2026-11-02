@@ -10,7 +10,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS</title>
-<link rel="stylesheet" href="/View/style/general.css">
+<link rel="stylesheet" href="<?= BASE_PATH?>/View/style/general.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -26,19 +26,19 @@
                 style="width:100%; height:100%; border:0;"></iframe>
         </div> -->
         
-        <form method="post" enctype="multipart/form-data" action="/upload-document">
+        <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH?>/upload-document">
             <input type="file" name="document"
                   accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   required>
             <button type="submit">Upload document</button>
         </form>
-        <img src="/get-profile" width="150" height="150" alt="No profile picture yet">
+        <img src="<?= BASE_PATH?>/get-profile" width="150" height="150" alt="No profile picture yet">
 
         <?php if (!empty($uploadStatusMessage)): ?>
           <p><?= htmlspecialchars($uploadStatusMessage) ?></p>
         <?php endif; ?>
 
-        <form method="post" enctype="multipart/form-data" action="/upload-profile">
+        <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH?>/upload-profile">
           <input type="file" name="profile_picture" accept="image/jpeg,image/png,image/webp" required>
           <button type="submit">change profile</button>
         </form>
