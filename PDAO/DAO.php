@@ -10,7 +10,7 @@ $options = [
   PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
 ];
 
-$db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root", "", $options);
+$db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root", "John_Chrl@2006;", $options);
 
 
 $userDAO = new PHPDAO($db_connection);
@@ -24,7 +24,7 @@ $userDAO->prepareStatement(
   "UPDATE students
     SET image_data       = ?,
         mime_type        = ?
-  WHERE concat(year(date_created),lpad(facultyID,5,0)) = ?"
+  WHERE concat(year(date_created),lpad(studentID,5,0)) = ?"
 );
 $userDAO->prepareStatement(
   "uploadFacultyProfile",
