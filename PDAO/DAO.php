@@ -10,7 +10,7 @@ $options = [
   PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
 ];
 
-$db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root", "John_Chrl@2006;", $options);
+$db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root", "", $options);
 
 
 $userDAO = new PHPDAO($db_connection);
