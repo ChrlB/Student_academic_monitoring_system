@@ -2,13 +2,15 @@
   
 
   function logout(){
+    global $base;
     terminateSession();
-    header('Location: /login');
+    header('Location: '.$base.'/login');
     exit;
   }
 
   function login($login_info){
     global $userDAO;
+    global $base;
 
     $records = $userDAO->executeQuery("getUserByID",[$login_info["username"]]);
 
@@ -21,12 +23,12 @@
 
       $_SESSION["message"] = "Account verification sucsessful";
 
-      header('Location: /dashboard');
+      header('Location: '.$base.'/dashboard');
       exit;
     }
     
     $_SESSION["error"] = "login failed";
-    header('Location: /');
+    header('Location: '.$base.'/');
     exit;
 
     

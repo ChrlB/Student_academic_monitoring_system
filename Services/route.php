@@ -33,10 +33,12 @@ $router = new Router();
 
 
 $router->get('/', function(){
-    header('Location: /login'); exit;
+    global $base;
+    header('Location: '.$base.'/login'); exit;
 });
 $router->get('/index.php', function(){
-    header('Location: /login'); exit;
+    global $base;
+    header('Location: '.$base.'/login'); exit;
 });
 
 
