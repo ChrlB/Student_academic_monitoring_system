@@ -117,7 +117,7 @@ function uploadProfile(){
       }
 
       
-      header('Location: /dashboard');
+      header('Location: '.BASE_PATH.'/dashboard');
       exit;
   }
 }

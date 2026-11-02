@@ -17,8 +17,25 @@ class Router {
 
     public function dispatch() {
 
+        // $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+        // $method = $_SERVER['REQUEST_METHOD'];
+
+        // if (isset($this->routes[$method][$path])) {
+        //     call_user_func($this->routes[$method][$path], $_REQUEST);
+        // } else {
+        //     http_response_code(404);
+        //     echo "404 - Page Not Found";
+        // }
+
         $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $method = $_SERVER['REQUEST_METHOD'];
+
+        if (BASE_PATH !== '' && strpos($path, BASE_PATH) === 0) {
+            $path = substr($path, strlen(BASE_PATH));
+        }
+        if ($path === '' || $path === false) {
+            $path = '/';
+        }
 
         if (isset($this->routes[$method][$path])) {
             call_user_func($this->routes[$method][$path], $_REQUEST);
@@ -33,10 +50,10 @@ $router = new Router();
 
 
 $router->get('/', function(){
-    header('Location: /login'); exit;
+    header('Location: '.BASE_PATH.'/login'); exit;
 });
 $router->get('/index.php', function(){
-    header('Location: /login'); exit;
+    header('Location: '.BASE_PATH.'/login'); exit;
 });
 
 

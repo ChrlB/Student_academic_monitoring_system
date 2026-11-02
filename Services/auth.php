@@ -3,7 +3,7 @@
 
   if(!isLoggedIn()){
     $_SESSION["error"] = "Account verification required";
-    header('Location: /login');
+    header('Location: '.BASE_PATH.'/login');
     exit;
   }
 
