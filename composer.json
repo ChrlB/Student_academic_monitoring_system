@@ -2,6 +2,9 @@
     "require": {
         "google/apiclient": "^2.20",
         "chrlb/pdao": "^0.2.0",
-        "ext-gd": "*"
+        "ext-gd": "*",
+        "ext-exif": "*",
+        "ext-fileinfo": "*",
+        "ext-zip": "*"
     }
 }
