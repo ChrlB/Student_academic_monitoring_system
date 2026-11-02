@@ -50,19 +50,10 @@ $router = new Router();
 
 
 $router->get('/', function(){
-<<<<<<< HEAD
-    global $base;
-    header('Location: '.$base.'/login'); exit;
-});
-$router->get('/index.php', function(){
-    global $base;
-    header('Location: '.$base.'/login'); exit;
-=======
     header('Location: '.BASE_PATH.'/login'); exit;
 });
 $router->get('/index.php', function(){
     header('Location: '.BASE_PATH.'/login'); exit;
->>>>>>> 762bac65d9bdd87d93ea7b06931500bb3d6f4638
 });
 
 

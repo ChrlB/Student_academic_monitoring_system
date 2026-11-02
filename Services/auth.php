@@ -4,11 +4,7 @@
   if(!isLoggedIn()){
     global $base;
     $_SESSION["error"] = "Account verification required";
-<<<<<<< HEAD
-    header('Location: '.$base.'/login');
-=======
     header('Location: '.BASE_PATH.'/login');
->>>>>>> 762bac65d9bdd87d93ea7b06931500bb3d6f4638
     exit;
   }
 

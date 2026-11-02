@@ -4,11 +4,7 @@
   function logout(){
     global $base;
     terminateSession();
-<<<<<<< HEAD
-    header('Location: '.$base.'/login');
-=======
     header('Location: '.BASE_PATH.'/login');
->>>>>>> 762bac65d9bdd87d93ea7b06931500bb3d6f4638
     exit;
   }
 
@@ -27,20 +23,12 @@
 
       $_SESSION["message"] = "Account verification sucsessful";
 
-<<<<<<< HEAD
-      header('Location: '.$base.'/dashboard');
-=======
       header('Location: '.BASE_PATH.'/dashboard');
->>>>>>> 762bac65d9bdd87d93ea7b06931500bb3d6f4638
       exit;
     }
     
     $_SESSION["error"] = "login failed";
-<<<<<<< HEAD
-    header('Location: '.$base.'/');
-=======
     header('Location: '.BASE_PATH.'/');
->>>>>>> 762bac65d9bdd87d93ea7b06931500bb3d6f4638
     exit;
 
     
