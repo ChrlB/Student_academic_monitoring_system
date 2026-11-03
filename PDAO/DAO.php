@@ -16,67 +16,40 @@ $db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root",
 $userDAO = new PHPDAO($db_connection);
 $studentDAO = new PHPDAO($db_connection);
 
-$userDAO->prepareStatement("getUsers",  
-  "SELECT
+$users = "SELECT
       CONCAT(
           'F',
-          YEAR(`ams_db`.`faculty`.`date_created`),
-          CONVERT(
-              LPAD(`ams_db`.`faculty`.`facultyID`, 5, 0) USING utf8mb4
-          )
+          YEAR(F.`date_created`),
+          LPAD(F.`facultyID`, 5, 0)
       ) AS `userID`,
-      `ams_db`.`faculty`.`first_name` AS `first_name`,
-      `ams_db`.`faculty`.`middle_name` AS `middle_name`,
-      `ams_db`.`faculty`.`last_name` AS `last_name`,
-      `ams_db`.`faculty`.`password` AS `password`,
-      `ams_db`.`faculty`.`role` AS `role`
+      F.`first_name` AS `first_name`,
+      F.`middle_name` AS `middle_name`,
+      F.`last_name` AS `last_name`,
+      F.`password` AS `password`,
+      F.`role` AS `role`
   FROM
-      `ams_db`.`faculty`
+      `faculty` as F
   UNION
   SELECT
       CONCAT(
-          YEAR(`ams_db`.`students`.`date_created`),
-          LPAD(`ams_db`.`students`.`studentID`, 5, 0)
+          YEAR(S.`date_created`),
+          LPAD(S.`studentID`, 5, 0)
       ) AS `userID`,
-      `ams_db`.`students`.`first_name` AS `first_name`,
-      `ams_db`.`students`.`middle_name` AS `middle_name`,
-      `ams_db`.`students`.`last_name` AS `last_name`,
-      `ams_db`.`students`.`password` AS `password`,
+      S.`first_name` AS `first_name`,
+      S.`middle_name` AS `middle_name`,
+      S.`last_name` AS `last_name`,
+      S.`password` AS `password`,
       'student' AS `role`
   FROM
-      `ams_db`.`students`"
+      `students` as S";
+
+$userDAO->prepareStatement("getUsers",  
+  $users
 );
 
 $userDAO->prepareStatement("getUserByID",  
   "SELECT * 
-   FROM (SELECT
-      CONCAT(
-          'F',
-          YEAR(`ams_db`.`faculty`.`date_created`),
-          CONVERT(
-              LPAD(`ams_db`.`faculty`.`facultyID`, 5, 0) USING utf8mb4
-          )
-      ) AS `userID`,
-      `ams_db`.`faculty`.`first_name` AS `first_name`,
-      `ams_db`.`faculty`.`middle_name` AS `middle_name`,
-      `ams_db`.`faculty`.`last_name` AS `last_name`,
-      `ams_db`.`faculty`.`password` AS `password`,
-      `ams_db`.`faculty`.`role` AS `role`
-  FROM
-      `ams_db`.`faculty`
-  UNION
-  SELECT
-      CONCAT(
-          YEAR(`ams_db`.`students`.`date_created`),
-          LPAD(`ams_db`.`students`.`studentID`, 5, 0)
-      ) AS `userID`,
-      `ams_db`.`students`.`first_name` AS `first_name`,
-      `ams_db`.`students`.`middle_name` AS `middle_name`,
-      `ams_db`.`students`.`last_name` AS `last_name`,
-      `ams_db`.`students`.`password` AS `password`,
-      'student' AS `role`
-  FROM
-      `ams_db`.`students`) AS users
+   FROM ($users) AS users
   WHERE users.userID = ?;"
   );
 
