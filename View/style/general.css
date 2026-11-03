@@ -189,6 +189,7 @@ header{
   .profile_icon{
     border: 1.5px solid #D9D9D9;
     width: 40px;
+    height: 40px;
     border-radius: 50%;
   }
 }
