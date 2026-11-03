@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "330a1d3b3d152dc1cba0c2055faffd71",
+    "content-hash": "5a34802e70023a8286c023aad3aef0ac",
     "packages": [
         {
             "name": "chrlb/pdao",
@@ -1237,7 +1237,12 @@
     "stability-flags": {},
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": {},
+    "platform": {
+        "ext-gd": "*",
+        "ext-exif": "*",
+        "ext-fileinfo": "*",
+        "ext-zip": "*"
+    },
     "platform-dev": {},
     "plugin-api-version": "2.9.0"
 }
