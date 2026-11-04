@@ -72,7 +72,7 @@ $router->get('/projects',  fn() => require __DIR__ . '/../View/projects.php');
 $router->get('/syllabus',  fn() => require __DIR__ . '/../View/syllabus.php');
 
 $router->get('/registration',  fn() => require __DIR__ . '/../View/registration.php');
-
+$router->post('/registration',  fn($request) => require __DIR__ . '/../View/registration.php');
 
 $router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    
