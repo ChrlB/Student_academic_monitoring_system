@@ -10,7 +10,6 @@
 
   function login($login_info){
     global $userDAO;
-    global $base;
 
     $records = $userDAO->executeQuery("getUserByID",[$login_info["username"]]);
 

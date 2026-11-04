@@ -43,15 +43,9 @@ $users = "SELECT
   FROM
       `students` as S";
 
-$userDAO->prepareStatement("getUsers",  
-  $users
-);
+$userDAO->prepareStatement("getUsers",  $users);
 
-$userDAO->prepareStatement("getUserByID",  
-  "SELECT * 
-   FROM ($users) AS users
-  WHERE users.userID = ?;"
-  );
+$userDAO->prepareStatement("getUserByID",  "SELECT *  FROM ($users) AS users WHERE users.userID = ?;" );
 
 $userDAO->prepareStatement( "uploadStudentProfile",
   "UPDATE students
@@ -68,14 +62,14 @@ $userDAO->prepareStatement("uploadFacultyProfile",
 $userDAO->prepareStatement( "getStudentProfile",
   "SELECT image_data, mime_type
                           FROM students
-  WHERE concat(year(date_created),lpad(studentID,5,0)) = ?"
+  WHERE concat(year(date_created),lpad(studentID,5,0)) = ?;"
 );
 $userDAO->prepareStatement( "getFacultyProfile",
   "SELECT image_data, mime_type
                           FROM faculty
   WHERE concat('F',year(date_created),lpad(facultyID,5,0)) = ?"
 );
-$userDAO->prepareStatement(  "getStudentInfo",
+$userDAO->prepareStatement( "getStudentInfo",
   "SELECT 
       concat(year(date_created),lpad(studentID,5,0)) as ID ,
       first_name,
@@ -94,7 +88,7 @@ $userDAO->prepareStatement(  "getStudentInfo",
       FROM students
       WHERE  concat(year(date_created),lpad(studentID,5,0)) = ?"
 );
-$userDAO->prepareStatement(  "getFacultyInfo",
+$userDAO->prepareStatement( "getFacultyInfo",
   "SELECT 
       concat('F',year(date_created),lpad(facultyID,5,0)) as ID ,
       first_name,

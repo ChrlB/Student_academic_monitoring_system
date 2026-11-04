@@ -1,13 +1,13 @@
 <?php
-// require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/DriveStorageService.php';
 require_once __DIR__ . '/DocumentUploadService.php';
 
-function uploadDocument(): void
+function uploadDocument($pageAfterUpload): void
 {
     global $userDAO;
 
-    $pageAfterUpload = '/documents'; // change to the page that shows the form
+    //$pageAfterUpload = BASE_PATH.'/documents';
+    //$pageAfterUpload = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
     if (empty($_SESSION['userID'])) {
         http_response_code(403);
@@ -101,11 +101,11 @@ function downloadDocument(): void
 
     // YOUR RULE: who may open this document? For example only the owner,
     // plus certain roles. Adjust the column names to match your table.
-    $isOwner = ($document['owner_id'] === (string) $loggedInUserId);
-    if (!$isOwner) {
-        http_response_code(403);
-        exit;
-    }
+    // $isOwner = ($document['owner_id'] === (string) $loggedInUserId);
+    // if (!$isOwner) {
+    //     http_response_code(403);
+    //     exit;
+    // }
 
     $driveConfig = require __DIR__ . '/../config.local.php';
     $driveStorageService = new DriveStorageService(

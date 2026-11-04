@@ -71,6 +71,8 @@ $router->get('/grades', fn() => require __DIR__ . '/../View/grades.php');
 $router->get('/projects',  fn() => require __DIR__ . '/../View/projects.php');
 $router->get('/syllabus',  fn() => require __DIR__ . '/../View/syllabus.php');
 
+$router->get('/registration',  fn() => require __DIR__ . '/../View/registration.php');
+
 
 $router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    
@@ -78,6 +80,6 @@ $router->post('/logout', fn() => logout());
 $router->post('/upload-profile', fn() => uploadProfile());
 $router->get('/get-profile', fn() => getProfilePic());
 
-$router->post('/upload-document', fn() => uploadDocument());
+$router->post('/upload-document', fn() => uploadDocument(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH).""));
 
 $router->dispatch();
