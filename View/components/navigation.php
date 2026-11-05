@@ -18,7 +18,7 @@ $page = $_SESSION["page"] ?? "";
       <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/View Quilt.png" alt="" class="nav_button_icons"> </div>
       <input type="button" value="DASHBOARD"></a>
 
-    <?php if(!in_array($_SESSION["role"], ["registrar"])): ?>
+    <?php if(in_array($_SESSION["role"], ["program coordinator","dean","prof","student"])): ?>
       <a class="nav_buttons row SCHEDULE" href="<?= BASE_PATH?>/class-sched">
         <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Calendar.png" alt="" class="nav_button_icons"> </div>
         <input type="button" value="SCHEDULE"></a>
