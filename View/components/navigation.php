@@ -17,9 +17,13 @@ $page = $_SESSION["page"] ?? "";
     <a class="nav_buttons row DASHBOARD" href="<?= BASE_PATH?>/dashboard">
       <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/View Quilt.png" alt="" class="nav_button_icons"> </div>
       <input type="button" value="DASHBOARD"></a>
-    <a class="nav_buttons row SCHEDULE" href="<?= BASE_PATH?>/class-sched">
-      <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Calendar.png" alt="" class="nav_button_icons"> </div>
-      <input type="button" value="SCHEDULE"></a>
+
+    <?php if(!in_array($_SESSION["role"], ["registrar"])): ?>
+      <a class="nav_buttons row SCHEDULE" href="<?= BASE_PATH?>/class-sched">
+        <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Calendar.png" alt="" class="nav_button_icons"> </div>
+        <input type="button" value="SCHEDULE"></a>
+    <?php endif ?>
+
     <a class="nav_buttons row GRADES" href="<?= BASE_PATH?>/grades">
       <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Grades.png" alt="" class="nav_button_icons"></div>
       <input type="button" value="GRADES"></a>
