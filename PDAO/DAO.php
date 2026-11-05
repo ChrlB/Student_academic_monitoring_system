@@ -166,8 +166,7 @@ $clearanceDAO->prepareStatement("getPieChartData",
  " SELECT
     COALESCE(SUM(UPPER(status) = 'CLEARED'), 0)  AS cleared,
     COALESCE(SUM(UPPER(status) = 'REJECTED'), 0) AS rejected,
-    COALESCE(SUM(UPPER(status) = 'PENDING'), 0) AS pending,
-    COALESCE(SUM(UPPER(status) = 'NOT YET CLEARED'), 0) AS not_yet_cleared
+    COALESCE(SUM(UPPER(status) in ( 'PENDING','NOT YET CLEARED')), 0) AS not_yet_cleared
     FROM ($cleranceUpdate) AS updates
   "
 );

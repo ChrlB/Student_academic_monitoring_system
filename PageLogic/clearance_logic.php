@@ -11,3 +11,13 @@ $updates_record = $clearanceDAO->executeQuery("getClearanceUpdates",[$userID,$us
 function statusClass(string $status): string{
     return strtoupper($status) === 'CLEARED' ? 'status_cleared' : 'status_rejected';
 }
+
+
+$data = $clearanceDAO->executeQuery("getPieChartData",[$userID,$userID,$userID]);
+// var_dump($data);
+$labels = json_encode(['Cleared', 'Rejected', 'Not yet cleared']);
+$values = json_encode([
+    (int) ($data[0]['cleared'] ?? 0),
+    (int) ($data[0]['rejected'] ?? 0),
+    (int) ($data[0]['not_yet_cleared'] ?? 0),
+]);
