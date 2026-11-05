@@ -14,7 +14,7 @@ $db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root",
 
 
 $userDAO = new PHPDAO($db_connection);
-$studentDAO = new PHPDAO($db_connection);
+$clearanceDAO = new PHPDAO($db_connection);
 
 $users = "SELECT
       CONCAT(
@@ -42,6 +42,53 @@ $users = "SELECT
       'student' AS `role`
   FROM
       `students` as S";
+
+$cleranceUpdate = "SELECT
+        'faculty' AS category,
+        f.role AS item_name,
+        CONCAT(f.last_name, ', ', f.first_name) AS name,
+        fc.studentID AS studentID,
+        DATE(fc.date_cleared) AS date_cleared,
+        fc.remarks AS remarks,
+        fc.status AS status
+    FROM faculty_clearance AS fc
+    JOIN faculty AS f ON f.facultyID = fc.facultyID
+    JOIN students AS S ON S.studentID = fc.studentID
+    WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
+
+    UNION ALL
+
+    SELECT
+        'office',
+        o.name,
+        CONCAT(f.last_name, ', ', f.first_name),
+        oc.studentID,
+        DATE(oc.date_cleared),
+        oc.remarks,
+        oc.status
+    FROM office_clearance AS oc
+    JOIN office AS o ON o.officeID = oc.officeID
+    JOIN faculty AS f ON f.facultyID = o.facultyID
+    JOIN students AS S ON S.studentID = oc.studentID
+    WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
+
+    UNION ALL
+
+    SELECT
+        'subjects',
+        su.name,
+        es.subjectID,
+        es.studentID,
+        DATE(sc.date_cleared),
+        sc.remarks,
+        sc.status
+    FROM subject_clearance AS sc
+    JOIN enrolled_subjects AS es ON es.enrolled_subjectID = sc.enrolled_subjectID
+    JOIN subjects AS su ON su.subjectID = es.subjectID
+    JOIN students AS S ON S.studentID = es.studentID
+    WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
+";
+
 
 $userDAO->prepareStatement("getUsers",  $users);
 
@@ -107,5 +154,21 @@ $userDAO->prepareStatement( "getFacultyInfo",
   WHERE  concat('F',year(date_created),lpad(facultyID,5,0)) = ?"
 );
 
+$clearanceDAO->prepareStatement("getClearanceUpdates",
+ " SELECT category, item_name, name, studentID, date_cleared, remarks, status
+  FROM ($cleranceUpdate) AS updates
+  WHERE upper(status) in ('CLEARED','REJECTED')
+  ORDER BY date_cleared DESC LIMIT 50
+  "
+);
 
+$clearanceDAO->prepareStatement("getPieChartData",
+ " SELECT
+    COALESCE(SUM(UPPER(status) = 'CLEARED'), 0)  AS cleared,
+    COALESCE(SUM(UPPER(status) = 'REJECTED'), 0) AS rejected,
+    COALESCE(SUM(UPPER(status) = 'PENDING'), 0) AS pending,
+    COALESCE(SUM(UPPER(status) = 'NOT YET CLEARED'), 0) AS not_yet_cleared
+    FROM ($cleranceUpdate) AS updates
+  "
+);
 
