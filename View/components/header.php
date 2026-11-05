@@ -1,8 +1,17 @@
 <div class="row">
   <header>
     <h2>
-    <?php echo $_SESSION["page"];?>
-</h2> 
+    <?php if($_SESSION["page"] == "SCHEDULE"):?>
+      <?php if($_SESSION["role"] == "student"): echo "Hi Student! Here’s your schedule"?>
+      <?php elseif($_SESSION["role"] == "prof"): echo "Hi Ma’am/Sir! Here’s your schedule"?>
+      <?php elseif($_SESSION["role"] == "dean"): echo "Hi Ma’am/ Sir! Monitor or add schedule here"?>
+      <?php elseif($_SESSION["role"] == "program coordinator"): echo "Hi Ma’am/Sir! Here’s your schedule"?>
+      <?php else :echo $_SESSION["page"] ?>
+      <?php endif ?>
+    <?php else :echo $_SESSION["page"] ?>
+    <?php endif ?>
+    
+  </h2> 
 
     <?php if (isset($_SESSION["user"])): ?>
       <div class="column" style="align-items: center;">
@@ -13,3 +22,6 @@
     <?php endif ?>
   </header>
 </div>
+<!-- If Student = ""
+If Prof = ""
+If Dean = "" -->
