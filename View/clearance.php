@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
 
- 
+
 
 ?>
 
@@ -39,16 +39,37 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
         </form>
         <img src="<?= BASE_PATH ?>/get-profile" width="150" height="150" alt="No profile picture yet"> -->
         <div class="row" style=" gap:20px">
-          <div class="clearance_categ_box"></div>
-          <div class="clearance_categ_box"></div>
-          <div class="clearance_categ_box"></div>
+          <div class="clearance_categ_box">
+            <div class="clearance_categ_box_upper_part">
+
+            </div>
+            <div class="clearance_categ_box_buttom_part column">
+              <b>SUBJECTS</b>
+            </div>
+          </div>
+          <div class="clearance_categ_box">
+            <div class="clearance_categ_box_upper_part">
+
+            </div>
+            <div class="clearance_categ_box_buttom_part column">
+              <b>FACULTY</b>
+            </div>
+          </div>
+          <div class="clearance_categ_box">
+            <div class="clearance_categ_box_upper_part">
+
+            </div>
+            <div class="clearance_categ_box_buttom_part column">
+              <b>OFFICE</b>
+            </div>
+          </div>
         </div>
 
         <div class="row" style="gap:20px">
           <div class="column" style="gap:20px">
             <div class="row" style="justify-content:space-between; align-items:center; color:white; ">
-              <b style=" font-size:30px">UPDATES</b>
-              <div class="row">
+              <b style=" font-size:30px; padding-left:20px">UPDATES</b>
+              <div class="row" style=" padding-right:20px">
                 <b style=" font-size:25px">View All Updates</b>
                 <div></div>
               </div>
@@ -103,7 +124,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
   </div>
 
   <script>
-new Chart(document.getElementById('pie'), {
+    new Chart(document.getElementById('pie'), {
       type: 'pie',
       data: {
         labels: <?= $labels ?>,
@@ -120,29 +141,38 @@ new Chart(document.getElementById('pie'), {
             display: true,
             text: 'Clearance Status',
             color: '#f8f1f1',
-            font: { size: 30, weight: 'bold', family: 'Arial' }
+            font: {
+              size: 30,
+              weight: 'bold',
+              family: 'Arial'
+            }
           },
           legend: {
             position: 'bottom',
             align: 'start',
             labels: {
-              color: '#ffffff',                 // legend text color
-              font: { size: 20, family: 'Arial' },
+              color: '#ffffff', // legend text color
+              font: {
+                size: 20,
+                family: 'Arial'
+              },
               padding: 40,
-              usePointStyle: true            // round bullets instead of boxes
+              usePointStyle: true // round bullets instead of boxes
             }
           },
           tooltip: {
-            backgroundColor: '#222',         // hover box background
+            backgroundColor: '#222', // hover box background
             titleColor: '#fff',
             bodyColor: '#ffd166',
-            bodyFont: { size: 14 },
+            bodyFont: {
+              size: 14
+            },
             padding: 10
           }
         }
       }
     });
-</script>
+  </script>
 </body>
 
 </html>
