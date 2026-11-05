@@ -27,15 +27,15 @@ new Chart(document.getElementById('pie'), {
             display: true,
             text: 'Clearance Status',
             color: '#f8f1f1',
-            font: { size: 20, weight: 'bold', family: 'Arial' }
+            font: { size: 30, weight: 'bold', family: 'Arial' }
           },
           legend: {
             position: 'bottom',
             align: 'start',
             labels: {
               color: '#ffffff',                 // legend text color
-              font: { size: 14, family: 'Arial' },
-              padding: 15,
+              font: { size: 20, family: 'Arial' },
+              padding: 40,
               usePointStyle: true            // round bullets instead of boxes
             }
           },
