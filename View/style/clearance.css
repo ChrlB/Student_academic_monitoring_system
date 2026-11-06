@@ -91,6 +91,31 @@
   text-overflow: ellipsis;
 }
 
+*{/**/
+  .clearance_box{
+    background-image: linear-gradient(#CABECE, #B19EB8, #A189A9, #A189A9);
+    height: 200px;
+    padding: 20px 30px;
+    width: 95%;
+    border-radius: 30px;
+    justify-content: space-between;
+    align-items: center;
+    .open_button{
+      width:70px; 
+      border-radius:50%
+    }
+    .open_button:hover{
+      width:70px; 
+      border-radius:50%;
+      background-color:#d4aae2;
+    }
+  }
+  .clearance_box:hover{
+    border: 3px solid #fffdfd;
+  }
+
+}
+
 /* column widths */
 .col_name {
   width: 25%;
@@ -135,6 +160,7 @@
 
 main{
   padding: 30px;
+  background-color: rgba(0,0,0,0.2);
 }
 
 .status_rejected {

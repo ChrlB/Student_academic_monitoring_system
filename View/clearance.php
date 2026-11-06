@@ -133,16 +133,16 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 <option value=""></option>
               </select>
             </form>
-            <div>
+            <div class="column" style="gap: 20px;">
               <?php foreach( getSubjectsClearance() as $subject):?>
                   <div class="row clearance_box">
                     <div class="column">
-                      <b><?= $subject["name"] ?></b>
-                      <b><?= $subject["prof_name"] ?></b>
-                      <b><?= $subject["room"] ?></b>
+                      <b style="font-size: 50px;"><?= $subject["name"] ?></b>
+                      <b style="font-size: 30px;"><?= $subject["prof_name"] ?></b>
+                      <b style="font-size: 30px;"><?= $subject["room"] ?></b>
                     </div>
                     <div>
-                      ->
+                      <img src="<?= BASE_PATH?>/View/resources/openClearance.png" alt="" class="open_button" >
                     </div>
 
                   </div>
