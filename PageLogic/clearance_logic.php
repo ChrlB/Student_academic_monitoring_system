@@ -33,3 +33,19 @@ var_dump( isset($_GET["view"]));
 function statusClass(string $status): string{
     return strtoupper($status) === 'CLEARED' ? 'status_cleared' : 'status_rejected';
 }
+
+function getSubjectsClearance($subjectID = "ALL", $status = "ALL"){
+    global $clearanceDAO;
+    
+
+    $records = $clearanceDAO->executeQuery("getSubjectsClearance",[
+        $subjectID, $subjectID,
+        $_SESSION["userID"], 
+        $status,$status
+    ]);
+
+    return $records;
+    // var_dump($subjectID == 'ALL');
+    // var_dump($_SESSION["userID"]);
+    // var_dump($records);
+}

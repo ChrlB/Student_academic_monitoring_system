@@ -196,3 +196,29 @@ $clearanceDAO->prepareStatement("getPieChartData",
   "
 );
 
+$clearanceDAO->prepareStatement("getSubjectsClearance","SELECT 
+        S.subjectID AS subjectID,
+        S.name AS name,
+        SC.date_cleared AS date_cleared,
+        SC.remarks AS remarks,
+        SC.status AS status,
+        SS.roomID AS room,
+        CONCAT(F.last_name,', ', F.first_name ) AS prof_name
+    FROM subject_clearance AS SC 
+        INNER JOIN enrolled_subjects AS  ES 
+        ON ES.enrolled_subjectID = SC.enrolled_subjectID
+        INNER JOIN students AS  ST 
+        ON ST.studentID = ES.studentID
+        INNER JOIN subjects AS  S
+        ON S.subjectID = ES.subjectID
+        LEFT JOIN subject_schedules AS  SS 
+        ON SS.enrollmentID = ES.enrollmentID
+        AND SS.subjectID = ES.subjectID
+        LEFT JOIN faculty AS  F
+        ON F.facultyID = SS.facultyID
+    WHERE ('ALL' = ? OR S.subjectID = ?)
+        AND concat(year(ST.date_created),lpad(ES.studentID,5,0)) = ?
+        AND ('ALL' = ? OR SC.status = ?);
+"
+);
+

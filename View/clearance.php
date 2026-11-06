@@ -123,7 +123,31 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <b class="view_title">SUBJECTS</b>
                <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
-           
+            <form class="row">
+              <div class="row">
+                <input type="text" name="search"  placeholder="SEARCH">
+                <img src="<?= BASE_PATH?>/View/resources/return.png" alt="">
+              </div>
+              
+              <select name="filter" >
+                <option value=""></option>
+              </select>
+            </form>
+            <div>
+              <?php foreach( getSubjectsClearance() as $subject):?>
+                  <div class="row clearance_box">
+                    <div class="column">
+                      <b><?= $subject["name"] ?></b>
+                      <b><?= $subject["prof_name"] ?></b>
+                      <b><?= $subject["room"] ?></b>
+                    </div>
+                    <div>
+                      ->
+                    </div>
+
+                  </div>
+              <?php endforeach ?>
+            </div> 
             
           <?php elseif ($student_view === "FACULTY"): ?>
             <div class="row" style="justify-content: space-between; align-items:center">
