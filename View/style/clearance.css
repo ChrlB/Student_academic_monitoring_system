@@ -92,6 +92,28 @@
 }
 
 *{/**/
+  .searchbar_frame{
+    border-radius: 20px;
+    background-color: #282828;
+    border: 1px solid white;
+    overflow: hidden;
+
+    .searchbar {
+      width: 500px;
+      background-color: #282828;
+      padding: 0px 20px;
+      border: 0px;
+      font-size: 20px;
+    }
+  }
+  .filter{
+    background-color: #282828;
+    font-size: 20px;
+    border-radius: 20px;
+    border: 1px solid white;
+    padding: 0px 20px;
+  }
+
   .clearance_box{
     background-image: linear-gradient(#CABECE, #B19EB8, #A189A9, #A189A9);
     height: 200px;
@@ -134,7 +156,7 @@
 }
 
 .back_buttons{
-  height: 40px;
+  height: 35px;
 }
 .view_title{
   font-size: 40px;

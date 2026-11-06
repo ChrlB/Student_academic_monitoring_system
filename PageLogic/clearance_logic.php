@@ -28,7 +28,7 @@ if($_SESSION["role"] == "student"){
     ]);
 }
 
-var_dump( isset($_GET["view"]));
+// var_dump( isset($_GET["view"]));
 
 function statusClass(string $status): string{
     return strtoupper($status) === 'CLEARED' ? 'status_cleared' : 'status_rejected';

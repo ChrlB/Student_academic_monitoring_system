@@ -118,23 +118,26 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             </div>
 
 
-          <?php elseif ($student_view === "SUBJECTS"): ?>
+          <?php elseif ($student_view === "SUBJECTS"): $subjects = getSubjectsClearance()?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">SUBJECTS</b>
                <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
-            <form class="row">
-              <div class="row">
-                <input type="text" name="search"  placeholder="SEARCH">
-                <img src="<?= BASE_PATH?>/View/resources/return.png" alt="">
+            <form class="row" style="gap: 20px;">
+              <div class="row searchbar_frame">
+                <input type="text" name="search"  placeholder="SEARCH" class="searchbar">
+                <img src="<?= BASE_PATH?>/View/resources/return.png" alt="" class="back_buttons" style="padding:5px">
               </div>
               
-              <select name="filter" >
-                <option value=""></option>
+              <select name="filter" class="filter">
+                <option value="ALL">ALL</option>
+                <?php $options = []; foreach( $subjects as $subject): if(!in_array($subject["status"],$options)): $options[] = $subject["status"];?>
+                  <option value="<?= $subject["status"] ?>"><?= $subject["status"] ?></option>
+                <?php endif; endforeach ?>
               </select>
             </form>
             <div class="column" style="gap: 20px;">
-              <?php foreach( getSubjectsClearance() as $subject):?>
+              <?php foreach( $subjects as $subject):?>
                   <div class="row clearance_box">
                     <div class="column">
                       <b style="font-size: 50px;"><?= $subject["name"] ?></b>
