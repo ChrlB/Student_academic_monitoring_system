@@ -119,14 +119,24 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
 
           <?php elseif ($student_view === "SUBJECTS"): ?>
-            <a href="<?= BASE_PATH ?>/clearance">← Back</a>
-            <!-- subjects UI -->
+            <div class="row" style="justify-content: space-between; align-items:center">
+              <b class="view_title">SUBJECTS</b>
+               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+            </div>
+           
+            
           <?php elseif ($student_view === "FACULTY"): ?>
-            <a href="<?= BASE_PATH ?>/clearance">← Back</a>
-            <!-- faculty UI -->
+            <div class="row" style="justify-content: space-between; align-items:center">
+              <b class="view_title">FACULTY</b>
+               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+            </div>
+            
           <?php elseif ($student_view === "OFFICE"): ?>
-            <a href="<?= BASE_PATH ?>/clearance">← Back</a>
-            <!-- office UI -->
+            <div class="row" style="justify-content: space-between; align-items:center">
+              <b class="view_title">OFFICE</b>
+               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+            </div>
+            
           <?php endif ?>
         <?php endif ?>
 

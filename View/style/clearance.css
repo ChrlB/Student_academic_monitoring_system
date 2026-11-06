@@ -108,6 +108,13 @@
   width: 20%;
 }
 
+.back_buttons{
+  height: 40px;
+}
+.view_title{
+  font-size: 40px;
+}
+
 .status_badge {
   display: inline-block;
   min-width: 75px;
@@ -118,8 +125,16 @@
   color: #fff;
 }
 
+*{
+  color: #fff;
+}
+
 .status_cleared {
   background: #1fa012;
+}
+
+main{
+  padding: 30px;
 }
 
 .status_rejected {
