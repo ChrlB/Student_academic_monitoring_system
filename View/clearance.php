@@ -38,80 +38,97 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             <button type="submit">Upload document</button>
         </form>
         <img src="<?= BASE_PATH ?>/get-profile" width="150" height="150" alt="No profile picture yet"> -->
-        <div class="row" style=" gap:20px">
-          <div class="clearance_categ_box">
-            <div class="clearance_categ_box_upper_part">
+        <?php if ($_SESSION["role"] == "student"): ?>
+          <?php if ($student_view == "MAIN"): ?>
+            <div class="row" style=" gap:20px">
+              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box" onclick="this.submit()">
+                <div class="clearance_categ_box_upper_part">
 
-            </div>
-            <div class="clearance_categ_box_buttom_part column">
-              <b>SUBJECTS</b>
-            </div>
-          </div>
-          <div class="clearance_categ_box">
-            <div class="clearance_categ_box_upper_part">
+                </div>
+                <div class="clearance_categ_box_buttom_part column">
+                  <b>SUBJECTS</b>
+                </div>
+                <input type="hidden" name="view" value="SUBJECTS">
+              </form>
+              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box" onclick="this.submit()">
+                <div class="clearance_categ_box_upper_part">
 
-            </div>
-            <div class="clearance_categ_box_buttom_part column">
-              <b>FACULTY</b>
-            </div>
-          </div>
-          <div class="clearance_categ_box">
-            <div class="clearance_categ_box_upper_part">
+                </div>
+                <div class="clearance_categ_box_buttom_part column">
+                  <b>FACULTY</b>
+                </div>
+                <input type="hidden" name="view" value="FACULTY">
+              </form>
+              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box" onclick="this.submit()">
+                <div class="clearance_categ_box_upper_part">
 
+                </div>
+                <div class="clearance_categ_box_buttom_part column">
+                  <b>OFFICE</b>
+                </div>
+                <input type="hidden" name="view" value="OFFICE">
+              </form>
             </div>
-            <div class="clearance_categ_box_buttom_part column">
-              <b>OFFICE</b>
-            </div>
-          </div>
-        </div>
 
-        <div class="row" style="gap:20px">
-          <div class="column" style="gap:20px">
-            <div class="row" style="justify-content:space-between; align-items:center; color:white; ">
-              <b style=" font-size:30px; padding-left:20px">UPDATES</b>
-              <div class="row" style=" padding-right:20px">
-                <b style=" font-size:25px">View All Updates</b>
-                <div></div>
+            <div class="row" style="gap:20px">
+              <div class="column" style="gap:20px">
+                <div class="row" style="justify-content:space-between; align-items:center; color:white; ">
+                  <b style=" font-size:30px; padding-left:20px">UPDATES</b>
+                  <div class="row" style=" padding-right:20px">
+                    <b style=" font-size:25px">View All Updates</b>
+                    <div></div>
+                  </div>
+
+                </div>
+                <div class="updates_frame">
+                  <table class="updates_table">
+                    <thead>
+                      <tr>
+                        <th class="col_name">CATEGORY</th>
+                        <th class="col_about">ABOUT</th>
+                        <th class="col_date">DATE</th>
+                        <th class="col_status">STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <?php foreach ($updates_record as $row): ?>
+                        <tr>
+                          <td title="<?= htmlspecialchars($row['category']) ?>">
+                            <?= htmlspecialchars($row['category']) ?>
+                          </td>
+                          <td title="<?= htmlspecialchars($row['item_name']) ?>">
+                            <?= htmlspecialchars($row['item_name']) ?>
+                          </td>
+                          <td><?= htmlspecialchars($row['date_cleared']) ?></td>
+                          <td>
+                            <span class="status_badge <?= statusClass($row['status']) ?>">
+                              <?= htmlspecialchars(strtoupper($row['status'])) ?>
+                            </span>
+                          </td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
+              <div class="pie_chart">
+                <canvas id="pie"></canvas>
+              </div>
             </div>
-            <div class="updates_frame">
-              <table class="updates_table">
-                <thead>
-                  <tr>
-                    <th class="col_name">CATEGORY</th>
-                    <th class="col_about">ABOUT</th>
-                    <th class="col_date">DATE</th>
-                    <th class="col_status">STATUS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($updates_record as $row): ?>
-                    <tr>
-                      <td title="<?= htmlspecialchars($row['category']) ?>">
-                        <?= htmlspecialchars($row['category']) ?>
-                      </td>
-                      <td title="<?= htmlspecialchars($row['item_name']) ?>">
-                        <?= htmlspecialchars($row['item_name']) ?>
-                      </td>
-                      <td><?= htmlspecialchars($row['date_cleared']) ?></td>
-                      <td>
-                        <span class="status_badge <?= statusClass($row['status']) ?>">
-                          <?= htmlspecialchars(strtoupper($row['status'])) ?>
-                        </span>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-          </div>
 
-          <div class="pie_chart">
-            <canvas id="pie"></canvas>
-          </div>
-        </div>
 
+          <?php elseif ($student_view === "SUBJECTS"): ?>
+            <a href="<?= BASE_PATH ?>/clearance">← Back</a>
+            <!-- subjects UI -->
+          <?php elseif ($student_view === "FACULTY"): ?>
+            <a href="<?= BASE_PATH ?>/clearance">← Back</a>
+            <!-- faculty UI -->
+          <?php elseif ($student_view === "OFFICE"): ?>
+            <a href="<?= BASE_PATH ?>/clearance">← Back</a>
+            <!-- office UI -->
+          <?php endif ?>
+        <?php endif ?>
 
         <!-- <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-profile">
           <input type="file" name="profile_picture" accept="image/jpeg,image/png,image/webp" required>
@@ -122,57 +139,58 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
       </main>
     </div>
   </div>
-
-  <script>
-    new Chart(document.getElementById('pie'), {
-      type: 'pie',
-      data: {
-        labels: <?= $labels ?>,
-        datasets: [{
-          data: <?= $values ?>,
-          backgroundColor: ['#7700ff', '#cf00fd', '#00a4fd', '#1eff00']
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          title: {
-            display: true,
-            text: 'Clearance Status',
-            color: '#f8f1f1',
-            font: {
-              size: 30,
-              weight: 'bold',
-              family: 'Arial'
-            }
-          },
-          legend: {
-            position: 'bottom',
-            align: 'start',
-            labels: {
-              color: '#ffffff', // legend text color
+  <?php if ($student_view == "MAIN"): ?>
+    <script>
+      new Chart(document.getElementById('pie'), {
+        type: 'pie',
+        data: {
+          labels: <?= $labels ?>,
+          datasets: [{
+            data: <?= $values ?>,
+            backgroundColor: ['#7700ff', '#cf00fd', '#00a4fd', '#1eff00']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Clearance Status',
+              color: '#f8f1f1',
               font: {
-                size: 20,
+                size: 30,
+                weight: 'bold',
                 family: 'Arial'
-              },
-              padding: 40,
-              usePointStyle: true // round bullets instead of boxes
-            }
-          },
-          tooltip: {
-            backgroundColor: '#222', // hover box background
-            titleColor: '#fff',
-            bodyColor: '#ffd166',
-            bodyFont: {
-              size: 14
+              }
             },
-            padding: 10
+            legend: {
+              position: 'bottom',
+              align: 'start',
+              labels: {
+                color: '#ffffff', // legend text color
+                font: {
+                  size: 20,
+                  family: 'Arial'
+                },
+                padding: 40,
+                usePointStyle: true // round bullets instead of boxes
+              }
+            },
+            tooltip: {
+              backgroundColor: '#222', // hover box background
+              titleColor: '#fff',
+              bodyColor: '#ffd166',
+              bodyFont: {
+                size: 14
+              },
+              padding: 10
+            }
           }
         }
-      }
-    });
-  </script>
+      });
+    </script>
+  <?php endif ?>
 </body>
 
 </html>

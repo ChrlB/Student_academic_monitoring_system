@@ -88,7 +88,32 @@ $cleranceUpdate = "SELECT
     JOIN students AS S ON S.studentID = es.studentID
     WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
 ";
-
+$prospectus = "SELECT
+      `s`.`subjectID` AS `subjectID`,
+      COALESCE(
+          GROUP_CONCAT(
+              DISTINCT `sp`.`prerequisite` SEPARATOR ', '
+          ),
+          ''
+      ) AS `prerequisite`,
+      `s`.`sem_available` AS `sem_available`,
+      `s`.`program` AS `program`,
+      `s`.`unit` AS `unit`,
+      `s`.`year` AS `year`
+  FROM
+      `syllabus` AS `s`
+  LEFT JOIN `ams_db`.`subject_prerequisite` AS `sp`
+  ON
+      `sp`.`subjectID` = `s`.`subjectID`
+  GROUP BY
+      `s`.`subjectID`,
+      `s`.`sem_available`,
+      `s`.`program`,
+      `s`.`year`,
+      `s`.`unit`
+  ORDER BY
+      `s`.`year`
+";
 
 $userDAO->prepareStatement("getUsers",  $users);
 

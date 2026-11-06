@@ -20,7 +20,7 @@ require_once __DIR__ . "/../PageLogic/registration_logic.php";
     <div class="column" style="flex: 1;">
       <?php require_once __DIR__ . "/components/header.php"; ?>
       <main class="column scrollbar">
-        <form action="/registration" method="post">
+        <form action="<?= BASE_PATH ?>/registration" method="post">
           <select  id="" name="acount_category" onchange="this.form.submit()">
             <option value="STUDENT" <?php echo ($selected == "STUDENT") ? 'selected' : '';?>>STUDENT</option>
             <option value="FACULTY" <?php echo ($selected == "FACULTY")? 'selected' : ''; ?>>FACULTY</option>
