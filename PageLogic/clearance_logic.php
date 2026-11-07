@@ -9,6 +9,10 @@ $data = [];
 $labels = [];
 $values = [];
 
+$subjectID = "ALL";
+$status = "ALL";
+
+
 $allowedViews = ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE'];
 $student_view = strtoupper($_GET['view'] ?? 'MAIN');
 if (!in_array($student_view, $allowedViews, true)) {
@@ -29,13 +33,20 @@ if($_SESSION["role"] == "student"){
 }
 
 // var_dump( isset($_GET["view"]));
+if($student_view == "SUBJECTS"){
+    $subjectID = trim($_GET['search'] ?? '');
+    if ($subjectID === '') { $subjectID = 'ALL'; }  
+    $status =  ($_GET['statusfilter'] ?? 'ALL');
+    echo $subjectID.$status;
+}
 
 function statusClass(string $status): string{
     return strtoupper($status) === 'CLEARED' ? 'status_cleared' : 'status_rejected';
 }
 
-function getSubjectsClearance($subjectID = "ALL", $status = "ALL"){
+function getSubjectsClearance($subjectID = 'ALL',$status = 'ALL'){
     global $clearanceDAO;
+    
     
 
     $records = $clearanceDAO->executeQuery("getSubjectsClearance",[

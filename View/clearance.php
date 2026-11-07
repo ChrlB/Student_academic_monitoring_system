@@ -118,40 +118,48 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             </div>
 
 
-          <?php elseif ($student_view === "SUBJECTS"): $subjects = getSubjectsClearance()?>
+          <?php elseif ($student_view === "SUBJECTS"): $subjects = getSubjectsClearance($subjectID,$status)?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">SUBJECTS</b>
                <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
-            <form class="row" style="gap: 20px;">
+            <form class="row" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
+              <input type="hidden" name="view" value="SUBJECTS">
               <div class="row searchbar_frame">
-                <input type="text" name="search"  placeholder="SEARCH" class="searchbar">
-                <img src="<?= BASE_PATH?>/View/resources/return.png" alt="" class="back_buttons" style="padding:5px">
+                <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($subjectID === "ALL" ? '':$subjectID) ?>">
+                <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
+                    <img src="<?= BASE_PATH?>/View/resources/return.png" alt="" class="back_buttons" style="padding:5px">
+                </button>
               </div>
               
-              <select name="filter" class="filter">
-                <option value="ALL">ALL</option>
-                <?php $options = []; foreach( $subjects as $subject): if(!in_array($subject["status"],$options)): $options[] = $subject["status"];?>
-                  <option value="<?= $subject["status"] ?>"><?= $subject["status"] ?></option>
+              <select name="statusfilter" class="filter" onchange="this.form.submit()">
+                <option value="ALL" <?= $status === 'ALL' ? 'selected' : '' ?>>ALL</option>
+                <?php $options = []; foreach( getSubjectsClearance() as $subject): if(!in_array($subject["status"],$options)): $options[] = $subject["status"];?>
+                  <option  value="<?= $subject["status"] ?>" <?php if($status == $subject["status"]) echo 'selected'?>><?= $subject["status"] ?></option>
                 <?php endif; endforeach ?>
               </select>
             </form>
             <div class="column" style="gap: 20px;">
               <?php foreach( $subjects as $subject):?>
+                <input type="hidden" name="view" value="SUBJECT">
                   <div class="row clearance_box">
                     <div class="column">
-                      <b style="font-size: 50px;"><?= $subject["name"] ?></b>
+                      <b style="font-size: 50px;"><?= $subject["subjectID"].' - '.$subject["name"] ?></b>
                       <b style="font-size: 30px;"><?= $subject["prof_name"] ?></b>
                       <b style="font-size: 30px;"><?= $subject["room"] ?></b>
                     </div>
-                    <div>
-                      <img src="<?= BASE_PATH?>/View/resources/openClearance.png" alt="" class="open_button" >
-                    </div>
+                    <form action="<?= BASE_PATH ?>/clearance" method="get">
+                      <button type="submit" onclick="this.form.submit()" >
+                        <img src="<?= BASE_PATH?>/View/resources/openClearance.png" alt="" class="open_button" >
+                      </button>
+                      <input type="hidden" name="subjectID" value="<?php echo $subject["subjectID"] ?>">
+                    </form>
 
                   </div>
               <?php endforeach ?>
             </div> 
-            
+          <?php elseif ($student_view === "SUBJECT"): $subjects = getSubjectsClearance($subjectID,$status)?>
+                
           <?php elseif ($student_view === "FACULTY"): ?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">FACULTY</b>
