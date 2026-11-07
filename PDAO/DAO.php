@@ -226,3 +226,16 @@ $clearanceDAO->prepareStatement("getSubjectsClearance","SELECT
 "
 );
 
+$clearanceDAO->prepareStatement("addSubjectRequirement","INSERT INTO 
+    `subject_clearance_requirements` ( `subjectID`, `fileID`, `file_name`,mime_type, `file_size`,  `uploaded_by`) 
+    VALUES (?, ?,?,?, ?,?)"
+);
+$clearanceDAO->prepareStatement("addFacultyRequirement","INSERT INTO 
+    `faculty_clearance_requirements` ( `faculty_clearanceID`, `fileID`, `file_name`,mime_type, `file_size`,  `uploaded_by`) 
+    VALUES (?, ?,?,?, ?,?)"
+);
+$clearanceDAO->prepareStatement("addOfficeRequirement","INSERT INTO 
+    `office_clearance_requirements` ( `office_clearanceID`, `fileID`, `file_name`,mime_type, `file_size`,  `uploaded_by`) 
+    VALUES (?, ?,?,?, ?,?)"
+);
+

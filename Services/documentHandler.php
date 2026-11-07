@@ -5,6 +5,7 @@ require_once __DIR__ . '/DocumentUploadService.php';
 function uploadDocument($request): void
 {
     global $userDAO;
+    global $clearanceDAO;
 
     //$pageAfterUpload = BASE_PATH.'/documents';
     // $pageAfterUpload = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
@@ -68,14 +69,18 @@ function uploadDocument($request): void
             $savedMimeType
         );
 
-        // $userDAO->executeUpdate('saveDocument', [
-        //     $_SESSION['userID'],
-        //     $_SESSION['role'],
-        //     $driveFileId,
-        //     $validation['originalName'],
-        //     $savedMimeType,
-        //     (int) $uploadedFile['size'],
-        // ]);
+
+
+        $clearanceDAO->executeUpdate("addSubjectRequirement",
+            [
+                $request["ID"],
+                $driveFileId,
+                $validation['originalName'],
+                $savedMimeType,
+                (int) $uploadedFile['size'],
+                $_SESSION['userID'],
+            ]
+        );
 
         $_SESSION['message'] = 'Document uploaded!';
     } catch (Throwable $error) {

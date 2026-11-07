@@ -149,7 +149,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                       <b style="font-size: 30px;"><?= $subject["room"] ?></b>
                     </div>
                     <form action="<?= BASE_PATH ?>/clearance" method="get">
-                      <button type="submit" onclick="this.form.submit()" >
+                      <button type="submit" onclick="this.form.submit()" style="background-color: transparent; border:0px;">
                         <img src="<?= BASE_PATH?>/View/resources/openClearance.png" alt="" class="open_button" >
                       </button>
                       <input type="hidden" name="subjectID" value="<?php echo $subject["subjectID"] ?>">
@@ -173,6 +173,18 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             </div>
             
           <?php endif ?>
+
+        <?php elseif (in_array($_SESSION["role"], ["prof","dean","program coordinator"])):?>
+          <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
+            <input type="file" name="document"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  required>
+            <button type="submit">Upload document</button>
+            <input type="hidden" name="docs_for" value="addSubjectRequirement">
+            <input type="hidden" name="ID" value="CSC111L">
+            <input type="hidden" name="page_uploader" value="<?php echo parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?>">
+          </form>
+          <!-- INSERT INTO `subject_clearance_requirements` (`ID`, `enrolled_subjectID`, `fileID`, `file_name`, `file_size`, `uploaded_at`, `uploaded_by`) VALUES (NULL, '', '', '', '', CURRENT_TIMESTAMP, '') -->
         <?php endif ?>
 
         <!-- <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-profile">
