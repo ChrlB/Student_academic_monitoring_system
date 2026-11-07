@@ -13,7 +13,7 @@ $subjectID = "ALL";
 $status = "ALL";
 
 
-$allowedViews = ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE'];
+$allowedViews = ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE','SUBJECT-REQUIREMENTS'];
 $student_view = strtoupper($_GET['view'] ?? 'MAIN');
 if (!in_array($student_view, $allowedViews, true)) {
     $student_view = 'MAIN';
@@ -37,7 +37,10 @@ if($student_view == "SUBJECTS"){
     $subjectID = trim($_GET['search'] ?? '');
     if ($subjectID === '') { $subjectID = 'ALL'; }  
     $status =  ($_GET['statusfilter'] ?? 'ALL');
-    echo $subjectID.$status;
+    // echo $subjectID.$status;
+}elseif($student_view == "SUBJECT-REQUIREMENTS"){
+    $subjectID = trim($_GET['subjectID'] ?? '');
+    
 }
 
 function statusClass(string $status): string{
@@ -59,4 +62,12 @@ function getSubjectsClearance($subjectID = 'ALL',$status = 'ALL'){
     // var_dump($subjectID == 'ALL');
     // var_dump($_SESSION["userID"]);
     // var_dump($records);
+}
+
+
+function getSubjectRequireMents($subjectID){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ]);
+
+    return $records;
 }

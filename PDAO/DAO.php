@@ -239,3 +239,45 @@ $clearanceDAO->prepareStatement("addOfficeRequirement","INSERT INTO
     VALUES (?, ?,?,?, ?,?)"
 );
 
+$clearanceDAO->prepareStatement("getSubjectRequirements","SELECT
+        S.subjectID AS subjectID,
+        S.name AS name,
+        SC.date_cleared AS date_cleared,
+        SC.remarks AS remarks,
+        SC.status AS status,
+        CONCAT(SS.time_start,' - ', SS.time_end) as class_time,
+        SS.day AS day,
+        SS.roomID AS room,
+        CONCAT(F.last_name, ', ', F.first_name) AS prof_name,
+        SCR.fileID,
+        SCR.file_name,
+        SCR.mime_type,
+        IF(
+            COALESCE(SCR.file_size, 0) < 1000000,
+            CONCAT(ROUND(COALESCE(SCR.file_size, 0) / 1024, 1), ' KB'),
+            CONCAT(ROUND(COALESCE(SCR.file_size, 0) / 1048576, 2), ' MB')
+        ) AS file_size,
+        SCR.uploaded_at
+    FROM
+        subject_clearance AS SC
+    INNER JOIN enrolled_subjects AS ES
+    ON
+        ES.enrolled_subjectID = SC.enrolled_subjectID
+    INNER JOIN students AS ST
+    ON
+        ST.studentID = ES.studentID
+    INNER JOIN subjects AS S
+    ON
+        S.subjectID = ES.subjectID
+    LEFT JOIN subject_schedules AS SS
+    ON
+        SS.enrollmentID = ES.enrollmentID AND SS.subjectID = ES.subjectID
+    LEFT JOIN faculty AS F
+    ON  F.facultyID = SS.facultyID
+    left JOIN subject_clearance_requirements AS SCR
+    ON 	SCR.subjectID = ES.subjectID
+        
+    WHERE
+        S.subjectID = ?;
+
+");

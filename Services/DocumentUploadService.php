@@ -11,7 +11,7 @@ class DocumentUploadService
         ],
     ];
 
-    public function __construct(private int $maxUploadSizeInBytes = 10 * 1024 * 1024) {}
+    public function __construct(private int $maxUploadSizeInBytes = 50  * 1024 * 1024) {}
 
     public function validate(array $uploadedFile): array
     {
