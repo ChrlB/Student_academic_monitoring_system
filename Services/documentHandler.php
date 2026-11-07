@@ -2,12 +2,13 @@
 require_once __DIR__ . '/DriveStorageService.php';
 require_once __DIR__ . '/DocumentUploadService.php';
 
-function uploadDocument($pageAfterUpload): void
+function uploadDocument($request): void
 {
     global $userDAO;
 
     //$pageAfterUpload = BASE_PATH.'/documents';
-    //$pageAfterUpload = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    // $pageAfterUpload = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    $pageAfterUpload = $request["page_uploader"];
 
     if (empty($_SESSION['userID'])) {
         http_response_code(403);
@@ -17,6 +18,8 @@ function uploadDocument($pageAfterUpload): void
         header('Location: ' . $pageAfterUpload);
         exit;
     }
+
+    
 
     $uploadedFile = $_FILES['document'];
     $validation = (new DocumentUploadService())->validate($uploadedFile);
@@ -39,11 +42,25 @@ function uploadDocument($pageAfterUpload): void
 
     try {
         $driveConfig = require __DIR__ . '/../config.local.php';
+
+
+
         $driveStorageService = new DriveStorageService(
             $driveConfig['oauthClientPath'],
             $driveConfig['refreshToken'],
-            $driveConfig['driveFolderId']
+            ($_SESSION['folderID'] == null)
+                ? $driveConfig['driveFolderId'] 
+                : $_SESSION['folderID']
         );
+
+        if ($_SESSION['folderID'] == null) {
+            $_SESSION['folderID'] = $driveStorageService->createFolder($_SESSION["userID"]);
+            $driveStorageService = new DriveStorageService(
+                $driveConfig['oauthClientPath'],
+                $driveConfig['refreshToken'],
+                $_SESSION['folderID']
+            );
+        }
 
         $driveFileId = $driveStorageService->uploadFile(
             $uploadedFile['tmp_name'],
@@ -71,7 +88,7 @@ function uploadDocument($pageAfterUpload): void
             }
         }
         error_log('Document upload failed: ' . $error->getMessage());
-        $_SESSION['message'] = 'Could not upload the document.';
+        $_SESSION['error'] = 'Could not upload the document.';
     }
 
     header('Location: ' . $pageAfterUpload);

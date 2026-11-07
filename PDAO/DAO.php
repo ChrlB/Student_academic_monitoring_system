@@ -22,10 +22,12 @@ $users = "SELECT
           YEAR(F.`date_created`),
           LPAD(F.`facultyID`, 5, 0)
       ) AS `userID`,
+      F.`facultyID` AS real_userID,
       F.`first_name` AS `first_name`,
       F.`middle_name` AS `middle_name`,
       F.`last_name` AS `last_name`,
       F.`password` AS `password`,
+      F.`folderID` AS `folderID`,
       F.`role` AS `role`
   FROM
       `faculty` as F
@@ -35,10 +37,12 @@ $users = "SELECT
           YEAR(S.`date_created`),
           LPAD(S.`studentID`, 5, 0)
       ) AS `userID`,
+      S.`studentID` AS real_userID,
       S.`first_name` AS `first_name`,
       S.`middle_name` AS `middle_name`,
       S.`last_name` AS `last_name`,
       S.`password` AS `password`,
+      S.`folderID` AS `folderID`,
       'student' AS `role`
   FROM
       `students` as S";

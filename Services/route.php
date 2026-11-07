@@ -82,6 +82,6 @@ $router->post('/logout', fn() => logout());
 $router->post('/upload-profile', fn() => uploadProfile());
 $router->get('/get-profile', fn() => getProfilePic());
 
-$router->post('/upload-document', fn() => uploadDocument(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH).""));
+$router->post('/upload-document', fn($request) => uploadDocument($request));
 
 $router->dispatch();

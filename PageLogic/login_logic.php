@@ -19,6 +19,8 @@
       $_SESSION["userID"] = trim($login_info['username']);
       $_SESSION['user'] = $records[0]["last_name"];
       $_SESSION["role"] = $records[0]["role"];
+      $_SESSION['folderID'] = $records[0]["folderID"];
+      $_SESSION['real_userID'] = $records[0]["real_userID"];
 
       $_SESSION["message"] = "Account verification sucsessful";
 
