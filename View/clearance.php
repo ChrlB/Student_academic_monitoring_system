@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
 
- 
+
 
 ?>
 
@@ -38,59 +38,202 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             <button type="submit">Upload document</button>
         </form>
         <img src="<?= BASE_PATH ?>/get-profile" width="150" height="150" alt="No profile picture yet"> -->
-        <div class="row" style=" gap:20px">
-          <div class="clearance_categ_box"></div>
-          <div class="clearance_categ_box"></div>
-          <div class="clearance_categ_box"></div>
-        </div>
+        <?php if ($_SESSION["role"] == "student"): ?>
+          <?php if ($student_view == "MAIN"): ?>
+            <div class="row" style=" gap:20px">
+              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box" onclick="this.submit()">
+                <div class="clearance_categ_box_upper_part">
 
-        <div class="row" style="gap:20px">
-          <div class="column" style="gap:20px">
-            <div class="row" style="justify-content:space-between; align-items:center; color:white; ">
-              <b style=" font-size:30px">UPDATES</b>
-              <div class="row">
-                <b style=" font-size:25px">View All Updates</b>
-                <div></div>
+                </div>
+                <div class="clearance_categ_box_buttom_part column">
+                  <b>SUBJECTS</b>
+                </div>
+                <input type="hidden" name="view" value="SUBJECTS">
+              </form>
+              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box" onclick="this.submit()">
+                <div class="clearance_categ_box_upper_part">
+
+                </div>
+                <div class="clearance_categ_box_buttom_part column">
+                  <b>FACULTY</b>
+                </div>
+                <input type="hidden" name="view" value="FACULTY">
+              </form>
+              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box" onclick="this.submit()">
+                <div class="clearance_categ_box_upper_part">
+
+                </div>
+                <div class="clearance_categ_box_buttom_part column">
+                  <b>OFFICE</b>
+                </div>
+                <input type="hidden" name="view" value="OFFICE">
+              </form>
+            </div>
+
+            <div class="row" style="gap:20px">
+              <div class="column" style="gap:20px">
+                <div class="row" style="justify-content:space-between; align-items:center; color:white; ">
+                  <b style=" font-size:30px; padding-left:20px">UPDATES</b>
+                  <div class="row" style=" padding-right:20px">
+                    <b style=" font-size:25px">View All Updates</b>
+                    <div></div>
+                  </div>
+
+                </div>
+                <div class="updates_frame">
+                  <table class="updates_table">
+                    <thead>
+                      <tr>
+                        <th class="col_name">CATEGORY</th>
+                        <th class="col_about">ABOUT</th>
+                        <th class="col_date">DATE</th>
+                        <th class="col_status">STATUS</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <?php foreach ($updates_record as $row): ?>
+                        <tr>
+                          <td title="<?= htmlspecialchars($row['category']) ?>">
+                            <?= htmlspecialchars($row['category']) ?>
+                          </td>
+                          <td title="<?= htmlspecialchars($row['item_name']) ?>">
+                            <?= htmlspecialchars($row['item_name']) ?>
+                          </td>
+                          <td><?= htmlspecialchars($row['date_cleared']) ?></td>
+                          <td>
+                            <span class="status_badge <?= statusClass($row['status']) ?>">
+                              <?= htmlspecialchars(strtoupper($row['status'])) ?>
+                            </span>
+                          </td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
+              <div class="pie_chart">
+                <canvas id="pie"></canvas>
+              </div>
             </div>
-            <div class="updates_frame">
-              <table class="updates_table">
-                <thead>
-                  <tr>
-                    <th class="col_name">CATEGORY</th>
-                    <th class="col_about">ABOUT</th>
-                    <th class="col_date">DATE</th>
-                    <th class="col_status">STATUS</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($updates_record as $row): ?>
-                    <tr>
-                      <td title="<?= htmlspecialchars($row['category']) ?>">
-                        <?= htmlspecialchars($row['category']) ?>
-                      </td>
-                      <td title="<?= htmlspecialchars($row['item_name']) ?>">
-                        <?= htmlspecialchars($row['item_name']) ?>
-                      </td>
-                      <td><?= htmlspecialchars($row['date_cleared']) ?></td>
-                      <td>
-                        <span class="status_badge <?= statusClass($row['status']) ?>">
-                          <?= htmlspecialchars(strtoupper($row['status'])) ?>
-                        </span>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
+
+
+          <?php elseif ($student_view === "SUBJECTS"): $subjects = getSubjectsClearance($subjectID,$status)?>
+            <div class="row" style="justify-content: space-between; align-items:center">
+              <b class="view_title">SUBJECTS</b>
+               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
-          </div>
+            <form class="row" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
+              <input type="hidden" name="view" value="SUBJECTS">
+              <div class="row searchbar_frame">
+                <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($subjectID === "ALL" ? '':$subjectID) ?>">
+                <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
+                    <img src="<?= BASE_PATH?>/View/resources/return.png" alt="" class="back_buttons" style="padding:5px">
+                </button>
+              </div>
+              
+              <select name="statusfilter" class="filter" onchange="this.form.submit()">
+                <option value="ALL" <?= $status === 'ALL' ? 'selected' : '' ?>>ALL</option>
+                <?php $options = []; foreach( getSubjectsClearance() as $subject): if(!in_array($subject["status"],$options)): $options[] = $subject["status"];?>
+                  <option  value="<?= $subject["status"] ?>" <?php if($status == $subject["status"]) echo 'selected'?>><?= $subject["status"] ?></option>
+                <?php endif; endforeach ?>
+              </select>
+            </form>
+            <div class="column" style="gap: 20px;">
+              <?php foreach( $subjects as $subject):?>
+                
+                <form class="row clearance_box" action="<?= BASE_PATH ?>/clearance" method="get">
+                  <div class="column">
+                    <b style="font-size: 50px;"><?= $subject["subjectID"].' - '.$subject["name"] ?></b>
+                    <b style="font-size: 30px;"><?= $subject["prof_name"] ?></b>
+                    <b style="font-size: 30px;"><?= $subject["room"] ?></b>
+                  </div>
+                  <div >
+                    <input type="hidden" name="view" value="SUBJECT-REQUIREMENTS">
+                    <button type="submit" onclick="this.form.submit()" style="background-color: transparent; border:0px;">
+                      <img src="<?= BASE_PATH?>/View/resources/openClearance.png" alt="" class="open_button" >
+                    </button>
+                    <input type="hidden" name="subjectID" value="<?php echo $subject["subjectID"] ?>">
+                  </div>
 
-          <div class="pie_chart">
-            <canvas id="pie"></canvas>
-          </div>
-        </div>
+                </form>
+              <?php endforeach ?>
+            </div> 
 
+          <?php elseif ($student_view === "SUBJECT-REQUIREMENTS"): $subject_info = getSubjectRequireMents($subjectID); ?>
+                <div class="row" style="justify-content: space-between; align-items:center">
+                  <b class="view_title"><?= $subject_info[0]["name"] ?></b>
+                  <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+                </div>
+                <div class="row">
+                  <div class="column">
+                    <b><?= $subject_info[0]["prof_name"] ?></b>
+                    <b><?= $subjectID?></b>
+                    
+                    
+                  </div>
+                  <div class="column">
+                    <b><?= $subject_info[0]["class_time"] ?></b>
+                    <b><?= $subject_info[0]["room"] ?></b>
+                    
+                    
+                  </div>
+                </div>
+                <div class="clearance_instructions">
+                  <b>How to submit your clearance requirement</b>
+                  <p>Upload the document that proves you have completed this requirement for this clearance.</p>
+                  <ol>
+                    <li>Accepted formats: PDF, DOC, or DOCX (maximum 40MB).</li>
+                    <li>Make sure the file is complete, readable, and shows your name and student number.</li>
+                    <li>Choose your file, then click <b>Upload document</b>.</li>
+                    <li>Wait for the confirmation message. Your requirement stays <i>Not yet cleared</i> until it is reviewed.</li>
+                    <li>If it is rejected, read the remarks, fix the issue, and upload a new file.</li>
+                    <li>If your file is larger than 40 MB, upload it to your own Google Drive and set sharing to
+                        <b>"Anyone with the link can view"</b>. Copy the link and paste it into a new document,
+                        along with your name and student number. Export that document as a PDF and upload the PDF here.
+                        Do not edit, move, or delete the file in your Drive until your requirement is cleared.</li>
+                  </ol>
+                  <p>For questions, contact the person or office in charge of this requirement.</p>
+                </div>
+                <div class="row">
+                  <?php foreach($subject_info as $requirement): ?>
+                    <div>
+                      <?= $requirement["file_name"]?>
+                      <?= $requirement['file_size'] ?>
+                    </div>
+                  <?php endforeach ?>
+                </div>
+                <div class="row">
+                  <button>UPLOAD FILE</button>
+                  <button>VIEW UPLOADS</button>
+                </div>
+
+          <?php elseif ($student_view === "FACULTY"): ?>
+            <div class="row" style="justify-content: space-between; align-items:center">
+              <b class="view_title">FACULTY</b>
+               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+            </div>
+            
+          <?php elseif ($student_view === "OFFICE"): ?>
+            <div class="row" style="justify-content: space-between; align-items:center">
+              <b class="view_title">OFFICE</b>
+               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+            </div>
+            
+          <?php endif ?>
+
+        <?php elseif (in_array($_SESSION["role"], ["prof","dean","program coordinator"])):?>
+          <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
+            <input type="file" name="document"
+                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  required>
+            <button type="submit">Upload document</button>
+            <input type="hidden" name="docs_for" value="addSubjectRequirement">
+            <input type="hidden" name="ID" value="CSC111L">
+            <input type="hidden" name="page_uploader" value="<?php echo parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?>">
+          </form>
+          <!-- INSERT INTO `subject_clearance_requirements` (`ID`, `enrolled_subjectID`, `fileID`, `file_name`, `file_size`, `uploaded_at`, `uploaded_by`) VALUES (NULL, '', '', '', '', CURRENT_TIMESTAMP, '') -->
+        <?php endif ?>
 
         <!-- <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-profile">
           <input type="file" name="profile_picture" accept="image/jpeg,image/png,image/webp" required>
@@ -101,48 +244,58 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
       </main>
     </div>
   </div>
-
-  <script>
-new Chart(document.getElementById('pie'), {
-      type: 'pie',
-      data: {
-        labels: <?= $labels ?>,
-        datasets: [{
-          data: <?= $values ?>,
-          backgroundColor: ['#7700ff', '#cf00fd', '#00a4fd', '#1eff00']
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          title: {
-            display: true,
-            text: 'Clearance Status',
-            color: '#f8f1f1',
-            font: { size: 30, weight: 'bold', family: 'Arial' }
-          },
-          legend: {
-            position: 'bottom',
-            align: 'start',
-            labels: {
-              color: '#ffffff',                 // legend text color
-              font: { size: 20, family: 'Arial' },
-              padding: 40,
-              usePointStyle: true            // round bullets instead of boxes
+  <?php if ($student_view == "MAIN"): ?>
+    <script>
+      new Chart(document.getElementById('pie'), {
+        type: 'pie',
+        data: {
+          labels: <?= $labels ?>,
+          datasets: [{
+            data: <?= $values ?>,
+            backgroundColor: ['#7700ff', '#cf00fd', '#00a4fd', '#1eff00']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            title: {
+              display: true,
+              text: 'Clearance Status',
+              color: '#f8f1f1',
+              font: {
+                size: 30,
+                weight: 'bold',
+                family: 'Arial'
+              }
+            },
+            legend: {
+              position: 'bottom',
+              align: 'start',
+              labels: {
+                color: '#ffffff', // legend text color
+                font: {
+                  size: 20,
+                  family: 'Arial'
+                },
+                padding: 40,
+                usePointStyle: true // round bullets instead of boxes
+              }
+            },
+            tooltip: {
+              backgroundColor: '#222', // hover box background
+              titleColor: '#fff',
+              bodyColor: '#ffd166',
+              bodyFont: {
+                size: 14
+              },
+              padding: 10
             }
-          },
-          tooltip: {
-            backgroundColor: '#222',         // hover box background
-            titleColor: '#fff',
-            bodyColor: '#ffd166',
-            bodyFont: { size: 14 },
-            padding: 10
           }
         }
-      }
-    });
-</script>
+      });
+    </script>
+  <?php endif ?>
 </body>
 
 </html>

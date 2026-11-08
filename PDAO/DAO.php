@@ -22,10 +22,12 @@ $users = "SELECT
           YEAR(F.`date_created`),
           LPAD(F.`facultyID`, 5, 0)
       ) AS `userID`,
+      F.`facultyID` AS real_userID,
       F.`first_name` AS `first_name`,
       F.`middle_name` AS `middle_name`,
       F.`last_name` AS `last_name`,
       F.`password` AS `password`,
+      F.`folderID` AS `folderID`,
       F.`role` AS `role`
   FROM
       `faculty` as F
@@ -35,10 +37,12 @@ $users = "SELECT
           YEAR(S.`date_created`),
           LPAD(S.`studentID`, 5, 0)
       ) AS `userID`,
+      S.`studentID` AS real_userID,
       S.`first_name` AS `first_name`,
       S.`middle_name` AS `middle_name`,
       S.`last_name` AS `last_name`,
       S.`password` AS `password`,
+      S.`folderID` AS `folderID`,
       'student' AS `role`
   FROM
       `students` as S";
@@ -88,7 +92,32 @@ $cleranceUpdate = "SELECT
     JOIN students AS S ON S.studentID = es.studentID
     WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
 ";
-
+$prospectus = "SELECT
+      `s`.`subjectID` AS `subjectID`,
+      COALESCE(
+          GROUP_CONCAT(
+              DISTINCT `sp`.`prerequisite` SEPARATOR ', '
+          ),
+          ''
+      ) AS `prerequisite`,
+      `s`.`sem_available` AS `sem_available`,
+      `s`.`program` AS `program`,
+      `s`.`unit` AS `unit`,
+      `s`.`year` AS `year`
+  FROM
+      `syllabus` AS `s`
+  LEFT JOIN `ams_db`.`subject_prerequisite` AS `sp`
+  ON
+      `sp`.`subjectID` = `s`.`subjectID`
+  GROUP BY
+      `s`.`subjectID`,
+      `s`.`sem_available`,
+      `s`.`program`,
+      `s`.`year`,
+      `s`.`unit`
+  ORDER BY
+      `s`.`year`
+";
 
 $userDAO->prepareStatement("getUsers",  $users);
 
@@ -171,3 +200,84 @@ $clearanceDAO->prepareStatement("getPieChartData",
   "
 );
 
+$clearanceDAO->prepareStatement("getSubjectsClearance","SELECT 
+        S.subjectID AS subjectID,
+        S.name AS name,
+        SC.date_cleared AS date_cleared,
+        SC.remarks AS remarks,
+        SC.status AS status,
+        SS.roomID AS room,
+        CONCAT(F.last_name,', ', F.first_name ) AS prof_name
+    FROM subject_clearance AS SC 
+        INNER JOIN enrolled_subjects AS  ES 
+        ON ES.enrolled_subjectID = SC.enrolled_subjectID
+        INNER JOIN students AS  ST 
+        ON ST.studentID = ES.studentID
+        INNER JOIN subjects AS  S
+        ON S.subjectID = ES.subjectID
+        LEFT JOIN subject_schedules AS  SS 
+        ON SS.enrollmentID = ES.enrollmentID
+        AND SS.subjectID = ES.subjectID
+        LEFT JOIN faculty AS  F
+        ON F.facultyID = SS.facultyID
+    WHERE ('ALL' = ? OR S.subjectID = ?)
+        AND concat(year(ST.date_created),lpad(ES.studentID,5,0)) = ?
+        AND ('ALL' = ? OR SC.status = ?);
+"
+);
+
+$clearanceDAO->prepareStatement("addSubjectRequirement","INSERT INTO 
+    `subject_clearance_requirements` ( `subjectID`, `fileID`, `file_name`,mime_type, `file_size`,  `uploaded_by`) 
+    VALUES (?, ?,?,?, ?,?)"
+);
+$clearanceDAO->prepareStatement("addFacultyRequirement","INSERT INTO 
+    `faculty_clearance_requirements` ( `faculty_clearanceID`, `fileID`, `file_name`,mime_type, `file_size`,  `uploaded_by`) 
+    VALUES (?, ?,?,?, ?,?)"
+);
+$clearanceDAO->prepareStatement("addOfficeRequirement","INSERT INTO 
+    `office_clearance_requirements` ( `office_clearanceID`, `fileID`, `file_name`,mime_type, `file_size`,  `uploaded_by`) 
+    VALUES (?, ?,?,?, ?,?)"
+);
+
+$clearanceDAO->prepareStatement("getSubjectRequirements","SELECT
+        S.subjectID AS subjectID,
+        S.name AS name,
+        SC.date_cleared AS date_cleared,
+        SC.remarks AS remarks,
+        SC.status AS status,
+        CONCAT(SS.time_start,' - ', SS.time_end) as class_time,
+        SS.day AS day,
+        SS.roomID AS room,
+        CONCAT(F.last_name, ', ', F.first_name) AS prof_name,
+        SCR.fileID,
+        SCR.file_name,
+        SCR.mime_type,
+        IF(
+            COALESCE(SCR.file_size, 0) < 1000000,
+            CONCAT(ROUND(COALESCE(SCR.file_size, 0) / 1024, 1), ' KB'),
+            CONCAT(ROUND(COALESCE(SCR.file_size, 0) / 1048576, 2), ' MB')
+        ) AS file_size,
+        SCR.uploaded_at
+    FROM
+        subject_clearance AS SC
+    INNER JOIN enrolled_subjects AS ES
+    ON
+        ES.enrolled_subjectID = SC.enrolled_subjectID
+    INNER JOIN students AS ST
+    ON
+        ST.studentID = ES.studentID
+    INNER JOIN subjects AS S
+    ON
+        S.subjectID = ES.subjectID
+    LEFT JOIN subject_schedules AS SS
+    ON
+        SS.enrollmentID = ES.enrollmentID AND SS.subjectID = ES.subjectID
+    LEFT JOIN faculty AS F
+    ON  F.facultyID = SS.facultyID
+    left JOIN subject_clearance_requirements AS SCR
+    ON 	SCR.subjectID = ES.subjectID
+        
+    WHERE
+        S.subjectID = ?;
+
+");

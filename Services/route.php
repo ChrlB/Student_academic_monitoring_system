@@ -64,6 +64,8 @@ $router->get('/attendance', fn() => require __DIR__ . '/../View/attendance.php')
 $router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
 
 $router->get('/clearance',  fn() => require __DIR__ . '/../View/clearance.php');
+// $router->post('/clearance',  fn($request) => require __DIR__ . '/../View/clearance.php');
+
 $router->get('/dashboard', fn() => require __DIR__ . '/../View/dashboard.php');
 $router->get('/enrollment',  fn() => require __DIR__ . '/../View/enrollment.php');
 
@@ -81,6 +83,6 @@ $router->post('/logout', fn() => logout());
 $router->post('/upload-profile', fn() => uploadProfile());
 $router->get('/get-profile', fn() => getProfilePic());
 
-$router->post('/upload-document', fn() => uploadDocument(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH).""));
+$router->post('/upload-document', fn($request) => uploadDocument($request));
 
 $router->dispatch();
