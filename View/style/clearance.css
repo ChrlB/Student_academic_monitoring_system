@@ -136,6 +136,54 @@
     border: 3px solid #fffdfd;
   }
 
+  .file_container{
+    justify-content: space-between; 
+    width:400px; 
+    align-items:center;
+    background-color: #7D6186;
+    padding: 10px 15px;
+    border-radius: 50px;
+    gap: 10px;
+
+    .file_icons{
+      height: 30px;
+    }
+  }
+
+  .subject_container{
+    background-color: rgba(0,0,0,0.2);
+     padding: 20px 30px;
+     border-radius: 30px;
+     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+     font-size: 25px;
+     justify-content: space-between;
+  }
+
+  .requirement_container{
+     background-color: rgba(0,0,0,0.2);
+     padding: 20px 30px;
+     border-radius: 30px;
+     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+     height: 700px;
+     overflow: scroll;
+  }
+  .fileupload_buttom{
+    justify-content: center;
+    gap: 20px;
+
+    button{
+      padding: 10px 25px;
+      font-size: 20px;
+      border-radius: 50px;
+      background-color: #282828;
+    }
+
+    button:hover{
+      background-color: #A45DBB;
+    }
+  }
+  
+
 }
 
 /* column widths */

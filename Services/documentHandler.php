@@ -100,34 +100,93 @@ function uploadDocument($request): void
     exit;
 }
 
+// function downloadDocument(): void
+// {
+//     global $userDAO;
+
+//     if (empty($_SESSION['userID'])) {
+//         http_response_code(403);
+//         exit;
+//     }
+
+//     $requestedDocumentId = (int) ($_GET['id'] ?? 0);
+//     $loggedInUserId = $_SESSION['userID'];
+//     $loggedInRole   = $_SESSION['role'];
+//     session_write_close(); // release the session lock before streaming
+
+//     $documentRows = $userDAO->executeQuery('findDocument', [$requestedDocumentId]);
+//     if (empty($documentRows)) {
+//         http_response_code(404);
+//         exit;
+//     }
+//     $document = $documentRows[0];
+
+//     // YOUR RULE: who may open this document? For example only the owner,
+//     // plus certain roles. Adjust the column names to match your table.
+//     // $isOwner = ($document['owner_id'] === (string) $loggedInUserId);
+//     // if (!$isOwner) {
+//     //     http_response_code(403);
+//     //     exit;
+//     // }
+
+//     $driveConfig = require __DIR__ . '/../config.local.php';
+//     $driveStorageService = new DriveStorageService(
+//         $driveConfig['oauthClientPath'],
+//         $driveConfig['refreshToken'],
+//         $driveConfig['driveFolderId']
+//     );
+
+//     $downloadName = str_replace(['"', "\r", "\n"], '', $document['original_name']);
+//     header('Content-Type: ' . $document['mime_type']);
+//     header("Content-Disposition: attachment; filename=\"{$downloadName}\"; filename*=UTF-8''" . rawurlencode($downloadName));
+//     header('Content-Length: ' . (int) $document['file_size']);
+//     header('Cache-Control: private, no-store');
+
+//     $driveStorageService->streamFile($document['drive_file_id']);
+//     exit;
+// }
 function downloadDocument(): void
 {
-    global $userDAO;
-
     if (empty($_SESSION['userID'])) {
         http_response_code(403);
         exit;
     }
 
     $requestedDocumentId = (int) ($_GET['id'] ?? 0);
-    $loggedInUserId = $_SESSION['userID'];
-    $loggedInRole   = $_SESSION['role'];
-    session_write_close(); // release the session lock before streaming
+    $wantsDownload       = ($_GET['download'] ?? '') === '1';
+    $loggedInUserId      = $_SESSION['userID'];
+    $loggedInRole        = $_SESSION['role'];
+    $docFor = $_GET['docfor'] ?? '';
+    $categ  = $_GET['categ'] ?? '';
 
-    $documentRows = $userDAO->executeQuery('findDocument', [$requestedDocumentId]);
-    if (empty($documentRows)) {
-        http_response_code(404);
+    
+    session_write_close();
+
+    $documentRows = [];
+    $document = [];
+
+    global $clearanceDAO;
+    if($docFor === "clearance"){
+        if (!in_array($categ, ['S', 'F', 'O'], true) || $requestedDocumentId < 1) {
+            http_response_code(400);
+            exit;
+        }
+        $documentRows = $clearanceDAO->executeQuery('findDocument', [$categ.$requestedDocumentId]);
+        if (empty($documentRows)) {
+            http_response_code(404);
+            exit;
+        }
+        $document = $documentRows[0];
+    } else {
+        http_response_code(400);
         exit;
     }
-    $document = $documentRows[0];
 
-    // YOUR RULE: who may open this document? For example only the owner,
-    // plus certain roles. Adjust the column names to match your table.
-    // $isOwner = ($document['owner_id'] === (string) $loggedInUserId);
-    // if (!$isOwner) {
-    //     http_response_code(403);
-    //     exit;
-    // }
+    // permission check goes here (see point 2)
+
+    // only PDFs can display inline; Word files always download
+    $disposition = ($wantsDownload || $document['mime_type'] !== 'application/pdf')
+        ? 'attachment' : 'inline';
 
     $driveConfig = require __DIR__ . '/../config.local.php';
     $driveStorageService = new DriveStorageService(
@@ -136,12 +195,22 @@ function downloadDocument(): void
         $driveConfig['driveFolderId']
     );
 
-    $downloadName = str_replace(['"', "\r", "\n"], '', $document['original_name']);
+    $downloadName = str_replace(['"', "\r", "\n", '/', '\\'], '', $document['file_name']);
+
+    while (ob_get_level() > 0) { ob_end_clean(); }
+    set_time_limit(0);
+
     header('Content-Type: ' . $document['mime_type']);
-    header("Content-Disposition: attachment; filename=\"{$downloadName}\"; filename*=UTF-8''" . rawurlencode($downloadName));
+    header("Content-Disposition: {$disposition}; filename=\"{$downloadName}\"; filename*=UTF-8''" . rawurlencode($downloadName));
     header('Content-Length: ' . (int) $document['file_size']);
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: SAMEORIGIN');
     header('Cache-Control: private, no-store');
 
-    $driveStorageService->streamFile($document['drive_file_id']);
+    try {
+        $driveStorageService->streamFile($document['fileID']);
+    } catch (Throwable $e) {
+        error_log('Drive stream failed: ' . $e->getMessage());
+    }
     exit;
 }

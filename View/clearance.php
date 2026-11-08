@@ -161,49 +161,74 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             </div> 
 
           <?php elseif ($student_view === "SUBJECT-REQUIREMENTS"): $subject_info = getSubjectRequireMents($subjectID); ?>
+          
                 <div class="row" style="justify-content: space-between; align-items:center">
                   <b class="view_title"><?= $subject_info[0]["name"] ?></b>
                   <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
                 </div>
-                <div class="row">
+                <div class="row subject_container">
                   <div class="column">
-                    <b><?= $subject_info[0]["prof_name"] ?></b>
-                    <b><?= $subjectID?></b>
+                    <b>NAME: <?= $subject_info[0]["prof_name"] ?></b>
+                    <b>SUBJECT CODE: <?= $subjectID?></b>
                     
                     
                   </div>
                   <div class="column">
-                    <b><?= $subject_info[0]["class_time"] ?></b>
-                    <b><?= $subject_info[0]["room"] ?></b>
-                    
+                    <b>CLASS TIME: <?= $subject_info[0]["class_time"] ?></b>
+                    <b>ROOM: <?= $subject_info[0]["room"] ?></b>
                     
                   </div>
                 </div>
-                <div class="clearance_instructions">
-                  <b>How to submit your clearance requirement</b>
-                  <p>Upload the document that proves you have completed this requirement for this clearance.</p>
-                  <ol>
-                    <li>Accepted formats: PDF, DOC, or DOCX (maximum 40MB).</li>
-                    <li>Make sure the file is complete, readable, and shows your name and student number.</li>
-                    <li>Choose your file, then click <b>Upload document</b>.</li>
-                    <li>Wait for the confirmation message. Your requirement stays <i>Not yet cleared</i> until it is reviewed.</li>
-                    <li>If it is rejected, read the remarks, fix the issue, and upload a new file.</li>
-                    <li>If your file is larger than 40 MB, upload it to your own Google Drive and set sharing to
-                        <b>"Anyone with the link can view"</b>. Copy the link and paste it into a new document,
-                        along with your name and student number. Export that document as a PDF and upload the PDF here.
-                        Do not edit, move, or delete the file in your Drive until your requirement is cleared.</li>
-                  </ol>
-                  <p>For questions, contact the person or office in charge of this requirement.</p>
+
+                <div class="requirement_container">
+                  <div class="clearance_instructions" style="font-size:20px">
+                    <b style="font-size:30px">How to submit your clearance requirement</b>
+                    <p>Upload the document that proves you have completed this requirement for this clearance.</p>
+                    <ol>
+                      <li>Accepted formats: PDF, DOC, or DOCX (maximum 40MB).</li>
+                      <li>Make sure the file is complete, readable, and shows your name and student number.</li>
+                      <li>Choose your file, then click <b>Upload document</b>.</li>
+                      <li>Wait for the confirmation message. Your requirement stays <i>Not yet cleared</i> until it is reviewed.</li>
+                      <li>If it is rejected, read the remarks, fix the issue, and upload a new file.</li>
+                      <li>If your file is larger than 40 MB, upload it to your own Google Drive and set sharing to
+                          <b>"Anyone with the link can view"</b>.<br> Copy the link and paste it into a new document,
+                          along with your name and student number. <br>Export that document as a PDF and upload the PDF here.
+                          Do not edit, move, or delete the file in your Drive until your requirement is cleared.</li>
+                    </ol>
+                    <p>For questions, contact the person or office in charge of this requirement.</p>
+                  </div>
+                  <div class="row" style="gap:20px; flex-wrap:wrap; justify-content:center" >
+                    <?php foreach($subject_info as $requirement): if ($requirement["file_name"] === null) continue;?>
+                      <div class="row file_container"  >
+                        <div class="row" style="align-items:center;">
+                          <img src="<?= BASE_PATH?>/View/resources/Document.png" alt="" class="file_icons">
+                          <b><?= $requirement["file_name"]?></b>
+                        </div>
+                        
+                        <b><?= $requirement['file_size'] ?></b>
+                        <!-- <div class="row" style="align-items:center;">
+                          <a href=""><img src="<= BASE_PATH?>/View/resources/Eye.png" alt="" class="file_icons"></a>
+                          <a href=""><img src="<= BASE_PATH?>/View/resources/Download.png" alt="" class="file_icons"></a>
+                        </div> -->
+                        <div class="row" style="align-items:center;">
+                          <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
+                            <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S" target="_blank">
+                              <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
+                            </a>
+                          <?php endif ?>
+                          
+                          <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S&amp;download=1">
+                            <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
+                          </a>
+                        </div>
+                      </div>
+
+                    <?php endforeach ?>
+                      
+                  </div>
+                  
                 </div>
-                <div class="row">
-                  <?php foreach($subject_info as $requirement): ?>
-                    <div>
-                      <?= $requirement["file_name"]?>
-                      <?= $requirement['file_size'] ?>
-                    </div>
-                  <?php endforeach ?>
-                </div>
-                <div class="row">
+                <div class="row fileupload_buttom">
                   <button>UPLOAD FILE</button>
                   <button>VIEW UPLOADS</button>
                 </div>

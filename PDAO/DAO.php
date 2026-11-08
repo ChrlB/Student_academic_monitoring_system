@@ -249,6 +249,7 @@ $clearanceDAO->prepareStatement("getSubjectRequirements","SELECT
         SS.day AS day,
         SS.roomID AS room,
         CONCAT(F.last_name, ', ', F.first_name) AS prof_name,
+        SCR.ID,
         SCR.fileID,
         SCR.file_name,
         SCR.mime_type,
@@ -281,3 +282,34 @@ $clearanceDAO->prepareStatement("getSubjectRequirements","SELECT
         S.subjectID = ?;
 
 ");
+
+$clearanceDAO->prepareStatement("findDocument","SELECT *
+    FROM (SELECT 
+        CONCAT('S',SCR.ID) AS ID,
+        SCR.fileID,
+        SCR.file_name,
+        SCR.mime_type,
+        SCR.file_size
+    FROM subject_clearance_requirements AS SCR
+    union
+    SELECT 
+        CONCAT('F',FCR.ID) AS ID,
+        FCR.fileID,
+        FCR.file_name,
+        FCR.mime_type,
+        FCR.file_size
+    FROM faculty_clearance_requirements AS FCR
+    union
+    SELECT 
+        CONCAT('O',OCR.ID) AS ID,
+        OCR.fileID,
+        OCR.file_name,
+        OCR.mime_type,
+        OCR.file_size
+    FROM office_clearance_requirements AS OCR) as CF
+    
+    WHERE CF.ID = ?;
+"
+);
+
+

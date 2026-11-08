@@ -83,5 +83,7 @@ $router->post('/upload-profile', fn() => uploadProfile());
 $router->get('/get-profile', fn() => getProfilePic());
 
 $router->post('/upload-document', fn($request) => uploadDocument($request));
+$router->get('/download-document', fn() => downloadDocument());
+$router->get('/view-document', fn() => require __DIR__ . '/../View/document.php');
 
 $router->dispatch();
