@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../PageLogic/login_logic.php';
+require_once __DIR__.'/../PageLogic/account_actions.php';   // changePassword(), updateProfile()
 require_once __DIR__."/../Services/session.php";
 require_once __DIR__."/../Services/imageHandler.php";
 require_once __DIR__ . '/../Services/documentHandler.php';
@@ -79,6 +80,10 @@ $router->post('/registration',  fn($request) => require __DIR__ . '/../View/regi
 
 $router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    
+
+// account popups (Change Password / Edit Profile). $_POST on purpose, not $_REQUEST.
+$router->post('/change-password', fn() => changePassword($_POST));
+$router->post('/edit-profile',    fn() => updateProfile($_POST));
  
 $router->post('/upload-profile', fn() => uploadProfile());
 $router->get('/get-profile', fn() => getProfilePic());
