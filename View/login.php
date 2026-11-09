@@ -103,6 +103,6 @@ function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | 
   </footer>
   <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="false"></div>
 
-  <script src="/View/script/login.js"></script>
+  <script src="<?= BASE_PATH ?>/View/script/login.js"></script>
 </body>
 </html>
