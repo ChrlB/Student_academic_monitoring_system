@@ -52,6 +52,7 @@ require_once __DIR__ . "/../PageLogic/registration_logic.php";
       </main>
     </div>
   </div>
+  <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 
 </html>

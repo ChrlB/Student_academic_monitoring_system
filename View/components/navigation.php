@@ -7,14 +7,14 @@ $page = $_SESSION["page"] ?? "";
 
 <div style="display: flex; flex-direction:row; ">
  
-<div class="column navbar scrollbar">
+<div class="column navbar scrollbar drop_shadow">
 
   <img src="<?= BASE_PATH?>/View/resources/logo1.png" alt="" class="nav_logo">
   
   <div class="buttons_section">
     
     
-    <a class="nav_buttons row DASHBOARD" href="<?= BASE_PATH?>/dashboard">
+    <a class="nav_buttons row DASHBOARD " href="<?= BASE_PATH?>/dashboard">
       <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/View Quilt.png" alt="" class="nav_button_icons"> </div>
       <input type="button" value="DASHBOARD"></a>
 
@@ -41,7 +41,7 @@ $page = $_SESSION["page"] ?? "";
     <a class="nav_buttons row SYLLABUS" href="<?= BASE_PATH?>/syllabus">
       <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Syllabus.png" alt="" class="nav_button_icons"></div>
       <input type="button" value="SYLLABUS"></a>
-    <a class="nav_buttons row CLEARANCE" href="<?= BASE_PATH?>/clearance">
+    <a class="nav_buttons row CLEARANCE " href="<?= BASE_PATH?>/clearance">
       <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/clearance.png" alt="" class="nav_button_icons"></div>
       <input type="button" value="CLEARANCE"></a>
     <a class="nav_buttons row ACCOUNT" href="<?= BASE_PATH?>/account">

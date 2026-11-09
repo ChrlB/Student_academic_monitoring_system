@@ -1130,5 +1130,6 @@ $csrf = $gradesLogic->csrfToken();
       </main>
     </div>
   </div>
+  <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>

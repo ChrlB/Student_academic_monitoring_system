@@ -1,5 +1,5 @@
-<div class="row">
-  <header>
+<div class="row ">
+  <header class="drop_shadow">
     <h2>
     <?php if($_SESSION["page"] == "SCHEDULE"):?>
       <?php if($_SESSION["role"] == "student"): echo "Hi Student! Here’s your schedule"?>

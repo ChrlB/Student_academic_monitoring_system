@@ -33,7 +33,7 @@ require_once __DIR__ . "/../PageLogic/dashboard_logic.php";
   </div>
 
 
-
+<?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 
 </html>

@@ -521,5 +521,6 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
 })();
 </script>
 <?php endif; ?>
+<?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>

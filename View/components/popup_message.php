@@ -1,13 +1,13 @@
 
 
 <?php  if (isset($_SESSION['message'])): ?>
-  <div class="popup">
+  <div class="popup drop_shadow">
     <?php echo $_SESSION['message'] ;?>
   </div>
   <?php unset($_SESSION['message']); ?>
 
 <?php  elseif (isset($_SESSION['error'])): ?>
-  <div class="popup error">
+  <div class="popup error drop_shadow">
     <?php echo $_SESSION['error'] ;?>
   </div>
   <?php unset($_SESSION['error']); ?>

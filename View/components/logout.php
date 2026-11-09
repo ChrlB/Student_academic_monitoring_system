@@ -1,5 +1,5 @@
 
-<dialog id="logout-dialog" class="confirm-dialog" aria-labelledby="logout-title">
+<dialog id="logout-dialog" class="confirm-dialog drop_shadow" aria-labelledby="logout-title">
 <form method="dialog">
     <h2 id="logout-title">Are you sure you want to logout?</h2>
     <div class="confirm-actions">

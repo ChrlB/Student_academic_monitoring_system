@@ -42,6 +42,6 @@
       </main>
     </div>
   </div>
-  <script src="/View/script/clearance.php"></script>
+  <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>

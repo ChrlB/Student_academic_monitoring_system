@@ -28,21 +28,21 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
       <?php require_once __DIR__ . "/components/header.php"; ?>
       <main class="column scrollbar" style="gap:20px">
         <!-- <div style="width:600px; height:400px; border:2px solid #444; border-radius:8px; overflow:hidden;">
-        <iframe src="serve.php?file=<= urlencode($file) ?>"
-                style="width:100%; height:100%; border:0;"></iframe>
-        </div> -->
+          <iframe src="serve.php?file=<= urlencode($file) ?>"
+                  style="width:100%; height:100%; border:0;"></iframe>
+          </div> -->
 
-        <!-- <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
-            <input type="file" name="document"
-                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  required>
-            <button type="submit">Upload document</button>
-        </form>
+          <!-- <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
+              <input type="file" name="document"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    required>
+              <button type="submit">Upload document</button>
+          </form>
         <img src="<?= BASE_PATH ?>/get-profile" width="150" height="150" alt="No profile picture yet"> -->
         <?php if ($_SESSION["role"] == "student"): ?>
           <?php if ($student_view == "MAIN"): ?>
             <div class="row" style=" gap:20px">
-              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box" onclick="this.submit()">
+              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
                 <div class="clearance_categ_box_upper_part">
 
                 </div>
@@ -51,7 +51,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 </div>
                 <input type="hidden" name="view" value="SUBJECTS">
               </form>
-              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box" onclick="this.submit()">
+              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
                 <div class="clearance_categ_box_upper_part">
 
                 </div>
@@ -60,7 +60,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 </div>
                 <input type="hidden" name="view" value="FACULTY">
               </form>
-              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box" onclick="this.submit()">
+              <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
                 <div class="clearance_categ_box_upper_part">
 
                 </div>
@@ -81,7 +81,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   </div>
 
                 </div>
-                <div class="updates_frame">
+                <div class="updates_frame  drop_shadow">
                   <table class="updates_table">
                     <thead>
                       <tr>
@@ -113,7 +113,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 </div>
               </div>
 
-              <div class="pie_chart">
+              <div class="pie_chart drop_shadow">
                 <canvas id="pie"></canvas>
               </div>
             </div>
@@ -143,7 +143,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             <div class="column" style="gap: 20px;">
               <?php foreach( $subjects as $subject):?>
                 
-                <form class="row clearance_box" action="<?= BASE_PATH ?>/clearance" method="get">
+                <form class="row clearance_box  drop_shadow" action="<?= BASE_PATH ?>/clearance" method="get">
                   <div class="column">
                     <b style="font-size: 50px;"><?= $subject["subjectID"].' - '.$subject["name"] ?></b>
                     <b style="font-size: 30px;"><?= $subject["prof_name"] ?></b>
@@ -165,7 +165,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           
                 <div class="row" style="justify-content: space-between; align-items:center">
                   <b class="view_title"><?= $subject_info[0]["name"] ?></b>
-                  <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+                  <a href="<?= BASE_PATH ?>/clearance?view=SUBJECTS" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
                 </div>
                 <div class="row subject_container">
                   <div class="column">
@@ -430,6 +430,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
       });
     </script>
   <?php endif ?>
+  <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 
 </html>
