@@ -82,13 +82,13 @@ function getfacultyClearance($faculty_lastname = 'ALL',$status = 'ALL'){
 
 function getSubjectRequireMents($subjectID){
     global $clearanceDAO;
-    $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ]);
+    $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ,$_SESSION['userID']]);
 
     return $records;
 }
 function getFacultyRequireMents($subjectID){
     global $clearanceDAO;
-    $records = $clearanceDAO->executeQuery("getFacultyRequirements",[ $subjectID ]);
+    $records = $clearanceDAO->executeQuery("getFacultyRequirements",[ $subjectID ,$_SESSION['userID']]);
 
     return $records;
 }

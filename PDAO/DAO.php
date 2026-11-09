@@ -183,7 +183,14 @@ $userDAO->prepareStatement( "getFacultyInfo",
   WHERE  concat('F',year(date_created),lpad(facultyID,5,0)) = ?"
 );
 
-
+$userDAO->prepareStatement("saveStudentFolderID","UPDATE 
+    TABLE students
+    SET folderID = ?;
+");
+$userDAO->prepareStatement("saveFacultyFolderID","UPDATE 
+    TABLE faculty
+    SET folderID = ?;
+");
 
 
 // CLEARANCE 
@@ -272,7 +279,7 @@ $clearanceDAO->prepareStatement("getSubjectRequirements","SELECT
     ON 	SCR.subjectID = ES.subjectID
         
     WHERE
-        S.subjectID = ?;
+        S.subjectID = ? and concat(year(ST.date_created),lpad(ES.studentID,5,0)) = ?;
 
 ");
 $clearanceDAO->prepareStatement("addSubjectRequirement","INSERT INTO 
@@ -343,33 +350,60 @@ $clearanceDAO->prepareStatement("addOfficeRequirement","INSERT INTO
 
 
 
-$clearanceDAO->prepareStatement("findDocument","SELECT *
-    FROM (SELECT 
-        CONCAT('S',SCR.ID) AS ID,
-        SCR.fileID,
-        SCR.file_name,
-        SCR.mime_type,
-        SCR.file_size
-    FROM subject_clearance_requirements AS SCR
-    union
-    SELECT 
-        CONCAT('F',FCR.ID) AS ID,
-        FCR.fileID,
-        FCR.file_name,
-        FCR.mime_type,
-        FCR.file_size
-    FROM faculty_clearance_requirements AS FCR
-    union
-    SELECT 
-        CONCAT('O',OCR.ID) AS ID,
-        OCR.fileID,
-        OCR.file_name,
-        OCR.mime_type,
-        OCR.file_size
-    FROM office_clearance_requirements AS OCR) as CF
-    
-    WHERE CF.ID = ?;
-"
+$clearanceDAO->prepareStatement("findClearanceDocument","SELECT
+        CF.ID,
+        CF.fileID,
+        CF.file_name,
+        CF.mime_type,
+        CF.file_size,
+        CF.studentID
+    FROM
+        (
+            SELECT
+                CONCAT('S', SCR.ID) AS ID,
+                SCR.fileID,
+                SCR.file_name,
+                SCR.mime_type,
+                SCR.file_size,
+                ES.studentID
+            FROM
+                subject_clearance_requirements AS SCR
+            INNER JOIN enrolled_subjects AS ES
+            ON
+                ES.subjectID = SCR.subjectID
+            UNION
+            SELECT
+                CONCAT('F', FCR.ID) AS ID,
+                FCR.fileID,
+                FCR.file_name,
+                FCR.mime_type,
+                FCR.file_size,
+                FC.studentID
+            FROM
+                faculty_clearance_requirements AS FCR
+            INNER JOIN faculty_clearance AS FC
+            ON
+                FC.faculty_clearanceID = FCR.faculty_clearanceID
+            UNION
+            SELECT
+                CONCAT('O', OCR.ID) AS ID,
+                OCR.fileID,
+                OCR.file_name,
+                OCR.mime_type,
+                OCR.file_size,
+                OC.studentID
+            FROM
+                office_clearance_requirements AS OCR
+            INNER JOIN office_clearance AS OC
+            ON
+                OC.office_clearanceID = OCR.office_clearanceID
+        ) AS CF
+    INNER JOIN students AS ST
+    ON
+        CF.studentID = ST.studentID
+    WHERE
+        CF.ID = ? AND CONCAT( YEAR(ST.date_created), LPAD(CF.studentID, 5, 0)) = ?;
+    "
 );
 
 

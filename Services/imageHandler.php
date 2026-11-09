@@ -140,7 +140,7 @@ function getProfilePic(){
     if (is_resource($imageBinaryData)) {
         $imageBinaryData = stream_get_contents($imageBinaryData);
     }
-
+      
     header('Cache-Control: private, no-cache');
 
     if ($imageBinaryData === null || $imageBinaryData === '' || $storedMimeType === null) {

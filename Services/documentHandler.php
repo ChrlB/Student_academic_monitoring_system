@@ -61,6 +61,7 @@ function uploadDocument($request): void
                 $driveConfig['refreshToken'],
                 $_SESSION['folderID']
             );
+            $clearanceDAO->executeUpdate("saveStudentFolderID",[$_SESSION['folderID']]);
         }
 
         $driveFileId = $driveStorageService->uploadFile(
@@ -171,7 +172,7 @@ function downloadDocument(): void
             http_response_code(400);
             exit;
         }
-        $documentRows = $clearanceDAO->executeQuery('findDocument', [$categ.$requestedDocumentId]);
+        $documentRows = $clearanceDAO->executeQuery('findClearanceDocument', [$categ.$requestedDocumentId, $_SESSION['userID']]);
         if (empty($documentRows)) {
             http_response_code(404);
             exit;
