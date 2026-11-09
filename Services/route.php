@@ -62,8 +62,9 @@ $router->get('/login',  fn() => require __DIR__ . '/../View/login.php');
 $router->get('/account',  fn() => require __DIR__ . '/../View/account.php');
 $router->get('/attendance', fn() => require __DIR__ . '/../View/attendance.php');
 $router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
-
+$router->post('/class-sched', fn() => require __DIR__ . '/../View/class_sched.php');
 $router->get('/clearance',  fn() => require __DIR__ . '/../View/clearance.php');
+
 // $router->post('/clearance',  fn($request) => require __DIR__ . '/../View/clearance.php');
 
 $router->get('/dashboard', fn() => require __DIR__ . '/../View/dashboard.php');
