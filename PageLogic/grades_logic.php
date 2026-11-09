@@ -46,7 +46,7 @@ class GradesLogic
     public function currentUserID()
     {
         $role = strtolower(trim((string)($_SESSION['role'] ?? '')));
-        if (preg_match('/student/', $role) || !preg_match('/prof|faculty|instructor|teacher|coordinator|dean/', $role)) {
+        if (preg_match('/student/', $role) || !preg_match('/prof|faculty|instructor|teacher|coordinator|dean|registrar/', $role)) {
             return 0;
         }
 
@@ -66,6 +66,170 @@ class GradesLogic
         }
 
         return ctype_digit($raw) ? (int)$raw : 0;
+    }
+
+    private function currentStudentID(): int
+    {
+        if (($_SESSION['role'] ?? '') !== 'student') {
+            return 0;
+        }
+
+        $studentID = $_SESSION['real_userID'] ?? null;
+        return is_scalar($studentID) && ctype_digit((string)$studentID)
+            ? (int)$studentID
+            : 0;
+    }
+
+    public function studentSemesters(): array
+    {
+        $studentID = $this->currentStudentID();
+        if ($studentID <= 0) {
+            return [];
+        }
+
+        $rows = $this->all(
+            "SELECT DISTINCT ep.acad_year, ep.sem
+             FROM enrolled_subjects es
+             JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
+             WHERE es.studentID = :studentID
+               AND es.status = 'approved'
+             ORDER BY ep.acad_year DESC, ep.sem DESC",
+            [':studentID' => $studentID]
+        );
+
+        foreach ($rows as &$row) {
+            $row['key'] = $row['acad_year'] . '|' . (int)$row['sem'];
+            $row['label'] = self::semesterLabel($row['acad_year'], $row['sem']);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
+    public function studentGrades(string $semesterKey): array
+    {
+        $studentID = $this->currentStudentID();
+        $semester = $this->splitSemester($semesterKey);
+        if ($studentID <= 0 || !$semester) {
+            return [];
+        }
+
+        list($acadYear, $sem) = $semester;
+        return $this->all(
+            "SELECT TRIM(es.subjectID) AS subject_code,
+                    s.name AS subject_name,
+                    es.midterm_grade,
+                    es.final_grade
+             FROM enrolled_subjects es
+             JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
+             JOIN subjects s ON TRIM(s.subjectID) = TRIM(es.subjectID)
+             WHERE es.studentID = :studentID
+               AND es.status = 'approved'
+               AND ep.acad_year = :acadYear
+               AND ep.sem = :sem
+             ORDER BY es.subjectID",
+            [
+                ':studentID' => $studentID,
+                ':acadYear' => $acadYear,
+                ':sem' => $sem,
+            ]
+        );
+    }
+
+    public static function percentageToGwa(float $percentage): ?float
+    {
+        if ($percentage < 0 || $percentage > 100) {
+            return null;
+        }
+
+        if ($percentage < 75) {
+            return 5.00;
+        }
+        if ($percentage < 76) {
+            return 3.00;
+        }
+        if ($percentage < 79) {
+            return 2.75;
+        }
+        if ($percentage < 82) {
+            return 2.50;
+        }
+        if ($percentage < 85) {
+            return 2.25;
+        }
+        if ($percentage < 88) {
+            return 2.00;
+        }
+        if ($percentage < 91) {
+            return 1.75;
+        }
+        if ($percentage < 94) {
+            return 1.50;
+        }
+        if ($percentage < 97) {
+            return 1.25;
+        }
+
+        return 1.00;
+    }
+
+    public static function percentageRemark(float $percentage): string
+    {
+        if ($percentage === 4.0) {
+            return 'Remedial';
+        }
+
+        return $percentage >= 75 ? 'Passed' : 'Failed';
+    }
+
+    public function studentGwaSummary(): array
+    {
+        $studentID = $this->currentStudentID();
+        if ($studentID <= 0) {
+            return ['overall' => null, 'terms' => []];
+        }
+
+        $rows = $this->all(
+            "SELECT ep.acad_year, ep.sem, es.final_grade
+             FROM enrolled_subjects es
+             JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
+             WHERE es.studentID = :studentID
+               AND es.status = 'approved'
+               AND es.final_grade IS NOT NULL
+             ORDER BY ep.acad_year DESC, ep.sem DESC",
+            [':studentID' => $studentID]
+        );
+
+        $totals = [];
+        $overallTotal = 0.0;
+        $overallCount = 0;
+        foreach ($rows as $row) {
+            $gradePoint = self::percentageToGwa((float)$row['final_grade']);
+            if ($gradePoint === null) {
+                continue;
+            }
+
+            $key = $row['acad_year'] . '|' . (int)$row['sem'];
+            if (!isset($totals[$key])) {
+                $totals[$key] = ['total' => 0.0, 'count' => 0];
+            }
+            $totals[$key]['total'] += $gradePoint;
+            $totals[$key]['count']++;
+            $overallTotal += $gradePoint;
+            $overallCount++;
+        }
+
+        $terms = [];
+        foreach ($totals as $key => $total) {
+            $terms[$key] = round($total['total'] / $total['count'], 2);
+        }
+
+        return [
+            'overall' => $overallCount > 0
+                ? round($overallTotal / $overallCount, 2)
+                : null,
+            'terms' => $terms,
+        ];
     }
 
     public function csrfToken()
@@ -98,6 +262,14 @@ class GradesLogic
              ORDER BY ep.acad_year DESC, ep.sem DESC",
             [':facultyID' => $facultyID]
         );
+
+        if (!$rows) {
+            $rows = $this->all(
+                "SELECT DISTINCT acad_year, sem
+                 FROM enrollment_period
+                 ORDER BY acad_year DESC, sem DESC"
+            );
+        }
 
         foreach ($rows as &$row) {
             $row['key'] = $row['acad_year'] . '|' . (int)$row['sem'];

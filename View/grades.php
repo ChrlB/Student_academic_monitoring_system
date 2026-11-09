@@ -7,13 +7,37 @@ function grades_e($value)
 }
 
 $gradesLogic = new GradesLogic();
-$semesters = $gradesLogic->semesters();
+$accountRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
+$isStudentAccount = $accountRole === 'student';
+$isFacultyAccount = in_array($accountRole, ['prof', 'dean', 'program coordinator', 'registrar'], true);
+$semesters = $isStudentAccount
+    ? $gradesLogic->studentSemesters()
+    : ($isFacultyAccount ? $gradesLogic->semesters() : []);
 $semesterKey = $gradesLogic->selectedSemester($_GET['sem'] ?? '', $semesters);
 $semesterLabel = $gradesLogic->semesterLabelForKey($semesterKey, $semesters);
+
+if ($isStudentAccount) {
+    $studentGrades = $gradesLogic->studentGrades($semesterKey);
+    $gwaSummary = $gradesLogic->studentGwaSummary();
+    $semesterGwa = $gwaSummary['terms'][$semesterKey] ?? null;
+    $overallGwa = $gwaSummary['overall'];
+    $gradedCount = count(array_filter(
+        $studentGrades,
+        static function (array $grade): bool {
+            return $grade['final_grade'] !== null;
+        }
+    ));
+    $gradeCount = count($studentGrades);
+    $progress = $gradeCount > 0 ? (int)round($gradedCount / $gradeCount * 100) : 0;
+    $semesterDisplay = $semesterLabel !== ''
+        ? str_replace(', AY ', ' ', $semesterLabel)
+        : 'No grades available';
+}
+
 $view = ($_GET['view'] ?? 'preview') === 'gradebook' ? 'gradebook' : 'preview';
 $scheduleID = (int)($_GET['class'] ?? $_POST['class'] ?? 0);
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_grades') {
+if ($isFacultyAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_grades') {
     $semesterKey = $gradesLogic->selectedSemester($_POST['sem'] ?? '', $semesters);
     $semesterLabel = $gradesLogic->semesterLabelForKey($semesterKey, $semesters);
     $class = $gradesLogic->assignedClass($scheduleID, $semesterKey);
@@ -69,14 +93,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_
     exit;
 }
 
-$classPreview = $gradesLogic->classPreview($semesterKey);
+$classPreview = $isFacultyAccount ? $gradesLogic->classPreview($semesterKey) : [];
 $class = null;
 $roster = null;
-$flash = $gradesLogic->takeFlash();
+$flash = $isFacultyAccount ? $gradesLogic->takeFlash() : null;
 $oldGrades = $_SESSION['grades_old'] ?? [];
 unset($_SESSION['grades_old']);
 
-if ($view === 'gradebook') {
+if ($isFacultyAccount && $view === 'gradebook') {
     $class = $gradesLogic->assignedClass($scheduleID, $semesterKey);
     if ($class) {
         $roster = $gradesLogic->classStudents($class, (int)($_GET['page'] ?? 1));
@@ -92,8 +116,17 @@ $csrf = $gradesLogic->csrfToken();
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS - Grades</title>
   <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/general.css">
+  <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/student_grades.css">
   <style>
+    body,
+    body * {
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
+
     .grades-add-shell {
       width: 100%;
       min-height: 100%;
@@ -187,6 +220,11 @@ $csrf = $gradesLogic->csrfToken();
       width: 100%;
     }
 
+    .grades-main--preview .grades-sidebar > .term-group {
+      width: fit-content;
+      max-width: 100%;
+    }
+
     .grades-sidebar {
       display: grid;
       grid-template-columns: minmax(100px, 120px) minmax(0, 1fr);
@@ -266,11 +304,28 @@ $csrf = $gradesLogic->csrfToken();
       cursor: pointer;
     }
 
-    .grades-main--preview .class-scope-btn {
-      grid-column: 1;
-      grid-row: 2;
+    .preview-toolbar {
+      grid-column: 1 / -1;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .preview-toolbar-actions {
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .preview-toolbar .class-scope-btn {
       width: 120px;
       margin-top: 0;
+      flex-shrink: 0;
     }
 
     .grade-content {
@@ -431,6 +486,11 @@ $csrf = $gradesLogic->csrfToken();
       width: 100%;
     }
 
+    .grades-main--preview .term-picker {
+      width: fit-content;
+      max-width: 100%;
+    }
+
     .term-picker select {
       width: 100%;
       min-width: 0;
@@ -444,6 +504,13 @@ $csrf = $gradesLogic->csrfToken();
       font-size: 0.95rem;
       font-weight: 600;
       letter-spacing: 0;
+    }
+
+    .grades-main--preview .term-picker select {
+      width: auto;
+      max-width: 100%;
+      padding-left: 12px;
+      padding-right: 28px;
     }
 
     .term-picker select option {
@@ -613,6 +680,27 @@ $csrf = $gradesLogic->csrfToken();
         column-gap: 10px;
       }
 
+      .preview-toolbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .preview-toolbar-actions {
+        justify-content: flex-start;
+      }
+
+      .grades-main--preview .grades-sidebar > .term-group {
+        width: 100%;
+      }
+
+      .grades-main--preview .term-picker {
+        width: 100%;
+      }
+
+      .grades-main--preview .term-picker select {
+        width: 100%;
+      }
+
       .back-btn {
         width: 100%;
       }
@@ -629,8 +717,127 @@ $csrf = $gradesLogic->csrfToken();
   <div class="row main_box">
     <?php require_once __DIR__ . "/components/navigation.php"; ?>
     <div class="column" style="flex: 1;">
-      <main class="column scrollbar">
-        <div class="grades-add-shell">
+      <main class="column scrollbar<?= $isStudentAccount ? ' student-grades-main' : '' ?>">
+      <?php if ($_SESSION['role'] === 'student'): ?>
+        <section class="student-grades" aria-labelledby="student-grades-title">
+          <header class="student-grades__heading">
+            <img class="student-grades__icon" src="<?= BASE_PATH ?>/View/resources/Grades.png" alt="">
+            <div>
+              <h1 id="student-grades-title">GRADES</h1>
+              <p>Track your academic performance</p>
+            </div>
+          </header>
+
+          <div class="student-grades__toolbar">
+            <form method="get" action="<?= BASE_PATH ?>/grades">
+              <label class="sr-only" for="student-grade-term">Select term</label>
+              <select class="student-grades__term" id="student-grade-term" name="sem"
+                      aria-label="Select term" onchange="this.form.submit()" <?= empty($semesters) ? 'disabled' : '' ?>>
+                <?php if (empty($semesters)): ?>
+                  <option value="">No terms available</option>
+                <?php endif; ?>
+                <?php foreach ($semesters as $semester): ?>
+                  <option value="<?= grades_e($semester['key']) ?>" <?= $semester['key'] === $semesterKey ? 'selected' : '' ?>>
+                    Select Term — <?= grades_e($semester['label']) ?>
+                  </option>
+                <?php endforeach; ?>
+              </select>
+            </form>
+            <span class="student-grades__period"><?= grades_e($semesterDisplay) ?></span>
+          </div>
+
+          <div class="student-grades__layout">
+            <aside class="student-grades__summary" aria-label="Grade summary">
+              <section class="student-grades__card">
+                <h2>GWA Tracker</h2>
+                <div class="student-grades__metric" aria-label="Semester GWA">
+                  <?= $semesterGwa !== null ? number_format($semesterGwa, 2) : '—' ?>
+                </div>
+                <p class="student-grades__metric-note">
+                  Average of posted final grades converted to the GWA scale.
+                </p>
+                <div class="student-grades__progress" role="progressbar"
+                     aria-label="Final grades posted" aria-valuemin="0" aria-valuemax="100"
+                     aria-valuenow="<?= $progress ?>">
+                  <span style="width: <?= $progress ?>%"></span>
+                </div>
+                <p class="student-grades__metric-note">
+                  <?= $gradedCount ?> of <?= $gradeCount ?> final grades posted (<?= $progress ?>%)
+                </p>
+              </section>
+
+              <section class="student-grades__card">
+                <h2>Overall GWA</h2>
+                <div class="student-grades__metric" aria-label="Overall GWA">
+                  <?= $overallGwa !== null ? number_format($overallGwa, 2) : '—' ?>
+                </div>
+                <p class="student-grades__metric-note">
+                  Average of all posted final grades converted to the GWA scale.
+                </p>
+                <?php if ($semesters): ?>
+                  <ul class="student-grades__history">
+                    <?php foreach ($semesters as $semester): ?>
+                      <li>
+                        <span><?= grades_e(str_replace(', AY ', ' ', $semester['label'])) ?></span>
+                        <strong>
+                          <?= isset($gwaSummary['terms'][$semester['key']])
+                              ? number_format($gwaSummary['terms'][$semester['key']], 2)
+                              : '—' ?>
+                        </strong>
+                      </li>
+                    <?php endforeach; ?>
+                  </ul>
+                <?php else: ?>
+                  <p class="student-grades__history-note">No semester grades are available yet.</p>
+                <?php endif; ?>
+              </section>
+            </aside>
+
+            <section class="student-grades__table-panel" aria-labelledby="subject-grades-title">
+              <h2 id="subject-grades-title">Subject Grades</h2>
+              <?php if ($studentGrades): ?>
+                <div class="student-grades__table-wrap">
+                  <table class="student-grades__table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Subject Code</th>
+                        <th scope="col">Subject Title</th>
+                        <th scope="col">Midterm Grade</th>
+                        <th scope="col">Final Grade</th>
+                        <th scope="col">Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <?php foreach ($studentGrades as $grade):
+                          $midtermGrade = $grade['midterm_grade'] !== null
+                              ? number_format((float)$grade['midterm_grade'], 2)
+                              : '—';
+                          $finalGrade = $grade['final_grade'] !== null
+                              ? number_format((float)$grade['final_grade'], 2)
+                              : '—';
+                          $remarks = $grade['final_grade'] !== null
+                              ? GradesLogic::percentageRemark((float)$grade['final_grade'])
+                              : ($grade['midterm_grade'] !== null ? 'Final grade pending' : 'Grades pending');
+                      ?>
+                        <tr>
+                          <td><?= grades_e($grade['subject_code']) ?></td>
+                          <td><?= grades_e($grade['subject_name']) ?></td>
+                          <td><?= grades_e($midtermGrade) ?></td>
+                          <td><?= grades_e($finalGrade) ?></td>
+                          <td><?= grades_e($remarks) ?></td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
+              <?php else: ?>
+                <div class="student-grades__empty">No approved subject grades are available for this term.</div>
+              <?php endif; ?>
+            </section>
+          </div>
+        </section>
+      <?php elseif (in_array($_SESSION['role'], ['prof', 'dean', 'program coordinator', 'registrar'], true)): ?>
+      <div class="grades-add-shell">
           <div class="grades-add-panel">
             <div class="grades-toolbar">
               <div class="grades-title-wrap">
@@ -655,8 +862,10 @@ $csrf = $gradesLogic->csrfToken();
                     : BASE_PATH . '/dashboard' ?>">Back</a>
 
                 <form class="term-group" method="get" action="<?= BASE_PATH ?>/grades">
-                  <?php if ($view === 'gradebook' && $class): ?>
+                  <?php if ($view === 'gradebook'): ?>
                     <input type="hidden" name="view" value="gradebook">
+                  <?php endif; ?>
+                  <?php if ($view === 'gradebook' && $class): ?>
                     <input type="hidden" name="class" value="<?= (int)$class['schedID'] ?>">
                   <?php endif; ?>
                   <div class="term-picker">
@@ -674,25 +883,30 @@ $csrf = $gradesLogic->csrfToken();
                   <noscript><button class="term-btn" type="submit">Show Term</button></noscript>
                 </form>
                 <?php if ($view === 'preview'): ?>
-                  <a class="class-scope-btn grades-action-link" href="<?= BASE_PATH ?>/grades?<?= http_build_query(['sem' => $semesterKey]) ?>">Class Preview</a>
+                  <?php
+                    $gradebookParams = ['view' => 'gradebook', 'sem' => $semesterKey];
+                    if (!empty($classPreview)) {
+                        $gradebookParams['class'] = (int)$classPreview[0]['schedID'];
+                    }
+                  ?>
+                  <div class="preview-toolbar">
+                    <a class="class-scope-btn grades-action-link" href="<?= BASE_PATH ?>/grades?<?= http_build_query(['sem' => $semesterKey]) ?>">Class Preview</a>
+                    <div class="preview-toolbar-actions">
+                      <div class="semester-pill"><?= grades_e($semesterLabel ?: 'No assigned semester') ?></div>
+                      <a class="add-grade-btn grades-action-link" href="<?= BASE_PATH ?>/grades?<?= http_build_query($gradebookParams) ?>">
+                        Add New Grade
+                      </a>
+                    </div>
+                  </div>
                 <?php endif; ?>
               </aside>
 
               <section class="grade-content">
-                <div class="grade-head">
-                  <div class="semester-pill"><?= grades_e($semesterLabel ?: 'No assigned semester') ?></div>
-                  <?php if ($view === 'preview'): ?>
-                    <?php
-                      $gradebookParams = ['view' => 'gradebook', 'sem' => $semesterKey];
-                      if (!empty($classPreview)) {
-                          $gradebookParams['class'] = (int)$classPreview[0]['schedID'];
-                      }
-                    ?>
-                    <a class="add-grade-btn grades-action-link" href="<?= BASE_PATH ?>/grades?<?= http_build_query($gradebookParams) ?>">
-                      Add New Grade
-                    </a>
-                  <?php endif; ?>
-                </div>
+                <?php if ($view === 'gradebook'): ?>
+                  <div class="grade-head">
+                    <div class="semester-pill"><?= grades_e($semesterLabel ?: 'No assigned semester') ?></div>
+                  </div>
+                <?php endif; ?>
 
                 <?php if ($view === 'gradebook' && $class && $roster): ?>
                   <section class="gradebook-panel" aria-labelledby="gradebook-class-title">
@@ -808,6 +1022,9 @@ $csrf = $gradesLogic->csrfToken();
             </div>
           </div>
         </div>
+        <?php else: ?>
+          <p>Account role could not be verified for this grades page.</p>
+        <?php endif; ?>
       </main>
     </div>
   </div>
