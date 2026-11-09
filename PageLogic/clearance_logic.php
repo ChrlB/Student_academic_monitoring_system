@@ -9,7 +9,7 @@ $data = [];
 $labels = [];
 $values = [];
 
-$subjectID = "ALL";
+$search = "ALL";
 $status = "ALL";
 
 
@@ -33,14 +33,13 @@ if($_SESSION["role"] == "student"){
 }
 
 // var_dump( isset($_GET["view"]));
-if($student_view == "SUBJECTS"){
-    $subjectID = trim($_GET['search'] ?? '');
-    if ($subjectID === '') { $subjectID = 'ALL'; }  
+if( in_array($student_view, ["SUBJECTS","FACULTY"])){
+    $search = trim($_GET['search'] ?? '');
+    if ($search === '') { $search = 'ALL'; }  
     $status =  ($_GET['statusfilter'] ?? 'ALL');
     // echo $subjectID.$status;
-}elseif($student_view == "SUBJECT-REQUIREMENTS"){
-    $subjectID = trim($_GET['subjectID'] ?? '');
-    
+}elseif(in_array($student_view, ["SUBJECT-REQUIREMENTS", "FACULTY-REQUIREMENTS"])){
+    $search = trim($_GET['search'] ?? '');
 }
 
 function statusClass(string $status): string{
@@ -63,6 +62,22 @@ function getSubjectsClearance($subjectID = 'ALL',$status = 'ALL'){
     // var_dump($_SESSION["userID"]);
     // var_dump($records);
 }
+function getfacultyClearance($faculty_lastname = 'ALL',$status = 'ALL'){
+    global $clearanceDAO;
+    
+    
+
+    $records = $clearanceDAO->executeQuery("getFacultyClearance",[
+        $faculty_lastname, $faculty_lastname,
+        $_SESSION["userID"], 
+        $status,$status
+    ]);
+
+    return $records;
+    // var_dump($subjectID == 'ALL');
+    // var_dump($_SESSION["userID"]);
+    // var_dump($records);
+}
 
 
 function getSubjectRequireMents($subjectID){
@@ -71,3 +86,15 @@ function getSubjectRequireMents($subjectID){
 
     return $records;
 }
+function getFacultyRequireMents($subjectID){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getFacultyRequirements",[ $subjectID ]);
+
+    return $records;
+}
+// function getSubjectRequireMents($subjectID){
+//     global $clearanceDAO;
+//     $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ]);
+
+//     return $records;
+// }

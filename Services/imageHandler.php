@@ -104,7 +104,7 @@ function uploadProfile(){
       } else {
           $imageBinaryData = $processedImage['imageBinaryData'];
           $savedMimeType = $processedImage['mimeType'];
-          // $saveStatement->bind_param('iss', $loggedInUserId, $imageBinaryData, $savedMimeType);
+         
 
           $upload_for = ($_SESSION['role'] == "student")
                 ? "uploadStudentProfile"

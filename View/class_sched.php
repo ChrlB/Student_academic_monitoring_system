@@ -176,6 +176,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS-Schedule</title>
+  <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/schedule.css">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/general.css">
 </head>
