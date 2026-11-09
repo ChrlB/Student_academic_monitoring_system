@@ -321,11 +321,11 @@ $clearanceDAO->prepareStatement("getFacultyRequirements","SELECT
         faculty_clearance AS FC
     INNER JOIN students AS ST
     ON
-        ST.studentID = ES.studentID
+        ST.studentID = FC.studentID
     LEFT JOIN faculty AS F
-    ON  F.facultyID = SS.facultyID
+    ON  F.facultyID = FC.facultyID
     left JOIN faculty_clearance_requirements AS FCR
-    ON 	FCR.facultyID = F.facultyID
+    ON 	FCR.faculty_clearanceID = FC.faculty_clearanceID
         
     WHERE
         F.facultyID = ?;

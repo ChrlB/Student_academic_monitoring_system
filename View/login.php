@@ -22,7 +22,7 @@ function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/View/style/login.css">
+  <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/login.css">
 </head>
 
 <body data-flash-error="<?= e($flashError) ?>" data-flash-message="<?= e($flashMessage) ?>">
@@ -58,14 +58,14 @@ function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | 
     <section class="card" aria-labelledby="login-title">
 
       <div class="brand brand--card">
-        <img src="/View/resources/logo1.png" alt="logo" class="brand-logo">
+        <img src="<?= BASE_PATH ?>/View/resources/logo1.png" alt="logo" class="brand-logo">
       </div>
 
       <h2 id="login-title" class="sr-only">Log in to your account</h2>
 
       <div id="alert" class="alert" role="alert" hidden></div>
 
-      <form id="login-form" action="/login" method="post" novalidate>
+      <form id="login-form" action="<?= BASE_PATH ?>/login" method="post" novalidate>
         <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
 
         <label for="school-id">School ID</label>

@@ -264,10 +264,11 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <b style="font-size: 30px;"><?= $faculty["prof_name"] ?></b>
                   </div>
                   <div >
-                    <input type="hidden" name="view" value="FACULTY-REQUIREMENTS">
+                    
                     <button type="submit" onclick="this.form.submit()" style="background-color: transparent; border:0px;">
                       <img src="<?= BASE_PATH?>/View/resources/openClearance.png" alt="" class="open_button" >
                     </button>
+                    <input type="hidden" name="view" value="FACULTY-REQUIREMENTS">
                     <input type="hidden" name="search" value="<?php echo $faculty["facultyID"] ?>">
                   </div>
 

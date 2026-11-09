@@ -13,7 +13,7 @@ $search = "ALL";
 $status = "ALL";
 
 
-$allowedViews = ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE','SUBJECT-REQUIREMENTS'];
+$allowedViews = ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE','SUBJECT-REQUIREMENTS','FACULTY-REQUIREMENTS'];
 $student_view = strtoupper($_GET['view'] ?? 'MAIN');
 if (!in_array($student_view, $allowedViews, true)) {
     $student_view = 'MAIN';
