@@ -67,7 +67,6 @@ function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v)
       <div class="sp-radios" role="radiogroup" aria-label="Class type">
         <label class="sp-radio"><input type="radio" name="class_type" value="LEC" <?= $type === 'LEC' ? 'checked' : '' ?>> <span>LECTURE (LEC)</span></label>
         <label class="sp-radio"><input type="radio" name="class_type" value="LAB" <?= $type === 'LAB' ? 'checked' : '' ?>> <span>LABORATORY (LAB)</span></label>
-        <label class="sp-radio"><input type="radio" name="class_type" value="GEC" <?= $type === 'GEC' ? 'checked' : '' ?>> <span>GENERAL EDUCATION (GEC)</span></label>
       </div>
     </div>
 
@@ -180,7 +179,6 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS-Schedule</title>
-  <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/schedule.css">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/general.css">
 </head>
@@ -244,7 +242,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
                       <?php endif; ?>
                     <?php else: foreach ($items as $it): ?>
                       <div class="class-item">
-                        <span class="sp-tag"><?= $it['type'] === 'LAB' ? 'Laboratory' : 'Lecture' ?></span>
+                        <span class="sp-tag"><?= $it['type'] === 'LAB' ? 'Laboratory' : 'Assigned Class' ?></span>
                         <strong class="class-item__name"><?= sched_e($it['subject_code']) ?> • <?= sched_e($it['block_label']) ?></strong>
                         <span><?= sched_e($it['range']) ?></span>
                         <span>Room <?= sched_e($it['roomID']) ?></span>
@@ -279,8 +277,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
           </div>
 
           <header class="class-head">
-            <div class="class-head__icon">
-              <?= str_replace('width="16" height="16"', 'width="40" height="40"', sched_icon('laptop')) ?></div>
+            <div class="class-head__icon"><?= str_replace('width="16" height="16"', 'width="40" height="40"', sched_icon('laptop')) ?></div>
             <div>
               <h2 class="sched-title"><?= sched_e($sched['subject_code']) ?> &nbsp;-&nbsp; <?= sched_e($sched['block_label']) ?></h2>
               <p class="class-head__sub"><?= sched_e($sched['subject_name']) ?></p>
@@ -552,6 +549,5 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
 })();
 </script>
 <?php endif; ?>
-<?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>

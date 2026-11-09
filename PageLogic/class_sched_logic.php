@@ -55,7 +55,8 @@ class ScheduleLogic
         $this->group  = self::roleGroup($this->role);
     }
 
-// Pang identify ng roles
+
+
     public static function roleGroup($role)
     {
         $r = strtolower(trim((string)$role));
@@ -64,13 +65,13 @@ class ScheduleLogic
         return 'student';
     }
 
-// Only the program coordinator and the dean may create or edit schedules.
+    /** Only the program coordinator and the dean may create or edit schedules. */
     public function canManage()
     {
         return (bool)preg_match('/coordinator|dean/', $this->role);
     }
 
-//Pang format
+   
     public static function parseDays($raw)
     {
         $found = [];
@@ -145,7 +146,7 @@ class ScheduleLogic
         return ucwords(strtolower(trim((string)$s)));
     }
 
-//Lookups for dropdowns
+    
 
     private function all($sql, array $params = [])
     {
@@ -169,7 +170,7 @@ class ScheduleLogic
         return $rows;
     }
 
-// Return a valid "acad|sem" key
+    /** Returns a valid "acad|sem" key, falling back to the newest semester. */
     public function selectedSemester($requested)
     {
         $list = $this->semesters();
@@ -185,7 +186,7 @@ class ScheduleLogic
         return [$p[0] ?? '', (int)($p[1] ?? 0)];
     }
 
-// Program + block pairs
+    /** Program + block pairs, value = "BSCS|1A", label = "BSCS 1A". */
     public function blocks()
     {
         $rows = $this->all(
@@ -231,8 +232,7 @@ class ScheduleLogic
         return $r[0] ?? null;
     }
 
-//Schedule reads (sql command tu)
-
+    
     const BASE_SELECT =
         "SELECT ss.schedID, ss.subjectID, s.name AS subject_name, ss.facultyID,
                 CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
@@ -254,7 +254,7 @@ class ScheduleLogic
         return $r;
     }
 
-// Role-filtered schedules for one semester ("acad|sem"). Manager view can filter by block text
+    /** Role-filtered schedules for one semester ("acad|sem"). Manager view can filter by block text. */
     public function schedules($semKey, $search = '')
     {
         list($acad, $sem) = self::splitSemester($semKey);
@@ -285,7 +285,7 @@ class ScheduleLogic
         return $rows ? $this->decorate($rows[0]) : null;
     }
 
-// Groups rows into Monday..Sunday buckets (a row with several days appears in each). 
+    /** Groups rows into Monday..Sunday buckets (a row with several days appears in each). */
     public function week(array $rows)
     {
         $w = array_fill_keys(self::WEEK, []);
@@ -295,7 +295,7 @@ class ScheduleLogic
         return $w;
     }
 
-// Paginated, searchable roster for a class.
+    /** Paginated, searchable roster for a class. */
     public function classStudents(array $row, $q, $page, $per = 6)
     {
         $where  = "es.subjectID = :sub AND es.enrollmentID = :eid AND es.status = 'approved'
@@ -326,7 +326,7 @@ class ScheduleLogic
         return ['rows' => $rows, 'total' => $total, 'page' => $page, 'pages' => $pages, 'offset' => $off];
     }
 
-//Writes 
+   
 
     private function normTime($t)
     {
@@ -365,7 +365,6 @@ class ScheduleLogic
         return array_values(array_unique($out));
     }
 
-    // Create ($id null) or update a schedule. Returns ['ok'=>bool, 'errors'=>[...]].
     public function save($id, array $in)
     {
         $errors = [];
@@ -403,7 +402,7 @@ class ScheduleLogic
         if ($errors) return ['ok' => false, 'errors' => $errors];
 
         $errors = $this->conflicts($acad, $sem, (int)$id, $faculty, $room, $program, $block, $days, $start, $end);
-        if ($errors) return ['ok' => false, 'errors' => $errors];
+        if ($errors) return ['ok' => false, 'errors' => $errors, 'conflict' => true];
 
         $params = [
             ':sub' => $subjectID, ':fac' => $faculty, ':eid' => (int)$ep[0]['enrollmentID'],
@@ -432,7 +431,6 @@ class ScheduleLogic
         return ['ok' => true, 'errors' => []];
     }
 
-// Request handling (POST -> redirect -> GET), flash + CSRF
 
     public function csrf()
     {
@@ -462,10 +460,10 @@ class ScheduleLogic
         exit;
     }
 
-// Call before any output.
-public function handlePost()
-{
-    if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') return;
+    /** Call before any output. */
+    public function handlePost()
+    {
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') return;
 
         $self   = strtok($_SERVER['REQUEST_URI'] ?? '', '?');
         $semKey = (string)($_POST['semester'] ?? '');
@@ -485,7 +483,7 @@ public function handlePost()
                 $this->go($self, ['sem' => $semKey]);
             }
             $_SESSION['sched_old']   = $_POST;
-            $_SESSION['sched_flash'] = ['type' => 'error', 'msgs' => $res['errors']];
+            $_SESSION['sched_flash'] = ['type' => !empty($res['conflict']) ? 'conflict' : 'error', 'msgs' => $res['errors']];
             $this->go($self, ['sem' => $semKey, 'add' => 1]);
         }
 
@@ -496,7 +494,7 @@ public function handlePost()
                 $this->go($self, ['view' => 'class', 'id' => $id]);
             }
             $_SESSION['sched_old']   = $_POST;
-            $_SESSION['sched_flash'] = ['type' => 'error', 'msgs' => $res['errors']];
+            $_SESSION['sched_flash'] = ['type' => !empty($res['conflict']) ? 'conflict' : 'error', 'msgs' => $res['errors']];
             $this->go($self, ['view' => 'edit', 'id' => $id]);
         }
 
