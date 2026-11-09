@@ -93,7 +93,7 @@ class GradesLogic
              JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
              WHERE es.studentID = :studentID
                AND es.status = 'approved'
-             ORDER BY ep.acad_year DESC, ep.sem DESC",
+             ORDER BY ep.acad_year DESC, ep.sem ASC",
             [':studentID' => $studentID]
         );
 
@@ -294,6 +294,13 @@ class GradesLogic
                 return $requested;
             }
         }
+
+        foreach ($semesters as $semester) {
+            if ((int)($semester['sem'] ?? 0) === 1) {
+                return $semester['key'];
+            }
+        }
+
         return $semesters ? $semesters[0]['key'] : '';
     }
 

@@ -662,6 +662,109 @@ $csrf = $gradesLogic->csrfToken();
       text-align: center;
     }
 
+    .faculty-grades .grades-add-shell {
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .faculty-grades .grades-add-panel {
+      min-height: 100%;
+      padding: 12px 18px 18px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+
+    .faculty-grades .grades-toolbar {
+      min-height: 98px;
+      margin-bottom: 20px;
+      padding: 16px 22px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      border-radius: 17px;
+      background: rgba(42, 34, 46, 0.82);
+      box-shadow: 0 8px 20px rgba(34, 20, 37, 0.18);
+    }
+
+    .faculty-grades .grades-title-wrap .book-icon {
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.12);
+      box-shadow: 0 5px 14px rgba(24, 14, 27, 0.2);
+    }
+
+    .faculty-grades .grades-sidebar {
+      align-content: start;
+    }
+
+    .faculty-grades .back-btn,
+    .faculty-grades .term-btn,
+    .faculty-grades .class-scope-btn,
+    .faculty-grades .add-grade-btn {
+      border-color: rgba(255, 255, 255, 0.72);
+      border-radius: 10px;
+      background-color: rgba(42, 34, 46, 0.56);
+      box-shadow: 0 4px 10px rgba(34, 20, 37, 0.14);
+      transition: background-color 140ms ease, transform 140ms ease;
+    }
+
+    .faculty-grades .back-btn:hover,
+    .faculty-grades .term-btn:hover,
+    .faculty-grades .class-scope-btn:hover,
+    .faculty-grades .add-grade-btn:hover,
+    .faculty-grades .gradebook-submit:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .faculty-grades .term-picker select {
+      border-radius: 10px;
+      background-color: rgba(42, 34, 46, 0.78);
+      box-shadow: 0 4px 10px rgba(34, 20, 37, 0.12);
+    }
+
+    .faculty-grades .semester-pill {
+      border-color: rgba(255, 255, 255, 0.58);
+      background: rgba(42, 34, 46, 0.58);
+      box-shadow: 0 4px 12px rgba(34, 20, 37, 0.14);
+    }
+
+    .faculty-grades .class-grid {
+      grid-auto-flow: column;
+      grid-auto-columns: 155px;
+      grid-template-columns: none;
+      grid-template-rows: minmax(112px, auto);
+      width: fit-content;
+      max-width: 100%;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    .faculty-grades .class-card {
+      background: rgba(54, 37, 59, 0.68);
+      box-shadow: 0 7px 16px rgba(34, 20, 37, 0.2);
+      transition: background-color 140ms ease, transform 140ms ease;
+    }
+
+    .faculty-grades .class-card-link:hover .class-card,
+    .faculty-grades .class-card-link:focus-visible .class-card {
+      background: rgba(101, 57, 110, 0.82);
+    }
+
+    .faculty-grades .gradebook-panel {
+      border: 1px solid rgba(255, 255, 255, 0.68);
+      border-radius: 16px;
+      background: rgba(73, 38, 80, 0.72);
+      box-shadow: 0 8px 20px rgba(34, 20, 37, 0.18);
+    }
+
+    .faculty-grades .grade-table th,
+    .faculty-grades .grade-table td {
+      border-color: rgba(255, 255, 255, 0.62);
+    }
+
     @media (max-width: 1100px) {
       .grades-main {
         grid-template-columns: minmax(0, 1fr);
@@ -837,9 +940,9 @@ $csrf = $gradesLogic->csrfToken();
           </div>
         </section>
       <?php elseif (in_array($_SESSION['role'], ['prof', 'dean', 'program coordinator', 'registrar'], true)): ?>
-      <div class="grades-add-shell">
+      <div class="grades-add-shell faculty-grades">
           <div class="grades-add-panel">
-            <div class="grades-toolbar">
+            <div class="grades-toolbar faculty-grades__heading-panel">
               <div class="grades-title-wrap">
                 <div class="book-icon" aria-hidden="true">▦</div>
                 <div>
@@ -907,7 +1010,6 @@ $csrf = $gradesLogic->csrfToken();
                     <div class="semester-pill"><?= grades_e($semesterLabel ?: 'No assigned semester') ?></div>
                   </div>
                 <?php endif; ?>
-
                 <?php if ($view === 'gradebook' && $class && $roster): ?>
                   <section class="gradebook-panel" aria-labelledby="gradebook-class-title">
                     <h2 class="gradebook-heading" id="gradebook-class-title">
