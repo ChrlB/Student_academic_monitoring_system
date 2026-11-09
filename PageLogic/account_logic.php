@@ -1,9 +1,12 @@
 <?php
-
+/* PageLogic/account_logic.php
+   Prepares what View/account.php shows. It only RETURNS data; the page decides the layout.
+   Nothing is escaped here: View/account.php escapes with e() at the moment it prints. */
 
 require_once __DIR__ . '/../Services/auth.php';
 $_SESSION["page"] = "ACCOUNT";
 
+// Safe printing helper (htmlspecialchars). Guarded in case another file already defines it.
 if (!function_exists('e')) {
     function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 }
@@ -15,11 +18,8 @@ function yearLevelLabel($n): string {
     $suffix = [1 => 'st', 2 => 'nd', 3 => 'rd'][$n] ?? 'th';
     return $n . $suffix . ' Year';
 }
-function nameCase(string $name): string {
-    $name = trim(preg_replace('/\s+/', ' ', $name));
-    return mb_convert_case(mb_strtolower($name, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
-}
 
+// "Fred", "martinez", "Cruz" -> "Fred M. Cruz"
 function buildFullName(array $r): string {
     $first  = trim((string)($r['first_name']  ?? ''));
     $middle = trim((string)($r['middle_name'] ?? ''));
@@ -27,6 +27,7 @@ function buildFullName(array $r): string {
     $initial = $middle !== '' ? mb_strtoupper(mb_substr($middle, 0, 1)) . '.' : '';
     return trim(preg_replace('/\s+/', ' ', "$first $initial $last"));
 }
+
 /* Returns everything the page needs:
    [
      'isStudent'   => bool,
@@ -58,9 +59,6 @@ function getAccountInfo(): array {
     } catch (Throwable $err) {
         error_log('account info query failed: ' . $err->getMessage());
     }
-    foreach (['first_name', 'middle_name', 'last_name'] as $k) {
-        if (isset($row[$k])) $row[$k] = nameCase((string)$row[$k]);
-    }
 
     // first non-empty value among the given column names, or ''
     $s = function (string ...$keys) use ($row): string {
@@ -85,6 +83,7 @@ function getAccountInfo(): array {
         'phone'       => $s('number'),
         'programYear' => $programYear,
 
+        // Columns that exist in `students` today: first_name, middle_name, last_name, date_of_birth, gender
         'personal' => [
             'first_name'   => $s('first_name'),
             'last_name'    => $s('last_name'),
@@ -99,8 +98,9 @@ function getAccountInfo(): array {
         ],
         'contact' => [
             'phone' => $s('number'),
-            'email' => $userID !== '' ? $userID . '@gordoncollege.edu.ph' : '',   // derived, not stored
+            'email' => $s('email') ?: ($userID !== '' ? $userID . '@gordoncollege.edu.ph' : ''),   // stored email if the column exists, else derived from the ID
         ],
+        // `students` has ONE address column, so the whole text goes into the street line for now
         'address' => [
             'region'       => $s('region'),             // no column yet
             'province'     => $s('province'),           // no column yet

@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . "/../PageLogic/account_logic.php";
+require_once __DIR__ . "/../PageLogic/account_actions.php";
 $acct = getAccountInfo();
+$dlg  = takeDialogState();      // error + typed values when a popup was sent back
 
 // One labelled, read-only box. $w = how wide it is (CSS class).
 function field(string $label, string $value, string $w = ''): void { ?>
@@ -18,6 +20,7 @@ function field(string $label, string $value, string $w = ''): void { ?>
   <link rel="icon" type="image/x-icon" href="/View/resources/favicon1.jpg">
   <link rel="stylesheet" href="/View/style/general.css">
   <link rel="stylesheet" href="/View/style/account.css">
+  <link rel="stylesheet" href="/View/style/account_dialogs.css">
 </head>
 <body>
 
@@ -27,8 +30,6 @@ function field(string $label, string $value, string $w = ''): void { ?>
 
     <div class="column" style="flex: 1; min-width: 0;">
       <main class="account scrollbar" data-role="<?= e(str_replace(' ', '-', $acct['role'])) ?>">
-
-        <!-- ===== banner ===== -->
         <div class="acc-banner">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.4 2.7 3 6 3s6-1.6 6-3v-4.5M22 9v6"/></svg>
           <span class="bar" aria-hidden="true"></span>
@@ -37,7 +38,6 @@ function field(string $label, string $value, string $w = ''): void { ?>
 
         <div class="acc-top">
 
-          <!-- ===== profile card ===== -->
           <section class="acc-card acc-profile">
             <div class="avatar">
               <svg class="avatar-fallback" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
@@ -51,9 +51,11 @@ function field(string $label, string $value, string $w = ''): void { ?>
             <div class="profile-body">
               <div class="profile-head">
                 <h2><?= $acct['isStudent'] ? 'Student Profile' : e(ucwords($acct['role'])) . ' Profile' ?></h2>
+                <?php if ($acct['isStudent']): ?>
                 <button type="button" class="edit-btn" data-action="edit-profile">
                   <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13 7l4 4"/></svg>Edit
                 </button>
+                <?php endif; ?>
               </div>
               <dl class="profile-info">
                 <div><dt>Full Name:</dt><dd><?= e($acct['fullName'] ?: '—') ?></dd></div>
@@ -67,17 +69,17 @@ function field(string $label, string $value, string $w = ''): void { ?>
               </dl>
             </div>
           </section>
-
-          <!-- ===== account security card ===== -->
           <section class="acc-card acc-security">
             <div class="sec-head">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8-7.5 9.5-4.3-1.5-7.5-4.9-7.5-9.5V6z"/></svg>
               <div><h2>Account Security</h2><p>Manage your account</p></div>
             </div>
+            <?php if (canChangePassword()): ?>
             <button type="button" class="sec-row" data-action="change-password">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2.2"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5"/></svg>
               <span>Change Password</span><i class="chev" aria-hidden="true"></i>
             </button>
+            <?php endif; ?>
             <form method="post" action="/logout">
               <button type="submit" class="sec-row">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4H6a1 1 0 00-1 1v14a1 1 0 001 1h4M15 8l4 4-4 4M19 12H9"/></svg>
@@ -88,7 +90,6 @@ function field(string $label, string $value, string $w = ''): void { ?>
         </div>
 
         <?php if ($acct['isStudent']): ?>
-        <!-- ===== student information (accordions: no JavaScript, <details> opens and closes itself) ===== -->
         <section class="acc-card acc-info">
           <div class="info-head">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>
@@ -145,6 +146,8 @@ function field(string $label, string $value, string $w = ''): void { ?>
     </div>
   </div>
 
+  <?php require_once __DIR__ . "/components/account_dialogs.php"; ?>
+  <script src="/View/script/account.js" defer></script>
   <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>
