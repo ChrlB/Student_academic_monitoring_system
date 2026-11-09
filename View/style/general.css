@@ -195,7 +195,9 @@ header{
     border-radius: 50%;
   }
 }
-
+ .drop_shadow{
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  }
 main{
   border-radius: 20px;
   border: 3px solid #D9D9D9;

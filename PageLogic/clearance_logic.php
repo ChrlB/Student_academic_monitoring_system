@@ -9,7 +9,11 @@ $data = [];
 $labels = [];
 $values = [];
 
-$allowedViews = ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE'];
+$search = "ALL";
+$status = "ALL";
+
+
+$allowedViews = ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE','SUBJECT-REQUIREMENTS','FACULTY-REQUIREMENTS'];
 $student_view = strtoupper($_GET['view'] ?? 'MAIN');
 if (!in_array($student_view, $allowedViews, true)) {
     $student_view = 'MAIN';
@@ -29,13 +33,22 @@ if($_SESSION["role"] == "student"){
 }
 
 // var_dump( isset($_GET["view"]));
+if( in_array($student_view, ["SUBJECTS","FACULTY"])){
+    $search = trim($_GET['search'] ?? '');
+    if ($search === '') { $search = 'ALL'; }  
+    $status =  ($_GET['statusfilter'] ?? 'ALL');
+    // echo $subjectID.$status;
+}elseif(in_array($student_view, ["SUBJECT-REQUIREMENTS", "FACULTY-REQUIREMENTS"])){
+    $search = trim($_GET['search'] ?? '');
+}
 
 function statusClass(string $status): string{
     return strtoupper($status) === 'CLEARED' ? 'status_cleared' : 'status_rejected';
 }
 
-function getSubjectsClearance($subjectID = "ALL", $status = "ALL"){
+function getSubjectsClearance($subjectID = 'ALL',$status = 'ALL'){
     global $clearanceDAO;
+    
     
 
     $records = $clearanceDAO->executeQuery("getSubjectsClearance",[
@@ -49,3 +62,39 @@ function getSubjectsClearance($subjectID = "ALL", $status = "ALL"){
     // var_dump($_SESSION["userID"]);
     // var_dump($records);
 }
+function getfacultyClearance($faculty_lastname = 'ALL',$status = 'ALL'){
+    global $clearanceDAO;
+    
+    
+
+    $records = $clearanceDAO->executeQuery("getFacultyClearance",[
+        $faculty_lastname, $faculty_lastname,
+        $_SESSION["userID"], 
+        $status,$status
+    ]);
+
+    return $records;
+    // var_dump($subjectID == 'ALL');
+    // var_dump($_SESSION["userID"]);
+    // var_dump($records);
+}
+
+
+function getSubjectRequireMents($subjectID){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ,$_SESSION['userID']]);
+
+    return $records;
+}
+function getFacultyRequireMents($subjectID){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getFacultyRequirements",[ $subjectID ,$_SESSION['userID']]);
+
+    return $records;
+}
+// function getSubjectRequireMents($subjectID){
+//     global $clearanceDAO;
+//     $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ]);
+
+//     return $records;
+// }

@@ -8,6 +8,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS</title>
+  <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
 <link rel="stylesheet" href="<?= BASE_PATH?>/View/style/general.css">
 </head>
 <body>
@@ -41,6 +42,6 @@
       </main>
     </div>
   </div>
-  <script src="/View/script/clearance.php"></script>
+  <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>

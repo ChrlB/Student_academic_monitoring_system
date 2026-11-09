@@ -104,7 +104,7 @@ function uploadProfile(){
       } else {
           $imageBinaryData = $processedImage['imageBinaryData'];
           $savedMimeType = $processedImage['mimeType'];
-          // $saveStatement->bind_param('iss', $loggedInUserId, $imageBinaryData, $savedMimeType);
+         
 
           $upload_for = ($_SESSION['role'] == "student")
                 ? "uploadStudentProfile"
@@ -140,7 +140,7 @@ function getProfilePic(){
     if (is_resource($imageBinaryData)) {
         $imageBinaryData = stream_get_contents($imageBinaryData);
     }
-
+      
     header('Cache-Control: private, no-cache');
 
     if ($imageBinaryData === null || $imageBinaryData === '' || $storedMimeType === null) {
