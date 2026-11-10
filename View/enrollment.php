@@ -544,7 +544,7 @@ $csrf  = $logic->csrf();
                 $hasPending = false;
                 foreach ($logic->studentSubjects as $ss) { if ($ss['status'] === 'pending') { $hasPending = true; break; } }
             ?>
-                <a href="<?= enroll_e(enroll_url([])) ?>" class="btn-enroll" style="margin-bottom: 20px; font-size:12px; padding: 4px 10px;">← Back</a>
+                <a href="<?= enroll_e(enroll_url([])) ?>" class="btn-enroll" style="margin-bottom: 20px; font-size:12px; padding: 6px 10px;">← Back</a>
                 <div style="margin-bottom: 20px;">
                     <h1 style="margin: 0; color: #fff; font-weight: normal; font-size: 28px;">Review — <?= enroll_e($rv['first_name'] . ' ' . $rv['last_name']) ?></h1>
                     <p style="color: rgba(255,255,255,0.7); margin-top: 5px; font-size: 13px;">Student ID: <?= $rvID ?></p>
@@ -560,7 +560,7 @@ $csrf  = $logic->csrf();
                         <input type="hidden" name="enroll_action" value="toggle_student">
                         <input type="hidden" name="student_id" value="<?= $rvID ?>">
                         <input type="hidden" name="enroll_id" value="<?= $rvEnroll ?>">
-                        <button class="btn-enroll" style="font-size: 12px; padding: 6px 12px;">🔒 <?= $logic->isWindowOpen ? 'Close Window' : 'Open Window' ?></button>
+                        <button class="btn-enroll" style="font-size: 12px; padding: 6px 12px;"> <?= $logic->isWindowOpen ? 'Close Window' : 'Open Window' ?></button>
                     </form>
                 </div>
 
@@ -590,7 +590,7 @@ $csrf  = $logic->csrf();
                             <input type="hidden" name="enroll_action" value="approve">
                             <input type="hidden" name="student_id" value="<?= $rvID ?>">
                             <input type="hidden" name="enroll_id" value="<?= $rvEnroll ?>">
-                            <button class="btn-enroll btn-approve">✅ Approve</button>
+                            <button class="btn-enroll btn-approve">Approve</button>
                         </form>
 
                         <form method="POST" action="<?= $formAction ?>" style="flex: 1; min-width: 260px;" onsubmit="return confirm('Reject this enrollment request?');">
@@ -602,7 +602,7 @@ $csrf  = $logic->csrf();
                                 <label>REJECTION REMARKS</label>
                                 <textarea name="remarks" class="form-control" rows="3" placeholder="Reason for rejection" required></textarea>
                             </div>
-                            <button class="btn-enroll btn-danger">❌ Reject</button>
+                            <button class="btn-enroll btn-danger">Reject</button>
                         </form>
                     </div>
                     <?php endif; ?>
