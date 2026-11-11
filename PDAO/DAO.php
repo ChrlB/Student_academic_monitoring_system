@@ -399,7 +399,37 @@ $clearanceDAO->prepareStatement("getFacultyRequirements","SELECT
 
 "); 
 
+$clearanceDAO->prepareStatement("getUploadedFacultyRequirements","SELECT
+        FC.faculty_clearanceID ,
+        FC.date_cleared AS date_cleared,
+        FC.remarks AS remarks,
+        FC.status AS status,
+        CONCAT(F.last_name, ', ', F.first_name) AS prof_name,
+        F.role,
+        FCR.ID,
+        FCR.fileID,
+        FCR.file_name,
+        FCR.mime_type,
+        IF(
+            COALESCE(FCR.file_size, 0) < 1000000,
+            CONCAT(ROUND(COALESCE(FCR.file_size, 0) / 1024, 1), ' KB'),
+            CONCAT(ROUND(COALESCE(FCR.file_size, 0) / 1048576, 2), ' MB')
+        ) AS file_size,
+        FCR.uploaded_at
+    FROM
+        faculty_clearance AS FC
+    INNER JOIN students AS ST
+    ON ST.studentID = FC.studentID
+    inner JOIN faculty AS F
+    ON  F.facultyID = FC.facultyID
+    inner JOIN faculty_clearance_requirements AS FCR
+    ON 	FCR.faculty_clearanceID = FC.faculty_clearanceID
 
+    WHERE
+        FC.facultyID = ? and concat(year(ST.date_created),lpad(ST.studentID,5,0)) = ?
+        AND  FCR.uploaded_by = ?;
+
+");
 
 $clearanceDAO->prepareStatement("addOfficeRequirement","INSERT INTO 
     `office_clearance_requirements` ( `office_clearanceID`, `fileID`, `file_name`,mime_type, `file_size`,  `uploaded_by`) 

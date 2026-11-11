@@ -126,7 +126,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <div class="row searchbar_frame">
                 <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($search === "ALL" ? '':$search) ?>">
                 <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
-                    <img src="<?= BASE_PATH?>/View/resources/return.png" alt="" class="back_buttons" style="padding:5px">
+                    <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons" style="padding:5px">
                 </button>
               </div>
               
@@ -240,7 +240,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                       <div class="row upload_header">
                         <b>YOUR FILES</b>
                         <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>">
-                          <img src="<?= BASE_PATH ?>/View/resources/return.png" alt="Close" class="back_buttons">
+                          <img src="<?= BASE_PATH ?>/View/resources/Close.png" alt="Close" class="back_buttons">
                         </a>
                       </div>
                       
@@ -272,7 +272,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                         <div class="row"  style="justify-content: space-between;">
                             <b>UPLOADED FILES</b>
                             <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>">
-                              <img src="<?= BASE_PATH?>/View/resources/return.png" alt="" class="back_buttons"></a>
+                              <img src="<?= BASE_PATH?>/View/resources/Close.png" alt="" class="back_buttons"></a>
                         </div>
                         <hr>
                         <div class="column" style="gap:20px;  " >
@@ -319,7 +319,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <div class="row searchbar_frame">
                 <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($_GET["search"] ??  '') ?>">
                 <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
-                    <img src="<?= BASE_PATH?>/View/resources/return.png" alt="" class="back_buttons" style="padding:5px">
+                    <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons" style="padding:5px">
                 </button>
               </div>
               
@@ -425,7 +425,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                       <div class="row upload_header">
                         <b>YOUR FILES</b>
                         <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>">
-                          <img src="<?= BASE_PATH ?>/View/resources/return.png" alt="Close" class="back_buttons">
+                          <img src="<?= BASE_PATH ?>/View/resources/Close.png" alt="Close" class="back_buttons">
                         </a>
                       </div>
                       
@@ -452,12 +452,12 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                       <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
                     </form>
 
-                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedSubjectRequireMents($search);?>
+                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedFacultyRequireMents($search);?>
                     <form class="uploads_container uploaded_container">
                         <div class="row"  style="justify-content: space-between;">
                             <b>UPLOADED FILES</b>
                             <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>">
-                              <img src="<?= BASE_PATH?>/View/resources/return.png" alt="" class="back_buttons"></a>
+                              <img src="<?= BASE_PATH?>/View/resources/Close.png" alt="" class="back_buttons"></a>
                         </div>
                         <hr>
                         <div class="column" style="gap:20px;  " >
@@ -497,7 +497,40 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <b class="view_title">OFFICE</b>
                <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
-            
+            <form class="row" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
+              <input type="hidden" name="view" value="FACULTY">
+              <div class="row searchbar_frame">
+                <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($_GET["search"] ??  '') ?>">
+                <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
+                    <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons" style="padding:5px">
+                </button>
+              </div>
+              
+              <select name="statusfilter" class="filter" onchange="this.form.submit()">
+                <option value="ALL" <?= $status === 'ALL' ? 'selected' : '' ?>>ALL</option>
+                <?php $options = []; foreach( getFacultyClearance() as $faculty): if(!in_array($faculty["status"],$options)): $options[] = $faculty["status"];?>
+                  <option  value="<?= $faculty["status"] ?>" <?php if($status == $faculty["status"]) echo 'selected'?>><?= $faculty["status"] ?></option>
+                <?php endif; endforeach ?>
+              </select>
+            </form>
+            <div class="column" style="gap: 20px;">
+              <?php //foreach( $offices as $faculty):?>
+                
+                <form class="row clearance_box" action="<?= BASE_PATH ?>/clearance" method="get">
+                  <div class="column">
+                    <b style="font-size: 50px;"><?= strtoupper($faculty["role"]) ?></b>
+                    <b style="font-size: 30px;"><?= $faculty["prof_name"] ?></b>
+                  </div>
+                  <div >
+                    <button type="submit" onclick="this.form.submit()" style="background-color: transparent; border:0px;">
+                      <img src="<?= BASE_PATH?>/View/resources/openClearance.png" alt="" class="open_button" >
+                    </button>
+                    <input type="hidden" name="view" value="FACULTY-REQUIREMENTS">
+                    <input type="hidden" name="search" value="<?php echo $faculty["facultyID"] ?>">
+                  </div>
+                </form>
+              <?php //endforeach ?>
+            </div> 
           <?php endif ?>
 
         <?php elseif (in_array($_SESSION["role"], ["prof","dean","program coordinator"])):?>
@@ -577,7 +610,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
         
       
     <?php elseif ($student_view == "SUBJECT-REQUIREMENTS"): ?>
-      const input = document.getElementById('document');
+    <?php elseif ($student_view == "FACULTY-REQUIREMENTS"): ?>
+        const input = document.getElementById('document');
         const list = document.querySelector('.file_list');
         const noFiles = document.querySelector('.no_files');
         const form = document.querySelector('.upload_container');

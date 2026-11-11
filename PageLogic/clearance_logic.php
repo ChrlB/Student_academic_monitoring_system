@@ -100,6 +100,14 @@ function getFacultyRequireMents($facultyID){
 
     return $records;
 }
+
+function getUploadedFacultyRequireMents($facultyID){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getUploadedFacultyRequirements",[ $facultyID ,$_SESSION['userID'],$_SESSION['userID']]);
+
+    return $records;
+}
+
 // function getSubjectRequireMents($subjectID){
 //     global $clearanceDAO;
 //     $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ]);
