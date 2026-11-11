@@ -1,17 +1,12 @@
 <?php
-/* PageLogic/account_logic.php
-   Prepares what View/account.php shows. It only RETURNS data; the page decides the layout.
-   Nothing is escaped here: View/account.php escapes with e() at the moment it prints. */
 
 require_once __DIR__ . '/../Services/auth.php';
 $_SESSION["page"] = "ACCOUNT";
 
-// Safe printing helper (htmlspecialchars). Guarded in case another file already defines it.
 if (!function_exists('e')) {
     function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 }
 
-// 1 -> "1st Year", 2 -> "2nd Year" ...
 function yearLevelLabel($n): string {
     $n = (int)$n;
     if ($n < 1) return '';
@@ -19,7 +14,6 @@ function yearLevelLabel($n): string {
     return $n . $suffix . ' Year';
 }
 
-// "Fred", "martinez", "Cruz" -> "Fred M. Cruz"
 function buildFullName(array $r): string {
     $first  = trim((string)($r['first_name']  ?? ''));
     $middle = trim((string)($r['middle_name'] ?? ''));
@@ -28,20 +22,6 @@ function buildFullName(array $r): string {
     return trim(preg_replace('/\s+/', ' ', "$first $initial $last"));
 }
 
-/* Returns everything the page needs:
-   [
-     'isStudent'   => bool,
-     'role'        => 'student',
-     'schoolId'    => '202600001',
-     'name'        => 'Fred Cruz',                 // short name for the profile card
-     'fullName'    => 'Fred M. Cruz',
-     'phone'       => '0909-090-90009',
-     'programYear' => 'BSCS-1A • 1st Year',        // students only
-     'personal'    => [ first_name, last_name, middle_name, birth_date, birth_place, civil_status, sex, orientation, citizenship, religion ],
-     'contact'     => [ phone, email ],
-     'address'     => [ region, province, municipality, street, zip ],
-   ]
-   Keys whose column does not exist in the database yet come back as ''. */
 function getAccountInfo(): array {
     global $userDAO;
 

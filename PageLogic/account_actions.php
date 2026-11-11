@@ -1,23 +1,21 @@
 <?php
 
+
 require_once __DIR__ . '/../Services/session.php';
 require_once __DIR__ . '/../Services/csrf.php';
 
 const PW_MIN_LENGTH = 8;
-const PW_MAX_LENGTH = 72;      // bcrypt only reads the first 72 bytes
-const PW_MAX_FAILS  = 5;       // wrong "current password" tries ...
-const PW_LOCK_MINUTES = 15;    // ... per this many minutes
+const PW_MAX_LENGTH = 72;      
+const PW_MAX_FAILS  = 5;       
+const PW_LOCK_MINUTES = 15;    
 
 // Roles allowed to change their password from the account page.
-// Students only for now. Faculty roles (e.g. 'prof') get added here later; the registrar is never added.
 const PW_CHANGE_ROLES = ['student'];
 
 function canChangePassword(): bool {
     return in_array((string)($_SESSION['role'] ?? ''), PW_CHANGE_ROLES, true);
 }
 
-// false = only date of birth, sex and street are saved (columns that exist today).
-// Run sql/students_profile_columns.sql, add the extra columns to getStudentInfo, then set this to true.
 const PROFILE_EXTRA_COLUMNS = true;
 
 // the school email domain (same constant the login/reset files use)
@@ -36,6 +34,7 @@ function accountDone(string $text): void {
     exit;
 }
 
+// $dialog = 'password' | 'profile'. $old = typed values to put back (never passwords).
 function accountFail(string $dialog, string $error, array $old = []): void {
     $_SESSION['account_dialog'] = ['open' => $dialog, 'error' => $error, 'old' => $old];
     header('Location: ' . accountUrl('/account'));
@@ -72,6 +71,7 @@ function accountUserOrLogin(): array {
     return $key;
 }
 
+/* ---------- 1. change password ---------- */
 function changePassword($post) {
     global $userDAO;
     [$table, $num, $year] = accountUserOrLogin();
@@ -143,10 +143,13 @@ function changePassword($post) {
     accountDone('Password changed successfully.');
 }
 
+/* ---------- 2. edit profile ---------- */
+
 // Single source of truth: field => [label, type, max length or options, required, needs extra column]
 function profileRules(): array {
     return [
         'middle_name'        => ['Middle Name',        'text',   50,  false, false],
+        'number'             => ['Contact Number',     'phone',  20,  false, false],
         'email'              => ['Email Address',      'email',  100, false, true],
         'date_of_birth'      => ['Date of Birth',      'date',   null, true,  false],
         'sex'                => ['Sex',                'select', ['Male', 'Female'], true, false],
@@ -187,6 +190,15 @@ function validateProfileValue(string $field, array $rule, string $raw): array {
         if (substr($v, -strlen($d)) !== $d) return ['', 'Use your school email (ending in ' . SCHOOL_EMAIL_DOMAIN . ').'];
         return [$v, null];
     }
+    if ($type === 'phone') {
+        // digits with an optional leading +, spaces, dashes and brackets: 0909 090 9009, 0909-090-9009, +63 909 090 9009
+        $digits = preg_replace('/\D/', '', $v);
+        if (!preg_match('/^\+?[0-9(][0-9 ()\-]*$/', $v) || strlen($digits) < 7 || strlen($digits) > 15) {
+            return ['', 'Enter a valid contact number, e.g. 0909 123 4567.'];
+        }
+        if (mb_strlen($v) > $limit) return ['', "$label is too long ($limit characters at most)."];
+        return [$v, null];
+    }
     if ($type === 'zip') {
         return preg_match('/^\d{4}$/', $v) ? [$v, null] : ['', 'Zip Code must be 4 digits.'];
     }
@@ -225,14 +237,14 @@ function updateProfile($post) {
 
         if (PROFILE_EXTRA_COLUMNS) {
             $userDAO->executeQuery('updateStudentProfileFull', [
-                $clean['middle_name'], $clean['email'], $clean['date_of_birth'], $clean['sex'], $clean['street'],
+                $clean['middle_name'], $clean['email'], $clean['number'], $clean['date_of_birth'], $clean['sex'], $clean['street'],
                 $clean['place_of_birth'], $clean['civil_status'], $clean['sexual_orientation'],
                 $clean['citizenship'], $clean['religion'], $clean['region'], $clean['province'],
                 $clean['municipality'], $clean['zip_code'], $num, $year,
             ]);
         } else {
             $userDAO->executeQuery('updateStudentProfile', [
-                $clean['middle_name'], $clean['date_of_birth'], $clean['sex'], $clean['street'], $num, $year,
+                $clean['middle_name'], $clean['number'], $clean['date_of_birth'], $clean['sex'], $clean['street'], $num, $year,
             ]);
         }
     } catch (Throwable $e) {

@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../PageLogic/account_logic.php";
 require_once __DIR__ . "/../PageLogic/account_actions.php";
 $acct = getAccountInfo();
-$dlg  = takeDialogState();      // error + typed values when a popup was sent back
+$dlg  = takeDialogState();      
 
 // One labelled, read-only box. $w = how wide it is (CSS class).
 function field(string $label, string $value, string $w = ''): void { ?>
