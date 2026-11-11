@@ -268,7 +268,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     </form>
 
                   <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedSubjectRequireMents($search);?>
-                    <form class="uploads_container uploaded_container">
+                    <div class="uploads_container uploaded_container">
                         <div class="row"  style="justify-content: space-between;">
                             <b>UPLOADED FILES</b>
                             <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>">
@@ -295,15 +295,20 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                                   </a>
                                 <?php endif ?>
                                 
-                                <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S&amp;download=1">
-                                  <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
-                                </a>
+                                <form action="<?= BASE_PATH ?>/delete-document" method="post" onsubmit="return confirm('Delete this file? This cannot be undone.')">
+                                  <input type="hidden" name="categ" value="S">
+                                  <input type="hidden" name="ID" value="<?= (int) $requirement['ID'] ?>">
+                                  <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+
+                                  <button type="submit" style="background-color: transparent;border:0">
+                                    <img src="<?= BASE_PATH ?>/View/resources/Trash.png" alt="Download" class="file_icons"></button>
+                                </form>
                               </div>
                             </div>
 
                           <?php endforeach ?>
                         </div>
-                    </form>
+                    </div>
                   <?php endif ?>
                 </div>
 
@@ -453,7 +458,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     </form>
 
                   <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedFacultyRequireMents($search);?>
-                    <form class="uploads_container uploaded_container">
+                    <div class="uploads_container uploaded_container">
                         <div class="row"  style="justify-content: space-between;">
                             <b>UPLOADED FILES</b>
                             <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>">
@@ -480,15 +485,20 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                                   </a>
                                 <?php endif ?>
                                 
-                                <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S&amp;download=1">
-                                  <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
-                                </a>
+                                <form action="<?= BASE_PATH ?>/delete-document" method="post" onsubmit="return confirm('Delete this file? This cannot be undone.')">
+                                  <input type="hidden" name="categ" value="F">
+                                  <input type="hidden" name="ID" value="<?= (int) $requirement['ID'] ?>">
+                                  <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+
+                                  <button type="submit" style="background-color: transparent;border:0">
+                                    <img src="<?= BASE_PATH ?>/View/resources/Trash.png" alt="Download" class="file_icons"></button>
+                                </form>
                               </div>
                             </div>
 
                           <?php endforeach ?>
                         </div>
-                    </form>
+                    </div>
                   <?php endif ?>
                 </div>
             
@@ -637,7 +647,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     </form>
 
                   <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedOfficeRequireMents($search);?>
-                    <form class="uploads_container uploaded_container">
+                    <div class="uploads_container uploaded_container">
                         <div class="row"  style="justify-content: space-between;">
                             <b>UPLOADED FILES</b>
                             <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>">
@@ -646,7 +656,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                         <hr>
                         <div class="column" style="gap:20px;  " >
                           <?php foreach($uploaded_files as $requirement): if ($requirement["file_name"] === null) continue;?>
-                            <div class="row uploaded_file_container"  >
+                            <div  class="row uploaded_file_container"  >
                               <div class="row" style="align-items:center;">
                                 <img src="<?= BASE_PATH?>/View/resources/Document.png" alt="" class="file_icons">
                                 <b><?= $requirement["file_name"]?></b>
@@ -664,15 +674,21 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                                   </a>
                                 <?php endif ?>
                                 
-                                <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S&amp;download=1">
-                                  <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
-                                </a>
+                                <form action="<?= BASE_PATH ?>/delete-document" method="post" onsubmit="return confirm('Delete this file? This cannot be undone.')">
+                                  <input type="hidden" name="categ" value="O">
+                                  <input type="hidden" name="ID" value="<?= (int) $requirement['ID'] ?>">
+                                  <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+
+                                  <button type="submit" style="background-color: transparent;border:0">
+                                    <img src="<?= BASE_PATH ?>/View/resources/Trash.png" alt="Download" class="file_icons"></button>
+                                </form>
+                                
                               </div>
                             </div>
 
                           <?php endforeach ?>
                         </div>
-                    </form>
+                    </div>
                   <?php endif ?>
                 </div>
           <?php endif ?>                        

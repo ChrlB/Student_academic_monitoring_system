@@ -300,7 +300,9 @@
 
 }
 
-
+button{
+  cursor: pointer;
+}
 
 /* column widths */
 .col_name {
