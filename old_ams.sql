@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 02, 2026 at 03:09 AM
+-- Generation Time: Nov 02, 2026 at 09:49 AM
 -- Server version: 8.0.34
 -- PHP Version: 8.2.12
 
@@ -51,12 +51,12 @@ INSERT INTO `attendance` (`ID`, `eventID`, `facultyID`, `studentID`, `timein`, `
 --
 CREATE TABLE `clearance_updates` (
 `category` varchar(8)
-,`date_cleared` timestamp
 ,`item_name` varchar(250)
 ,`name` varchar(402)
+,`studentID` int unsigned
+,`date_cleared` timestamp
 ,`remarks` varchar(250)
 ,`status` varchar(50)
-,`studentID` int unsigned
 );
 
 -- --------------------------------------------------------
@@ -331,6 +331,22 @@ INSERT INTO `projects` (`projectID`, `enrolled_subjectID`, `name`, `deadline`, `
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `project_documents`
+--
+
+CREATE TABLE `project_documents` (
+  `ID` int UNSIGNED NOT NULL,
+  `projectID` int UNSIGNED NOT NULL,
+  `fileID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_size` int UNSIGNED NOT NULL,
+  `uploaded_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `uploaded_by` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `project_task`
 --
 
@@ -357,10 +373,10 @@ INSERT INTO `project_task` (`taskID`, `projectID`, `task_title`, `deadline`, `sa
 -- (See below for the actual view)
 --
 CREATE TABLE `prospectus` (
-`prerequisite` text
-,`program` varchar(50)
+`subjectID` varchar(100)
+,`prerequisite` text
 ,`sem_available` tinyint unsigned
-,`subjectID` varchar(100)
+,`program` varchar(50)
 ,`unit` tinyint
 ,`year` tinyint
 );
@@ -633,12 +649,12 @@ INSERT INTO `team_members` (`memberID`, `projectID`, `studentID`) VALUES
 -- (See below for the actual view)
 --
 CREATE TABLE `users` (
-`first_name` varchar(200)
-,`last_name` varchar(200)
+`userID` varchar(11)
+,`first_name` varchar(200)
 ,`middle_name` varchar(200)
+,`last_name` varchar(200)
 ,`password` varchar(250)
 ,`role` varchar(200)
-,`userID` varchar(11)
 );
 
 -- --------------------------------------------------------
@@ -770,6 +786,13 @@ ALTER TABLE `programs`
 ALTER TABLE `projects`
   ADD PRIMARY KEY (`projectID`),
   ADD KEY `enrolled_subjectID` (`enrolled_subjectID`);
+
+--
+-- Indexes for table `project_documents`
+--
+ALTER TABLE `project_documents`
+  ADD PRIMARY KEY (`ID`),
+  ADD KEY `projectID` (`projectID`);
 
 --
 -- Indexes for table `project_task`
@@ -932,6 +955,12 @@ ALTER TABLE `projects`
   MODIFY `projectID` int UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
+-- AUTO_INCREMENT for table `project_documents`
+--
+ALTER TABLE `project_documents`
+  MODIFY `ID` int UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `project_task`
 --
 ALTER TABLE `project_task`
@@ -1075,6 +1104,12 @@ ALTER TABLE `projects`
   ADD CONSTRAINT `projects_ibfk_1` FOREIGN KEY (`enrolled_subjectID`) REFERENCES `enrolled_subjects` (`enrolled_subjectID`);
 
 --
+-- Constraints for table `project_documents`
+--
+ALTER TABLE `project_documents`
+  ADD CONSTRAINT `project_documents_ibfk_1` FOREIGN KEY (`projectID`) REFERENCES `projects` (`projectID`);
+
+--
 -- Constraints for table `project_task`
 --
 ALTER TABLE `project_task`
@@ -1151,3 +1186,21 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+ALTER TABLE faculty
+ADD COLUMN folderID VARCHAR(100) NULL AFTER password;
+
+ALTER TABLE students
+ADD COLUMN folderID VARCHAR(100) NULL AFTER password;
+
+ALTER TABLE students
+  ADD COLUMN email              VARCHAR(100) NOT NULL DEFAULT '',
+  ADD COLUMN place_of_birth     VARCHAR(100) NOT NULL DEFAULT '',
+  ADD COLUMN civil_status       VARCHAR(20)  NOT NULL DEFAULT '',
+  ADD COLUMN sexual_orientation VARCHAR(40)  NOT NULL DEFAULT '',
+  ADD COLUMN citizenship        VARCHAR(40)  NOT NULL DEFAULT '',
+  ADD COLUMN religion           VARCHAR(60)  NOT NULL DEFAULT '',
+  ADD COLUMN region             VARCHAR(60)  NOT NULL DEFAULT '',
+  ADD COLUMN province           VARCHAR(60)  NOT NULL DEFAULT '',
+  ADD COLUMN municipality       VARCHAR(60)  NOT NULL DEFAULT '',
+  ADD COLUMN zip_code           CHAR(4)      NOT NULL DEFAULT '';

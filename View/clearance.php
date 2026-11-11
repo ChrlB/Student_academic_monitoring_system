@@ -72,10 +72,10 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <div class="column" style="gap:20px">
                 <div class="row" style="justify-content:space-between; align-items:center; color:white; ">
                   <b style=" font-size:30px; padding-left:20px">UPDATES</b>
-                  <div class="row" style=" padding-right:20px">
+                  <a class="row" href="<?= BASE_PATH ?>/clearance?view=UPDATES" style="padding-right:20px ; align-items:center; text-decoration: none; gap:10px">
                     <b style=" font-size:25px">View All Updates</b>
-                    <div></div>
-                  </div>
+                    <div><img src="<?= BASE_PATH ?>/View/resources/arrow.png" alt="" style="width:40px"></div>
+                  </a>
 
                 </div>
                 <div class="updates_frame  drop_shadow">
@@ -115,7 +115,41 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               </div>
             </div>
 
-
+          <?php elseif ($student_view == "UPDATES"): ?>
+            <div class="row" style="justify-content: space-between; align-items:center">
+              <b class="view_title">CLEARANCE UPDATES</b>
+               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+            </div>
+            <div class="updates_frame2  drop_shadow">
+              <table class="updates_table">
+                <thead>
+                  <tr>
+                    <th class="col_name">CATEGORY</th>
+                    <th class="col_about">ABOUT</th>
+                    <th class="col_date">DATE</th>
+                    <th class="col_status">STATUS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($updates_record as $row): ?>
+                    <tr>
+                      <td title="<?= htmlspecialchars($row['category']) ?>">
+                        <?= htmlspecialchars($row['category']) ?>
+                      </td>
+                      <td title="<?= htmlspecialchars($row['item_name']) ?>">
+                        <?= htmlspecialchars($row['item_name']) ?>
+                      </td>
+                      <td><?= htmlspecialchars($row['date_cleared']) ?></td>
+                      <td>
+                        <span class="status_badge <?= statusClass($row['status']) ?>">
+                          <?= htmlspecialchars(strtoupper($row['status'])) ?>
+                        </span>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>              
           <?php elseif ($student_view === "SUBJECTS"): $subjects = getSubjectsClearance($search,$status)?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">SUBJECTS</b>
