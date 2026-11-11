@@ -613,6 +613,24 @@ $userDAO->prepareStatement("updateStudentPassword",
         "
     );
 
+    // 'S' => 'deleteStudentClearanceDocument',
+    //     'F' => 'deleteFacultyClearanceDocument',
+    //     'O' => 'deleteOfficeClearanceDocument',
+
+    $clearanceDAO->prepareStatement("deleteStudentClearanceDocument","
+        DELETE FROM subject_clearance_requirements 
+        WHERE ID = ? and uploaded_by = ?; 
+    ");
+
+    $clearanceDAO->prepareStatement("deleteFacultyClearanceDocument","
+        DELETE FROM faculty_clearance_requirements 
+        WHERE ID = ? and uploaded_by = ?;
+    ");
+
+    $clearanceDAO->prepareStatement("deleteOfficeClearanceDocument","
+        DELETE FROM office_clearance_requirements 
+        WHERE ID = ? and uploaded_by = ?;
+    ");
 
 }
 
