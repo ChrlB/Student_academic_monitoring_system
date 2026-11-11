@@ -53,6 +53,7 @@ class DriveStorageService
       'supportsAllDrives' => true,
     ]);
 
+    /** @var \Psr\Http\Message\ResponseInterface $response */
     $fileStream = $response->getBody();
     while (!$fileStream->eof()) {
       echo $fileStream->read(8192);

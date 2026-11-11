@@ -284,8 +284,21 @@ form label:not(:first-of-type) {
   color: var(--purple-500);
   opacity: 0.9;
 }
+.field-error {
+  margin: 8px 0 14px;
+  padding: 6px 11px;
+  border: 1px solid #ff8da1;
+  border-radius: 9px;
+  background: rgba(110, 10, 40, 0.55);
+  color: #ffe1e7;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.field-error[hidden] {
+  display: none;
+}
 
-/* eye button */
 .toggle {
   display: grid;
   place-items: center;

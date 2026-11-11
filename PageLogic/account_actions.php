@@ -1,9 +1,4 @@
 <?php
-/* PageLogic/account_actions.php
-   changePassword($_POST)  runs for  POST /change-password
-   updateProfile($_POST)   runs for  POST /edit-profile
-   Both end in a redirect back to /account (PRG). When something is wrong the page reopens
-   the popup with the error and what the person typed (passwords are never sent back). */
 
 require_once __DIR__ . '/../Services/session.php';
 require_once __DIR__ . '/../Services/csrf.php';
@@ -41,7 +36,6 @@ function accountDone(string $text): void {
     exit;
 }
 
-// $dialog = 'password' | 'profile'. $old = typed values to put back (never passwords).
 function accountFail(string $dialog, string $error, array $old = []): void {
     $_SESSION['account_dialog'] = ['open' => $dialog, 'error' => $error, 'old' => $old];
     header('Location: ' . accountUrl('/account'));
@@ -78,7 +72,6 @@ function accountUserOrLogin(): array {
     return $key;
 }
 
-/* ---------- 1. change password ---------- */
 function changePassword($post) {
     global $userDAO;
     [$table, $num, $year] = accountUserOrLogin();
@@ -149,8 +142,6 @@ function changePassword($post) {
     session_regenerate_id(true);
     accountDone('Password changed successfully.');
 }
-
-/* ---------- 2. edit profile ---------- */
 
 // Single source of truth: field => [label, type, max length or options, required, needs extra column]
 function profileRules(): array {

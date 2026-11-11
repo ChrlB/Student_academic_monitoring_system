@@ -16,7 +16,7 @@ function field(string $label, string $value, string $w = ''): void { ?>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AMS | School Account</title>
+  <title>AMS | Student Account</title>
   <link rel="icon" type="image/x-icon" href="/View/resources/favicon1.jpg">
   <link rel="stylesheet" href="/View/style/general.css">
   <link rel="stylesheet" href="/View/style/account.css">
@@ -40,12 +40,10 @@ function field(string $label, string $value, string $w = ''): void { ?>
 
           <section class="acc-card acc-profile">
             <div class="avatar">
-              <svg class="avatar-fallback" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
-              <!-- if /get-profile has no picture it fails to load; onerror removes it so the fallback icon shows -->
               <img src="/get-profile" alt="Profile picture" class="avatar-img" onerror="this.remove()">
               <button type="button" class="avatar-btn" data-action="upload-photo" aria-label="Change profile picture">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg>
-              </button>
+              </button>     
             </div>
 
             <div class="profile-body">
