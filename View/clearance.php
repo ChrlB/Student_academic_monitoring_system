@@ -492,13 +492,13 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   <?php endif ?>
                 </div>
             
-          <?php elseif ($student_view === "OFFICE"): ?>
+          <?php elseif ($student_view === "OFFICE"): $offices = getOfficeClearance($search,$status);?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">OFFICE</b>
                <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
             <form class="row" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
-              <input type="hidden" name="view" value="FACULTY">
+              <input type="hidden" name="view" value="OFFICE">
               <div class="row searchbar_frame">
                 <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($_GET["search"] ??  '') ?>">
                 <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
@@ -508,38 +508,181 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               
               <select name="statusfilter" class="filter" onchange="this.form.submit()">
                 <option value="ALL" <?= $status === 'ALL' ? 'selected' : '' ?>>ALL</option>
-                <?php $options = []; foreach( getFacultyClearance() as $faculty): if(!in_array($faculty["status"],$options)): $options[] = $faculty["status"];?>
+                <?php $options = []; foreach( getOfficeClearance() as $faculty): if(!in_array($faculty["status"],$options)): $options[] = $faculty["status"];?>
                   <option  value="<?= $faculty["status"] ?>" <?php if($status == $faculty["status"]) echo 'selected'?>><?= $faculty["status"] ?></option>
                 <?php endif; endforeach ?>
               </select>
             </form>
             <div class="column" style="gap: 20px;">
-              <?php //foreach( $offices as $faculty):?>
+              <?php foreach( $offices as $office):?>
                 
                 <form class="row clearance_box" action="<?= BASE_PATH ?>/clearance" method="get">
                   <div class="column">
-                    <b style="font-size: 50px;"><?= strtoupper($faculty["role"]) ?></b>
-                    <b style="font-size: 30px;"><?= $faculty["prof_name"] ?></b>
+                    <b style="font-size: 50px;"><?= strtoupper($office["name"]) ?></b>
+                    <b style="font-size: 30px;"><?= strtoupper($office["prof_name"]) ?></b>
                   </div>
                   <div >
                     <button type="submit" onclick="this.form.submit()" style="background-color: transparent; border:0px;">
                       <img src="<?= BASE_PATH?>/View/resources/openClearance.png" alt="" class="open_button" >
                     </button>
-                    <input type="hidden" name="view" value="FACULTY-REQUIREMENTS">
-                    <input type="hidden" name="search" value="<?php echo $faculty["facultyID"] ?>">
+                    <input type="hidden" name="view" value="OFFICE-REQUIREMENTS">
+                    <input type="hidden" name="search" value="<?php echo $office["officeID"] ?>">
                   </div>
                 </form>
-              <?php //endforeach ?>
+              <?php endforeach ?>
             </div> 
-          <?php endif ?>
+          
+          
+          <?php elseif ($student_view === "OFFICE-REQUIREMENTS"): $office_info = getOfficeRequireMents($search); ?>
+            <div class="row" style="justify-content: space-between; align-items:center">
+              <b class="view_title">OFFICE</b>
+               <a href="<?= BASE_PATH ?>/clearance?view=OFFICE" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+            </div>
+            <div class="row subject_container">
+              <div class="column">
+                <b>NAME: <?= $office_info[0]["name"] ?></b>
+                <b>ROLE: <?= $office_info[0]["prof_name"]?></b>
+                
+                
+              </div>
+            </div>
 
-        <?php elseif (in_array($_SESSION["role"], ["prof","dean","program coordinator"])):?>
+            <div class="requirement_container">
+              <div class="clearance_instructions" style="font-size:20px">
+                <b style="font-size:25px">How to submit your clearance requirement</b>
+                <p>Upload the document that proves you have completed this requirement for this clearance.</p>
+                <ol>
+                  <li>Accepted formats: PDF, DOC, or DOCX (maximum 40MB).</li>
+                  <li>Make sure the file is complete, readable, and shows your name and student number.</li>
+                  <li>Choose your file, then click <b>Upload document</b>.</li>
+                  <li>Wait for the confirmation message. Your requirement stays <i>Not yet cleared</i> until it is reviewed.</li>
+                  <li>If it is rejected, read the remarks, fix the issue, and upload a new file.</li>
+                  <li>If your file is larger than 40 MB, upload it to your own Google Drive and set sharing to
+                      <b>"Anyone with the link can view"</b>.<br> Copy the link and paste it into a new document,
+                      along with your name and student number. <br>Export that document as a PDF and upload the PDF here.
+                      Do not edit, move, or delete the file in your Drive until your requirement is cleared.</li>
+                </ol>
+                <p>For questions, contact the person or office in charge of this requirement.</p>
+              </div>
+              <div class="row" style="gap:20px; flex-wrap:wrap; justify-content:center" >
+                <?php foreach($office_info as $requirement): if ($requirement["file_name"] === null) continue;?>
+                  <div class="row file_container"  >
+                    <div class="row" style="align-items:center;">
+                      <img src="<?= BASE_PATH?>/View/resources/Document.png" alt="" class="file_icons">
+                      <b><?= $requirement["file_name"]?></b>
+                    </div>
+                    
+                    <b><?= $requirement['file_size'] ?></b>
+                    <!-- <div class="row" style="align-items:center;">
+                      <a href=""><img src="<= BASE_PATH?>/View/resources/Eye.png" alt="" class="file_icons"></a>
+                      <a href=""><img src="<= BASE_PATH?>/View/resources/Download.png" alt="" class="file_icons"></a>
+                    </div> -->
+                    <div class="row" style="align-items:center;">
+                      <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
+                        <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S" target="_blank">
+                          <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
+                        </a>
+                      <?php endif ?>
+                      
+                      <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S&amp;download=1">
+                        <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
+                      </a>
+                    </div>
+                  </div>
+
+                <?php endforeach ?>
+                  
+              </div>
+              
+            </div>
+            <div class="row fileupload_buttom">
+                  <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>&upload=1">
+                    <button type="button">UPLOAD FILE</button>
+                  </a>
+                  <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>&uploaded=1">
+                    <button type="button">VIEW UPLOADS</button>
+                  </a>
+
+
+                  <?php if(isset($_GET['upload']) && ($_GET['upload'] == 1)): ?>
+                    <form class="uploads_container upload_container" method="POST" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
+                      <div class="row upload_header">
+                        <b>YOUR FILES</b>
+                        <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>">
+                          <img src="<?= BASE_PATH ?>/View/resources/Close.png" alt="Close" class="back_buttons">
+                        </a>
+                      </div>
+                      
+
+                      <div class="upload_body">
+                        <hr>
+                        <div class="files_section">
+                          <h3>Files Uploaded</h3>
+                          <p class="no_files">No files attached yet.</p>
+                          <ul class="file_list"></ul>
+                        </div>
+                        <hr>
+                      </div>
+
+                      <div class="row upload_actions">
+                        <label for="document" class="pill_btn">ATTACH FILE</label>
+                        <button type="submit" class="pill_btn">SUBMIT</button>
+
+                        <input type="file" id="document" name="document"  hidden
+                              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                      </div>
+                      <input type="hidden" name="docs_for" value="addOfficeRequirement">
+                      <input type="hidden" name="ID" value="<?= $office_info[0]['office_clearanceID'] ?>">
+                      <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+                    </form>
+
+                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedOfficeRequireMents($search);?>
+                    <form class="uploads_container uploaded_container">
+                        <div class="row"  style="justify-content: space-between;">
+                            <b>UPLOADED FILES</b>
+                            <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>">
+                              <img src="<?= BASE_PATH?>/View/resources/Close.png" alt="" class="back_buttons"></a>
+                        </div>
+                        <hr>
+                        <div class="column" style="gap:20px;  " >
+                          <?php foreach($uploaded_files as $requirement): if ($requirement["file_name"] === null) continue;?>
+                            <div class="row uploaded_file_container"  >
+                              <div class="row" style="align-items:center;">
+                                <img src="<?= BASE_PATH?>/View/resources/Document.png" alt="" class="file_icons">
+                                <b><?= $requirement["file_name"]?></b>
+                              </div>
+                              
+                              <b><?= $requirement['file_size'] ?></b>
+                              <!-- <div class="row" style="align-items:center;">
+                                <a href=""><img src="<= BASE_PATH?>/View/resources/Eye.png" alt="" class="file_icons"></a>
+                                <a href=""><img src="<= BASE_PATH?>/View/resources/Download.png" alt="" class="file_icons"></a>
+                              </div> -->
+                              <div class="row" style="align-items:center;">
+                                <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
+                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S" target="_blank">
+                                    <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
+                                  </a>
+                                <?php endif ?>
+                                
+                                <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S&amp;download=1">
+                                  <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
+                                </a>
+                              </div>
+                            </div>
+
+                          <?php endforeach ?>
+                        </div>
+                    </form>
+                  <?php endif ?>
+                </div>
+          <?php endif ?>                        
+        <?php elseif (in_array($_SESSION["role"], ["prof","dean","program coordinator","registrar"])):?>
           <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
             <input type="file" name="document"
                   accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   required>
             <button type="submit">Upload document</button>
-            <input type="hidden" name="docs_for" value="addFacultyRequirement">
+            <input type="hidden" name="docs_for" value="addOfficeRequirement">
             <input type="hidden" name="ID" value="1">
             <input type="hidden" name="page_uploader" value="<?php echo parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?>">
           </form>
@@ -609,8 +752,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
         
       
-    <?php elseif ($student_view == "SUBJECT-REQUIREMENTS"): ?>
-    <?php elseif ($student_view == "FACULTY-REQUIREMENTS"): ?>
+    <?php elseif ($student_view == "SUBJECT-REQUIREMENTS" || $student_view == "FACULTY-REQUIREMENTS" || $student_view == "OFFICE-REQUIREMENTS"): ?>
         const input = document.getElementById('document');
         const list = document.querySelector('.file_list');
         const noFiles = document.querySelector('.no_files');

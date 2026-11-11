@@ -13,7 +13,7 @@ $search = "ALL";
 $status = "ALL";
 
 
-$allowedViews = ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE','SUBJECT-REQUIREMENTS','FACULTY-REQUIREMENTS'];
+$allowedViews = ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE','SUBJECT-REQUIREMENTS','FACULTY-REQUIREMENTS','OFFICE-REQUIREMENTS'];
 $student_view = strtoupper($_GET['view'] ?? 'MAIN');
 if (!in_array($student_view, $allowedViews, true)) {
     $student_view = 'MAIN';
@@ -33,12 +33,12 @@ if($_SESSION["role"] == "student"){
 }
 
 // var_dump( isset($_GET["view"]));
-if( in_array($student_view, ["SUBJECTS","FACULTY"])){
+if( in_array($student_view, ["SUBJECTS","FACULTY","OFFICE"])){
     $search = trim($_GET['search'] ?? '');
     if ($search === '') { $search = 'ALL'; }  
     $status =  ($_GET['statusfilter'] ?? 'ALL');
     // echo $subjectID.$status;
-}elseif(in_array($student_view, ["SUBJECT-REQUIREMENTS", "FACULTY-REQUIREMENTS"])){
+}elseif(in_array($student_view, ["SUBJECT-REQUIREMENTS", "FACULTY-REQUIREMENTS", "OFFICE-REQUIREMENTS"])){
     $search = trim($_GET['search'] ?? '');
 }
 
@@ -108,9 +108,33 @@ function getUploadedFacultyRequireMents($facultyID){
     return $records;
 }
 
-// function getSubjectRequireMents($subjectID){
-//     global $clearanceDAO;
-//     $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ]);
+function getOfficeClearance($faculty_lastname = 'ALL',$status = 'ALL'){
+    global $clearanceDAO;
+    
+    
 
-//     return $records;
-// }
+    $records = $clearanceDAO->executeQuery("getOfficeClearance",[
+        $faculty_lastname, $faculty_lastname,
+        $_SESSION["userID"], 
+        $status,$status
+    ]);
+
+    return $records;
+    // var_dump($subjectID == 'ALL');
+    // var_dump($_SESSION["userID"]);
+    // var_dump($records);
+}
+
+function getOfficeRequireMents($officeID){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getOfficeRequirements",[$officeID, $_SESSION['userID'], $_SESSION['userID']]);
+
+    return $records;
+}
+
+function getUploadedOfficeRequireMents($officeID){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getUploadedOfficeRequireMents",[ $officeID ,$_SESSION['userID'],$_SESSION['userID']]);
+
+    return $records;
+}
