@@ -184,12 +184,14 @@ $userDAO->prepareStatement( "getFacultyInfo",
 );
 
 $userDAO->prepareStatement("saveStudentFolderID","UPDATE 
-    TABLE students
-    SET folderID = ?;
+    students
+    SET folderID = ?
+    where concat(year(students.date_created),lpad(students.studentID,5,0)) = ?;
 ");
 $userDAO->prepareStatement("saveFacultyFolderID","UPDATE 
-    TABLE faculty
-    SET folderID = ?;
+    faculty
+    SET folderID = ?
+    where concat('F',year(faculty.date_created),lpad(faculty.facultyID,5,0)) = ?;
 ");
 
 
@@ -214,7 +216,7 @@ $clearanceDAO->prepareStatement("getPieChartData",
 );
 
 $clearanceDAO->prepareStatement("getSubjectsClearance","SELECT 
-        S.subjectID AS subjectID,
+        DISTINCT(S.subjectID) AS subjectID,
         S.name AS name,
         SC.date_cleared AS date_cleared,
         SC.remarks AS remarks,
@@ -233,7 +235,12 @@ $clearanceDAO->prepareStatement("getSubjectsClearance","SELECT
         AND SS.subjectID = ES.subjectID
         LEFT JOIN faculty AS  F
         ON F.facultyID = SS.facultyID
-    WHERE ('ALL' = ? OR S.subjectID = ?)
+    WHERE EXISTS (
+            SELECT 1
+            FROM subject_clearance_requirements AS SCR
+            WHERE SCR.subjectID = S.subjectID
+        )
+        AND ('ALL' = ? OR S.subjectID = ?)
         AND concat(year(ST.date_created),lpad(ES.studentID,5,0)) = ?
         AND ('ALL' = ? OR SC.status = ?);
 "
@@ -279,29 +286,80 @@ $clearanceDAO->prepareStatement("getSubjectRequirements","SELECT
     ON 	SCR.subjectID = ES.subjectID
         
     WHERE
-        S.subjectID = ? and concat(year(ST.date_created),lpad(ES.studentID,5,0)) = ?;
+        S.subjectID = ? and concat(year(ST.date_created),lpad(ES.studentID,5,0)) = ?
+        ANd not SCR.uploaded_by = ?;
 
 ");
+$clearanceDAO->prepareStatement("getUploadedSubjectRequirements","SELECT
+        S.subjectID AS subjectID,
+        S.name AS name,
+        SC.date_cleared AS date_cleared,
+        SC.remarks AS remarks,
+        SC.status AS status,
+        CONCAT(SS.time_start,' - ', SS.time_end) as class_time,
+        SS.day AS day,
+        SS.roomID AS room,
+        CONCAT(F.last_name, ', ', F.first_name) AS prof_name,
+        SCR.ID,
+        SCR.fileID,
+        SCR.file_name,
+        SCR.mime_type,
+        IF(
+            COALESCE(SCR.file_size, 0) < 1000000,
+            CONCAT(ROUND(COALESCE(SCR.file_size, 0) / 1024, 1), ' KB'),
+            CONCAT(ROUND(COALESCE(SCR.file_size, 0) / 1048576, 2), ' MB')
+        ) AS file_size,
+        SCR.uploaded_at
+    FROM
+        subject_clearance AS SC
+    INNER JOIN enrolled_subjects AS ES
+    ON
+        ES.enrolled_subjectID = SC.enrolled_subjectID
+    INNER JOIN students AS ST
+    ON
+        ST.studentID = ES.studentID
+    INNER JOIN subjects AS S
+    ON
+        S.subjectID = ES.subjectID
+    LEFT JOIN subject_schedules AS SS
+    ON
+        SS.enrollmentID = ES.enrollmentID AND SS.subjectID = ES.subjectID
+    LEFT JOIN faculty AS F
+    ON  F.facultyID = SS.facultyID
+    left JOIN subject_clearance_requirements AS SCR
+    ON 	SCR.subjectID = ES.subjectID
+        
+    WHERE
+        S.subjectID = ? and concat(year(ST.date_created),lpad(ES.studentID,5,0)) = ?
+        ANd SCR.uploaded_by = ?;
+
+");
+
 $clearanceDAO->prepareStatement("addSubjectRequirement","INSERT INTO 
     `subject_clearance_requirements` ( `subjectID`, `fileID`, `file_name`,mime_type, `file_size`,  `uploaded_by`) 
     VALUES (?, ?,?,?, ?,?)"
 );
 
 
-$clearanceDAO->prepareStatement("getFacultyClearance","SELECT 
+$clearanceDAO->prepareStatement("getFacultyClearance","SELECT DISTINCT
         F.role,
-        FC.facultyID,
+        FC.facultyID AS facultyID,
         FC.date_cleared AS date_cleared,
         FC.remarks AS remarks,
         FC.status AS status,
-        CONCAT(F.last_name,', ', F.first_name ) AS prof_name
-    FROM faculty_clearance AS FC 
-        INNER JOIN students AS  ST 
-        ON ST.studentID = FC.studentID
-        LEFT JOIN faculty AS  F
-        ON F.facultyID = FC.facultyID
-    WHERE ('ALL' = ? OR F.last_name = ?)
-        AND concat(year(ST.date_created),lpad(FC.studentID,5,0)) = ?
+        CONCAT(F.last_name, ', ', F.first_name) AS prof_name
+    FROM faculty_clearance AS FC
+        INNER JOIN students AS ST
+            ON ST.studentID = FC.studentID
+        LEFT JOIN faculty AS F
+            ON F.facultyID = FC.facultyID
+    WHERE EXISTS (
+            SELECT 1
+            FROM faculty_clearance_requirements AS FCR
+            WHERE FCR.faculty_clearanceID = FC.faculty_clearanceID
+        )
+        AND ('ALL' = ? OR F.last_name = ?)
+        AND CONCAT(YEAR(ST.date_created), LPAD(FC.studentID, 5, 0)) = ?
         AND ('ALL' = ? OR FC.status = ?);
 "
 );
@@ -310,10 +368,12 @@ $clearanceDAO->prepareStatement("addFacultyRequirement","INSERT INTO
     VALUES (?, ?,?,?, ?,?)"
 );
 $clearanceDAO->prepareStatement("getFacultyRequirements","SELECT
+        FC.faculty_clearanceID ,
         FC.date_cleared AS date_cleared,
         FC.remarks AS remarks,
         FC.status AS status,
         CONCAT(F.last_name, ', ', F.first_name) AS prof_name,
+        F.role,
         FCR.ID,
         FCR.fileID,
         FCR.file_name,
@@ -327,17 +387,17 @@ $clearanceDAO->prepareStatement("getFacultyRequirements","SELECT
     FROM
         faculty_clearance AS FC
     INNER JOIN students AS ST
-    ON
-        ST.studentID = FC.studentID
-    LEFT JOIN faculty AS F
+    ON ST.studentID = FC.studentID
+    inner JOIN faculty AS F
     ON  F.facultyID = FC.facultyID
-    left JOIN faculty_clearance_requirements AS FCR
+    inner JOIN faculty_clearance_requirements AS FCR
     ON 	FCR.faculty_clearanceID = FC.faculty_clearanceID
-        
-    WHERE
-        F.facultyID = ?;
 
-");
+    WHERE
+        FC.facultyID = ? and concat(year(ST.date_created),lpad(ST.studentID,5,0)) = ?
+        ANd not FCR.uploaded_by = ?;
+
+"); 
 
 
 

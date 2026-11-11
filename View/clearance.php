@@ -43,27 +43,24 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           <?php if ($student_view == "MAIN"): ?>
             <div class="row" style=" gap:20px">
               <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
-                <div class="clearance_categ_box_upper_part">
-
-                </div>
+                <img src="<?= BASE_PATH ?>/View/resources/image1.png" class="clearance_categ_box_upper_part">
+                
                 <div class="clearance_categ_box_buttom_part column">
                   <b>SUBJECTS</b>
                 </div>
                 <input type="hidden" name="view" value="SUBJECTS">
               </form>
               <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
-                <div class="clearance_categ_box_upper_part">
+                <img src="<?= BASE_PATH ?>/View/resources/image2.png" class="clearance_categ_box_upper_part">
 
-                </div>
                 <div class="clearance_categ_box_buttom_part column">
                   <b>FACULTY</b>
                 </div>
                 <input type="hidden" name="view" value="FACULTY">
               </form>
               <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
-                <div class="clearance_categ_box_upper_part">
+                <img src="<?= BASE_PATH ?>/View/resources/image3.png" class="clearance_categ_box_upper_part">
 
-                </div>
                 <div class="clearance_categ_box_buttom_part column">
                   <b>OFFICE</b>
                 </div>
@@ -230,9 +227,87 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   
                 </div>
                 <div class="row fileupload_buttom">
-                  <button>UPLOAD FILE</button>
-                  <button>VIEW UPLOADS</button>
+                  <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>&upload=1">
+                    <button type="button">UPLOAD FILE</button>
+                  </a>
+                  <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>&uploaded=1">
+                    <button type="button">VIEW UPLOADS</button>
+                  </a>
+
+
+                  <?php if(isset($_GET['upload']) && ($_GET['upload'] == 1)): ?>
+                    <form class="uploads_container upload_container" method="POST" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
+                      <div class="row upload_header">
+                        <b>YOUR FILES</b>
+                        <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>">
+                          <img src="<?= BASE_PATH ?>/View/resources/return.png" alt="Close" class="back_buttons">
+                        </a>
+                      </div>
+                      
+
+                      <div class="upload_body">
+                        <hr>
+                        <div class="files_section">
+                          <h3>Files Uploaded</h3>
+                          <p class="no_files">No files attached yet.</p>
+                          <ul class="file_list"></ul>
+                        </div>
+                        <hr>
+                      </div>
+
+                      <div class="row upload_actions">
+                        <label for="document" class="pill_btn">ATTACH FILE</label>
+                        <button type="submit" class="pill_btn">SUBMIT</button>
+
+                        <input type="file" id="document" name="document"  hidden
+                              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                      </div>
+                      <input type="hidden" name="docs_for" value="addSubjectRequirement">
+                      <input type="hidden" name="ID" value="<?= $subject_info[0]['subjectID'] ?>">
+                      <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+                    </form>
+
+                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedSubjectRequireMents($search);?>
+                    <form class="uploads_container uploaded_container">
+                        <div class="row"  style="justify-content: space-between;">
+                            <b>UPLOADED FILES</b>
+                            <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>">
+                              <img src="<?= BASE_PATH?>/View/resources/return.png" alt="" class="back_buttons"></a>
+                        </div>
+                        <hr>
+                        <div class="column" style="gap:20px;  " >
+                          <?php foreach($uploaded_files as $requirement): if ($requirement["file_name"] === null) continue;?>
+                            <div class="row uploaded_file_container"  >
+                              <div class="row" style="align-items:center;">
+                                <img src="<?= BASE_PATH?>/View/resources/Document.png" alt="" class="file_icons">
+                                <b><?= $requirement["file_name"]?></b>
+                              </div>
+                              
+                              <b><?= $requirement['file_size'] ?></b>
+                              <!-- <div class="row" style="align-items:center;">
+                                <a href=""><img src="<= BASE_PATH?>/View/resources/Eye.png" alt="" class="file_icons"></a>
+                                <a href=""><img src="<= BASE_PATH?>/View/resources/Download.png" alt="" class="file_icons"></a>
+                              </div> -->
+                              <div class="row" style="align-items:center;">
+                                <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
+                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S" target="_blank">
+                                    <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
+                                  </a>
+                                <?php endif ?>
+                                
+                                <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S&amp;download=1">
+                                  <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
+                                </a>
+                              </div>
+                            </div>
+
+                          <?php endforeach ?>
+                        </div>
+                    </form>
+                  <?php endif ?>
                 </div>
+
+                
 
           <?php elseif ($student_view === "FACULTY"): $faculties = getFacultyClearance($search,$status);?>
             <div class="row" style="justify-content: space-between; align-items:center">
@@ -264,33 +339,26 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <b style="font-size: 30px;"><?= $faculty["prof_name"] ?></b>
                   </div>
                   <div >
-                    
                     <button type="submit" onclick="this.form.submit()" style="background-color: transparent; border:0px;">
                       <img src="<?= BASE_PATH?>/View/resources/openClearance.png" alt="" class="open_button" >
                     </button>
                     <input type="hidden" name="view" value="FACULTY-REQUIREMENTS">
                     <input type="hidden" name="search" value="<?php echo $faculty["facultyID"] ?>">
                   </div>
-
                 </form>
               <?php endforeach ?>
             </div> 
 
-          <?php elseif ($student_view === "FACULTY-REQUIREMENTS"): $faculty_info = getFacultyRequireMents($search);?>
+          <?php elseif ($student_view === "FACULTY-REQUIREMENTS"): $faculty_info = getFacultyRequireMents($search); ?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">FACULTY</b>
-               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+               <a href="<?= BASE_PATH ?>/clearance?view=FACULTY" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
             <div class="row subject_container">
               <div class="column">
                 <b>NAME: <?= $faculty_info[0]["prof_name"] ?></b>
-                <b>SUBJECT CODE: <?= $faculty_info[0]["subjectID"]?></b>
+                <b>ROLE: <?= $faculty_info[0]["role"]?></b>
                 
-                
-              </div>
-              <div class="column">
-                <b>CLASS TIME: <?= $faculty_info[0]["class_time"] ?></b>
-                <b>ROOM: <?= $faculty_info[0]["room"] ?></b>
                 
               </div>
             </div>
@@ -344,9 +412,85 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               
             </div>
             <div class="row fileupload_buttom">
-              <button>UPLOAD FILE</button>
-              <button>VIEW UPLOADS</button>
-            </div>
+                  <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>&upload=1">
+                    <button type="button">UPLOAD FILE</button>
+                  </a>
+                  <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>&uploaded=1">
+                    <button type="button">VIEW UPLOADS</button>
+                  </a>
+
+
+                  <?php if(isset($_GET['upload']) && ($_GET['upload'] == 1)): ?>
+                    <form class="uploads_container upload_container" method="POST" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
+                      <div class="row upload_header">
+                        <b>YOUR FILES</b>
+                        <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>">
+                          <img src="<?= BASE_PATH ?>/View/resources/return.png" alt="Close" class="back_buttons">
+                        </a>
+                      </div>
+                      
+
+                      <div class="upload_body">
+                        <hr>
+                        <div class="files_section">
+                          <h3>Files Uploaded</h3>
+                          <p class="no_files">No files attached yet.</p>
+                          <ul class="file_list"></ul>
+                        </div>
+                        <hr>
+                      </div>
+
+                      <div class="row upload_actions">
+                        <label for="document" class="pill_btn">ATTACH FILE</label>
+                        <button type="submit" class="pill_btn">SUBMIT</button>
+
+                        <input type="file" id="document" name="document"  hidden
+                              accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+                      </div>
+                      <input type="hidden" name="docs_for" value="addFacultyRequirement">
+                      <input type="hidden" name="ID" value="<?= $faculty_info[0]['faculty_clearanceID'] ?>">
+                      <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+                    </form>
+
+                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedSubjectRequireMents($search);?>
+                    <form class="uploads_container uploaded_container">
+                        <div class="row"  style="justify-content: space-between;">
+                            <b>UPLOADED FILES</b>
+                            <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>">
+                              <img src="<?= BASE_PATH?>/View/resources/return.png" alt="" class="back_buttons"></a>
+                        </div>
+                        <hr>
+                        <div class="column" style="gap:20px;  " >
+                          <?php foreach($uploaded_files as $requirement): if ($requirement["file_name"] === null) continue;?>
+                            <div class="row uploaded_file_container"  >
+                              <div class="row" style="align-items:center;">
+                                <img src="<?= BASE_PATH?>/View/resources/Document.png" alt="" class="file_icons">
+                                <b><?= $requirement["file_name"]?></b>
+                              </div>
+                              
+                              <b><?= $requirement['file_size'] ?></b>
+                              <!-- <div class="row" style="align-items:center;">
+                                <a href=""><img src="<= BASE_PATH?>/View/resources/Eye.png" alt="" class="file_icons"></a>
+                                <a href=""><img src="<= BASE_PATH?>/View/resources/Download.png" alt="" class="file_icons"></a>
+                              </div> -->
+                              <div class="row" style="align-items:center;">
+                                <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
+                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S" target="_blank">
+                                    <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
+                                  </a>
+                                <?php endif ?>
+                                
+                                <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S&amp;download=1">
+                                  <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
+                                </a>
+                              </div>
+                            </div>
+
+                          <?php endforeach ?>
+                        </div>
+                    </form>
+                  <?php endif ?>
+                </div>
             
           <?php elseif ($student_view === "OFFICE"): ?>
             <div class="row" style="justify-content: space-between; align-items:center">
@@ -362,8 +506,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   required>
             <button type="submit">Upload document</button>
-            <input type="hidden" name="docs_for" value="addSubjectRequirement">
-            <input type="hidden" name="ID" value="CSC111L">
+            <input type="hidden" name="docs_for" value="addFacultyRequirement">
+            <input type="hidden" name="ID" value="1">
             <input type="hidden" name="page_uploader" value="<?php echo parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?>">
           </form>
           <!-- INSERT INTO `subject_clearance_requirements` (`ID`, `enrolled_subjectID`, `fileID`, `file_name`, `file_size`, `uploaded_at`, `uploaded_by`) VALUES (NULL, '', '', '', '', CURRENT_TIMESTAMP, '') -->
@@ -378,58 +522,85 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
       </main>
     </div>
   </div>
-  <?php if ($student_view == "MAIN"): ?>
-    <script>
-      new Chart(document.getElementById('pie'), {
-        type: 'pie',
-        data: {
-          labels: <?= $labels ?>,
-          datasets: [{
-            data: <?= $values ?>,
-            backgroundColor: ['#7700ff', '#cf00fd', '#00a4fd', '#1eff00']
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            title: {
-              display: true,
-              text: 'Clearance Status',
-              color: '#f8f1f1',
-              font: {
-                size: 30,
-                weight: 'bold',
-                family: 'Arial'
-              }
-            },
-            legend: {
-              position: 'bottom',
-              align: 'start',
-              labels: {
-                color: '#ffffff', // legend text color
+  <script>
+    <?php if ($student_view == "MAIN"): ?>
+      
+        new Chart(document.getElementById('pie'), {
+          type: 'pie',
+          data: {
+            labels: <?= $labels ?>,
+            datasets: [{
+              data: <?= $values ?>,
+              backgroundColor: ['#7700ff', '#cf00fd', '#00a4fd', '#1eff00']
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              title: {
+                display: true,
+                text: 'Clearance Status',
+                color: '#f8f1f1',
                 font: {
-                  size: 20,
+                  size: 30,
+                  weight: 'bold',
                   family: 'Arial'
-                },
-                padding: 40,
-                usePointStyle: true // round bullets instead of boxes
-              }
-            },
-            tooltip: {
-              backgroundColor: '#222', // hover box background
-              titleColor: '#fff',
-              bodyColor: '#ffd166',
-              bodyFont: {
-                size: 14
+                }
               },
-              padding: 10
+              legend: {
+                position: 'bottom',
+                align: 'start',
+                labels: {
+                  color: '#ffffff', // legend text color
+                  font: {
+                    size: 20,
+                    family: 'Arial'
+                  },
+                  padding: 40,
+                  usePointStyle: true // round bullets instead of boxes
+                }
+              },
+              tooltip: {
+                backgroundColor: '#222', // hover box background
+                titleColor: '#fff',
+                bodyColor: '#ffd166',
+                bodyFont: {
+                  size: 14
+                },
+                padding: 10
+              }
             }
           }
-        }
-      });
-    </script>
-  <?php endif ?>
+        });
+
+        
+      
+    <?php elseif ($student_view == "SUBJECT-REQUIREMENTS"): ?>
+      const input = document.getElementById('document');
+        const list = document.querySelector('.file_list');
+        const noFiles = document.querySelector('.no_files');
+        const form = document.querySelector('.upload_container');
+
+        input.addEventListener('change', () => {
+          list.innerHTML = '';
+          noFiles.style.display = input.files.length ? 'none' : '';
+
+          Array.from(input.files).forEach(file => {
+            const li = document.createElement('li');
+            li.textContent = file.name;
+            list.appendChild(li);
+          });
+        });
+
+        form.addEventListener('submit', e => {
+          if (!input.files.length) {
+            e.preventDefault();
+            noFiles.textContent = 'Please attach at least one file.';
+          }
+        });
+    <?php endif ?>
+  </script>
   <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 

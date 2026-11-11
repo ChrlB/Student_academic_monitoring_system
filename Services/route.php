@@ -2,7 +2,7 @@
 require_once __DIR__.'/../PageLogic/login_logic.php';
 require_once __DIR__."/../Services/session.php";
 require_once __DIR__."/../Services/imageHandler.php";
-require_once __DIR__ . '/../Services/documentHandler.php';
+require_once __DIR__ . '/../Services/ClearanceDocumentHandler.php';
 
 class Router {
     private array $routes = [];
