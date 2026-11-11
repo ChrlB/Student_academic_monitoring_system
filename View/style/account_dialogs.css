@@ -1,0 +1,325 @@
+/* View/style/account_dialogs.css : Change Password (light) and Edit Profile (dark) popups.
+   Own classes (.dlg, .df, .pw) so nothing depends on the account page's variables. */
+
+.dlg {
+  box-sizing: border-box;
+  padding: 0;
+  border: 0;
+  margin: auto;
+  max-height: 92vh;
+  overflow: hidden;
+  font-family:
+    'Inter',
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+.dlg::backdrop {
+  background: rgba(15, 4, 40, 0.65);
+  backdrop-filter: blur(3px);
+}
+.dlg:not([open]) {
+  display: none;
+}
+.dlg[open] {
+  display: block;
+}
+.dlg svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.dlg h2,
+.dlg h3,
+.dlg p {
+  margin: 0;
+}
+.dlg form {
+  margin: 0;
+}
+
+.pill {
+  min-width: 108px;
+  height: 44px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.pill:focus-visible {
+  outline: 3px solid #c58bff;
+  outline-offset: 2px;
+}
+.pill:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.dlg-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+/* ---------- Change Password (white card) ---------- */
+.dlg-light {
+  width: min(94vw, 520px);
+  border-radius: 26px;
+  background: #fff;
+  color: #1a1030;
+  box-shadow: 0 24px 60px rgba(10, 2, 30, 0.55);
+}
+.dlg-light form {
+  padding: 28px 40px 32px;
+}
+.dlg-light h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+.dlg-light h2 svg {
+  width: 24px;
+  height: 24px;
+}
+.dlg .dlg-msg {
+  margin: 16px 0 20px;
+  color: #c30f1b;
+  font-size: 0.95rem;
+  font-weight: 800;
+  line-height: 1.7;
+}
+.dlg-msg.err {
+  text-decoration: none;
+}
+
+.pw {
+  display: block;
+  margin-bottom: 20px;
+}
+.pw > span {
+  display: block;
+  margin: 0 0 4px 10px;
+  font-size: 0.8rem;
+}
+.pw-box {
+  position: relative;
+}
+.pw-box input {
+  box-sizing: border-box;
+  width: 100%;
+  height: 56px;
+  padding: 0 52px 0 20px;
+  border: 2px solid transparent;
+  border-radius: 16px;
+  background: #d9d9d9;
+  color: #1a1030;
+  font: inherit;
+  font-size: 1.05rem;
+}
+.pw-box input::placeholder {
+  color: #444;
+}
+.pw-box input:focus {
+  outline: none;
+  border-color: #9b30c0;
+  background: #e4e4e4;
+}
+.eye {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #111;
+  cursor: pointer;
+}
+.eye svg {
+  width: 24px;
+  height: 24px;
+}
+.eye:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+.eye:focus-visible {
+  outline: 3px solid #9b30c0;
+}
+.eye .slash {
+  display: inline;
+}
+.eye.on .slash {
+  display: none;
+} /* eye crossed out = hidden, plain eye = visible */
+.dlg-light .dlg-actions {
+  margin-top: 28px;
+}
+.dlg-light .pill {
+  background: #9b30c0;
+  color: #fff;
+}
+.dlg-light .pill:hover {
+  background: #8a22b0;
+}
+
+/* ---------- Edit Profile (dark card) ---------- */
+.dlg-dark {
+  width: min(96vw, 860px);
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(180deg, #4a3a5c 0%, #2c1536 55%, #1d0b27 100%);
+  border: 3px solid #1d86e6;
+  box-shadow: 0 24px 60px rgba(10, 2, 30, 0.6);
+}
+.dlg-dark form {
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+}
+.dlg-scroll {
+  overflow-y: auto;
+  padding: 26px 34px 6px;
+}
+.dlg-dark h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+}
+.dlg-dark h2 svg {
+  width: 22px;
+  height: 22px;
+}
+.dlg .dlg-sub {
+  margin: 22px 0 8px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.dlg .dlg-note {
+  margin: 10px 0 4px;
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.dlg .dlg-msg-dark {
+  margin: 12px 0 0;
+  padding: 9px 14px;
+  border-radius: 10px;
+  background: #fff;
+  color: #c30f1b;
+  font-size: 0.88rem;
+  line-height: 1.4;
+}
+
+.df-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 14px;
+  margin-top: 14px;
+}
+.df {
+  display: block;
+  min-width: 0;
+}
+.df > span {
+  display: block;
+  margin: 0 0 3px 4px;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+.df input,
+.df select {
+  box-sizing: border-box;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: #d9d9d9;
+  color: #1a1030;
+  font: inherit;
+  font-size: 0.9rem;
+}
+.df input:focus,
+.df select:focus {
+  outline: none;
+  border-color: #c58bff;
+}
+.df input:disabled,
+.df select:disabled {
+  background: #8f8798;
+  color: #3d3447;
+  cursor: not-allowed;
+}
+/* widths in 6ths of a row; the flex gap is subtracted so rows line up */
+.df.w2 {
+  flex: 0 0 calc(33.333% - 10px);
+}
+.df.w3 {
+  flex: 0 0 calc(33.333% - 10px);
+}
+.df.w4 {
+  flex: 0 0 calc(50% - 7px);
+}
+.df.w6 {
+  flex: 0 0 100%;
+}
+.df.w2 {
+  flex-basis: calc(25% - 11px);
+}
+
+.dlg-actions-dark {
+  padding: 18px 34px 24px;
+}
+.dlg-actions-dark .pill {
+  min-width: 96px;
+  height: 38px;
+  background: #e8e0f2;
+  color: #6a14c4;
+  font-size: 0.9rem;
+}
+.dlg-actions-dark .pill:hover {
+  background: #fff;
+}
+
+@media (max-width: 640px) {
+  .dlg-light form {
+    padding: 22px 20px 24px;
+  }
+  .dlg-scroll {
+    padding: 20px 18px 4px;
+  }
+  .dlg-actions-dark {
+    padding: 14px 18px 18px;
+  }
+  .df.w2,
+  .df.w3,
+  .df.w4 {
+    flex: 0 0 calc(50% - 7px);
+  }
+  .df.w6 {
+    flex: 0 0 100%;
+  }
+}
+@media (max-width: 420px) {
+  .df.w2,
+  .df.w3,
+  .df.w4 {
+    flex: 0 0 100%;
+  }
+}

@@ -146,23 +146,32 @@ $userDAO->prepareStatement( "getFacultyProfile",
   WHERE concat('F',year(date_created),lpad(facultyID,5,0)) = ?"
 );
 $userDAO->prepareStatement( "getStudentInfo",
-  "SELECT 
-      concat(year(date_created),lpad(studentID,5,0)) as ID ,
-      first_name,
-      middle_name,
-      last_name,
-      concat(concat(year(date_created),lpad(studentID,5,0)),'@gordoncollege.edu.ph') as email,
-      block,
-      year_level,
-      program,
-      date_created,
-      address,
-      number,
-      date_of_birth,
-      gender,
-      status
-      FROM students
-      WHERE  concat(year(date_created),lpad(studentID,5,0)) = ?"
+    "SELECT
+        concat(year(date_created),lpad(studentID,5,0)) as ID ,
+        first_name,
+        middle_name,
+        last_name,
+        COALESCE(NULLIF(email,''), concat(concat(year(date_created),lpad(studentID,5,0)),'@gordoncollege.edu.ph')) as email,
+        block,
+        year_level,
+        program,
+        date_created,
+        address,
+        number,
+        date_of_birth,
+        gender,
+        status,
+        place_of_birth,
+        civil_status,
+        sexual_orientation,
+        citizenship,
+        religion,
+        region,
+        province,
+        municipality,
+        zip_code
+    FROM students
+    WHERE  concat(year(date_created),lpad(studentID,5,0)) = ?"
 );
 $userDAO->prepareStatement( "getFacultyInfo",
   "SELECT 
@@ -198,6 +207,12 @@ $userDAO->prepareStatement("saveFacultyFolderID","UPDATE
 // CLEARANCE 
 
 
+$userDAO->prepareStatement("studentRowExists",
+    "SELECT studentID FROM students WHERE studentID = ? AND YEAR(date_created) = ?;");
+$userDAO->prepareStatement("updateStudentProfile",
+    "UPDATE students SET middle_name = ?, date_of_birth = ?, gender = ?, address = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
+$userDAO->prepareStatement("updateStudentPassword",
+    "UPDATE students SET password = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
 $clearanceDAO->prepareStatement("getClearanceUpdates",
  " SELECT category, item_name, name, studentID, date_cleared, remarks, status
   FROM ($cleranceUpdate) AS updates
@@ -205,6 +220,8 @@ $clearanceDAO->prepareStatement("getClearanceUpdates",
   ORDER BY date_cleared DESC LIMIT 50
   "
 );
+$userDAO->prepareStatement("updateStudentProfileFull",
+    "UPDATE students SET middle_name = ?, email = ?, date_of_birth = ?, gender = ?, address = ?, place_of_birth = ?, civil_status = ?, sexual_orientation = ?, citizenship = ?, religion = ?, region = ?, province = ?, municipality = ?, zip_code = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
 
 $clearanceDAO->prepareStatement("getPieChartData",
  " SELECT

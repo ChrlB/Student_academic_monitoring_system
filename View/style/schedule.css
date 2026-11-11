@@ -1,5 +1,6 @@
 .sched-page,
-.sched-modal {
+.sched-modal,
+.sched-alert {
     --sp-ink: #fff;
     --sp-muted: rgba(255, 255, 255, .75);
     --sp-line: rgba(255, 255, 255, .6);
@@ -16,11 +17,12 @@
 }
 
 .sched-page *, .sched-page *::before, .sched-page *::after,
-.sched-modal *, .sched-modal *::before, .sched-modal *::after { box-sizing: border-box; }
+.sched-modal *, .sched-modal *::before, .sched-modal *::after,
+.sched-alert *, .sched-alert *::before, .sched-alert *::after { box-sizing: border-box; }
 
 .sched-page { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 
-/*  Panel  */
+/* ---------- Panel ---------- */
 .sched-panel {
     flex: 1;
     border: 2px solid var(--sp-line);
@@ -40,7 +42,18 @@
     display: flex; align-items: center; gap: 8px; flex: 0 1 360px; min-width: 200px;
     padding: 0 12px; height: 38px; border: 1px solid var(--sp-line); border-radius: 8px; background: var(--sp-field);
 }
-.sched-search__box input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: inherit; font: inherit; }
+.sched-page .sched-search__box input[type="search"] {
+    flex: 1;
+    min-width: 0;
+    height: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    outline: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+}
 .sched-search__box input::placeholder { color: var(--sp-muted); }
 .sched-search__box:focus-within { outline: 2px solid #fff; outline-offset: 2px; }
 
@@ -55,7 +68,7 @@
 .sched-flash--ok    { color: var(--sp-ok);  border-color: rgba(195, 243, 208, .6); background: rgba(40, 120, 70, .25); }
 .sched-flash--error { color: var(--sp-err); border-color: rgba(255, 194, 204, .6); background: rgba(160, 30, 60, .25); }
 
-/*  Buttons / inputs  */
+/* ---------- Buttons / inputs ---------- */
 .sp-icon { flex: none; }
 
 .sp-btn {
@@ -90,7 +103,7 @@
 }
 .sp-pill { background: rgba(255, 255, 255, .85); border-color: transparent; color: #3a1450; font-weight: 700; font-size: .72rem; padding: 3px 12px; }
 
-/*  Week grid / day cards  */
+/* ---------- Week grid / day cards ---------- */
 .sched-week { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
 .day-card--sun { grid-column: 2; }
 
@@ -113,13 +126,54 @@
 
 .tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; }
 
-/*  Class detail  */
-.class-head { display: flex; align-items: center; gap: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--sp-line-soft); }
-.class-head__icon { display: grid; place-items: center; width: 88px; height: 88px; border: 1px solid var(--sp-line);
-    border-radius: 16px; background: rgba(132, 84, 142, .55); flex: none; }
-.class-head--compact .class-head__icon { width: 52px; height: 52px; border-radius: 12px; }
-.class-head__sub { margin: 4px 0 8px; color: var(--sp-muted); }
-.class-head--compact .class-head__sub { margin-bottom: 0; }
+.class-head { 
+  display: flex; 
+  align-items: center; 
+  gap: 18px; 
+  padding-bottom: 14px; 
+  border-bottom: 1px solid var(--sp-line-soft); 
+}
+
+/* Updated icon wrapper box */
+.class-head__icon { 
+  display: flex; 
+  align-items: center; 
+  justify-content: center; 
+  width: 56px;            /* Reduced from 88px to fit the header height */
+  height: 56px;           /* Reduced from 88px */
+  border: 1px solid var(--sp-line);
+  border-radius: 14px; 
+  background: rgba(132, 84, 142, .55); 
+  flex: none; 
+  box-sizing: border-box;
+}
+
+/* Explicitly scale the SVG inside the icon box */
+.class-head__icon svg {
+  width: 28px !important;
+  height: 28px !important;
+  display: block;
+}
+
+.class-head--compact .class-head__icon { 
+  width: 44px; 
+  height: 44px; 
+  border-radius: 10px; 
+}
+
+.class-head--compact .class-head__icon svg {
+  width: 22px !important;
+  height: 22px !important;
+}
+
+.class-head__sub { 
+  margin: 4px 0 8px; 
+  color: var(--sp-muted); 
+}
+
+.class-head--compact .class-head__sub { 
+  margin-bottom: 0; 
+}
 
 .class-meta { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 14px 8px; border-bottom: 1px solid var(--sp-line-soft); }
 .class-meta dt { font-size: .72rem; color: var(--sp-muted); }
@@ -146,7 +200,7 @@
 .sp-pager a.is-current { background: #fff; color: #3a1450; font-weight: 700; }
 .sp-pager a:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 
-/*  Forms (Add modal + Edit page)  */
+/* ---------- Forms (Add modal + Edit page) ---------- */
 .sp-form { display: flex; flex-direction: column; gap: 14px; }
 .sp-field { display: grid; grid-template-columns: 150px minmax(0, 1fr); align-items: center; gap: 12px; margin: 0; padding: 0; border: 0; min-width: 0; }
 .sp-field > label, .sp-label { font-size: .85rem; font-weight: 700; padding: 0; }
@@ -159,14 +213,14 @@
 .sp-radio:has(input:checked) { background: rgba(255, 255, 255, .85); color: #3a1450; }
 .sp-radio input, .sp-check input { accent-color: var(--sp-accent); width: 16px; height: 16px; margin: 0; }
 .sp-radio input:focus-visible, .sp-check input:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
-.sp-checks { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.sp-checks { display: grid; flex-wrap: wrap; gap: 8px 16px; }
 .sp-check { font-weight: 600; }
 
 .sp-time { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; font-size: .85rem; }
 
 .sp-form__actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 14px; border-top: 1px solid var(--sp-line-soft); margin-top: 4px; }
 
-/*  Modal  */
+/* ---------- Modal ---------- */
 .sched-modal {
     width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto;
     margin: auto; padding: 22px 26px 24px;
@@ -179,7 +233,20 @@
 .sched-modal__head h2 { margin: 0; font-size: 1.4rem; }
 .sched-modal__head p { margin: 2px 0 0; font-size: .8rem; color: var(--sp-muted); }
 
-/*  Responsive  */
+/* ---------- Conflict alert ---------- */
+.sched-alert {
+    width: min(440px, calc(100vw - 32px)); margin: auto; padding: 20px 24px 22px;
+    border: 1.5px solid var(--sp-line); border-radius: 18px;
+    background: linear-gradient(180deg, #8a6a98 0%, #4a1f63 45%, #240838 100%);
+}
+.sched-alert::backdrop { background: rgba(10, 2, 18, .6); }
+.sched-alert h2 { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 1.3rem; }
+.sched-alert h2 .sp-icon { width: 26px; height: 26px; color: #ffd27a; }
+.sched-alert p { margin: 0; font-size: .92rem; line-height: 1.5; }
+.sched-alert__list { margin: 10px 0 0; padding-left: 18px; font-size: .8rem; color: var(--sp-muted); }
+.sched-alert__actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+
+/* ---------- Responsive ---------- */
 @media (max-width: 1000px) {
     .sched-week { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .day-card--sun { grid-column: auto; }

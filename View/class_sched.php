@@ -2,7 +2,9 @@
 require_once __DIR__ . "/../PageLogic/class_sched_logic.php";
 
 $logic = new ScheduleLogic();
-$logic->handlePost(); 
+$logic->handlePost(); // handles create/update, then redirects (must run before any output)
+
+/* ---------- small view helpers ---------- */
 function sched_e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
 function sched_icon($name)
@@ -18,6 +20,7 @@ function sched_icon($name)
         'laptop'   => '<rect x="5" y="5" width="14" height="10" rx="1.5"/><path d="M3 19h18"/>',
         'plus'     => '<path d="M12 5v14M5 12h14"/>',
         'check'    => '<path d="M5 12l5 5 9-10"/>',
+        'warn'     => '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.5"/>',
         'close'    => '<path d="M6 6l12 12M18 6L6 18"/>',
     ];
     return '<svg class="sp-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" '
@@ -33,7 +36,7 @@ function sched_url($q)
     return $self . ($q ? '?' . http_build_query($q) : '');
 }
 
-
+/** Shared fields for the Add modal and the Edit page. */
 function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v)
 {
     $times = [];
@@ -42,7 +45,7 @@ function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v)
     }
     $startSel = isset($v['start_time']) ? substr($v['start_time'] . ':00', 0, 8) : '';
     $endSel   = isset($v['end_time'])   ? substr($v['end_time'] . ':00', 0, 8)   : '';
-    foreach ([$startSel, $endSel] as $t) {              
+    foreach ([$startSel, $endSel] as $t) {              // keep legacy times (e.g. 07:15) selectable
         if ($t !== '' && !isset($times[$t])) $times[$t] = ScheduleLogic::fmtTime($t);
     }
     ksort($times);
@@ -129,7 +132,7 @@ function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v)
     return ob_get_clean();
 }
 
-
+/* ---------- request state ---------- */
 $group     = $logic->group;
 $canManage = $logic->canManage();
 $semesters = $logic->semesters();
@@ -176,7 +179,6 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS-Schedule</title>
-  <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/schedule.css">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/general.css">
 </head>
@@ -190,13 +192,13 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
       <main class="sched-page">
         <section class="sched-panel">
 
-          <?php if ($flash && !isset($_GET['add'])): ?>
+          <?php if ($flash && $flash['type'] !== 'conflict' && !isset($_GET['add'])): ?>
             <div class="sched-flash sched-flash--<?= $flash['type'] === 'ok' ? 'ok' : 'error' ?>" role="alert">
               <?php foreach ($flash['msgs'] as $m): ?><p><?= sched_e($m) ?></p><?php endforeach; ?>
             </div>
           <?php endif; ?>
 
-
+<?php /* =============================== MANAGER: LIST =============================== */ ?>
 <?php if ($group === 'manager' && $view === 'list'): ?>
           <div class="sched-toolbar">
             <h2 class="sched-title">Teaching Schedule</h2>
@@ -258,7 +260,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             </div>
           <?php endif; ?>
 
-
+<?php /* =============================== MANAGER: VIEW CLASS =============================== */ ?>
 <?php elseif ($view === 'class' && $sched):
         $page = (int)($_GET['sp'] ?? 1);
         $sq   = trim((string)($_GET['sq'] ?? ''));
@@ -338,7 +340,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             </section>
           </div>
 
- 
+<?php /* =============================== MANAGER: EDIT CLASS =============================== */ ?>
 <?php elseif ($view === 'edit' && $sched):
         $vals = $old ?: [
             'block'      => $sched['program'] . '|' . $sched['block'],
@@ -382,7 +384,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             </div>
           </form>
 
-
+<?php /* =============================== FACULTY / STUDENT: DAY PAGE =============================== */ ?>
 <?php elseif ($view === 'day'):
         $idx  = array_search($dayName, ScheduleLogic::WEEK, true);
         $next = ScheduleLogic::WEEK[($idx + 1) % 7];
@@ -466,7 +468,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             </div>
             <button type="button" class="sp-btn sp-btn--icon" data-close-add aria-label="Close"><?= sched_icon('close') ?></button>
           </header>
-          <?php if ($flash && isset($_GET['add'])): ?>
+          <?php if ($flash && $flash['type'] !== 'conflict' && isset($_GET['add'])): ?>
             <div class="sched-flash sched-flash--error" role="alert">
               <?php foreach ($flash['msgs'] as $m): ?><p><?= sched_e($m) ?></p><?php endforeach; ?>
             </div>
@@ -482,12 +484,31 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
         </form>
       </dialog>
 <?php endif; ?>
+<?php if ($flash && $flash['type'] === 'conflict' && $canManage):
+        $cancelUrl = ($view === 'edit' && $sched)
+            ? sched_url(['view' => 'class', 'id' => $sched['schedID']])
+            : sched_url(['sem' => $semKey]); ?>
+      <dialog class="sched-alert" id="conflict-alert" aria-labelledby="conflict-title" aria-describedby="conflict-desc">
+        <h2 id="conflict-title"><?= sched_icon('warn') ?> Schedule Conflict</h2>
+        <div id="conflict-desc">
+          <p>This schedule overlaps with an existing class.<br>Please adjust the day, time, room, or instructor before trying again.</p>
+          <ul class="sched-alert__list">
+            <?php foreach ($flash['msgs'] as $m): ?><li><?= sched_e($m) ?></li><?php endforeach; ?>
+          </ul>
+        </div>
+        <div class="sched-alert__actions">
+          <a class="sp-btn" href="<?= sched_e($cancelUrl) ?>">Cancel</a>
+          <button type="button" class="sp-btn sp-btn--primary" data-close-alert autofocus>Edit Again</button>
+        </div>
+      </dialog>
+<?php endif; ?>
     </div>
   </div>
 
 <?php if ($needForm): ?>
 <script>
 (function () {
+  // Class type radios filter the subject dropdown (LEC vs LAB subjects are separate rows).
   document.querySelectorAll('[data-sched-form]').forEach(function (form) {
     var subject = form.querySelector('select[name="subject"]');
     function apply() {
@@ -504,8 +525,14 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
     apply();
   });
 
+  var alertDlg = document.getElementById('conflict-alert');
   var dlg = document.getElementById('add-schedule');
-  if (!dlg || typeof dlg.showModal !== 'function') return;
+  function showConflict() {
+    if (!alertDlg || typeof alertDlg.showModal !== 'function') return;
+    alertDlg.querySelector('[data-close-alert]').addEventListener('click', function () { alertDlg.close(); });
+    alertDlg.showModal();
+  }
+  if (!dlg || typeof dlg.showModal !== 'function') { showConflict(); return; }
   document.querySelectorAll('[data-open-add]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var day = btn.getAttribute('data-day');
@@ -518,9 +545,9 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
   dlg.querySelectorAll('[data-close-add]').forEach(function (b) { b.addEventListener('click', function () { dlg.close(); }); });
   dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
   if (dlg.hasAttribute('data-autoopen')) dlg.showModal();
+  showConflict();
 })();
 </script>
 <?php endif; ?>
-<?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>
