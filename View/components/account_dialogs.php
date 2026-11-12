@@ -25,7 +25,7 @@ $box = function (string $name, string $label, string $value, string $w, string $
         </select>
       <?php else: ?>
         <input type="<?= e($type) ?>" <?= $off ? 'disabled' : 'name="' . e($name) . '"' ?> value="<?= e($value) ?>"
-               <?= $type === 'date' ? 'max="' . date('Y-m-d') . '" min="1900-01-01"' : '' ?> autocomplete="off">
+              <?= $type === 'date' ? 'max="' . date('Y-m-d') . '" min="1900-01-01"' : '' ?> autocomplete="off">
       <?php endif; ?>
     </label>
     <?php
@@ -67,14 +67,9 @@ $box = function (string $name, string $label, string $value, string $w, string $
     <div class="dlg-scroll">
       <h2 id="pr-title">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>
-        Personal Information
+        Edit Personal Information
       </h2>
       <p class="dlg-msg dlg-msg-dark" id="pr-msg" role="alert" <?= $prErr === '' ? 'hidden' : '' ?>><?= e($prErr) ?></p>
-      <?php if (!$extra): ?>
-        <p class="dlg-note">Greyed-out fields can’t be saved yet. First and last name are managed by the school.</p>
-      <?php else: ?>
-        <p class="dlg-note">First and last name are managed by the school.</p>
-      <?php endif; ?>
 
       <div class="df-row">
         <?php $box('', 'First Name',  $p['first_name'],  'w3', 'text', [], true); ?>
@@ -83,6 +78,7 @@ $box = function (string $name, string $label, string $value, string $w, string $
       </div>
       <div class="df-row">
         <?php $box('email', 'Email Address', $val('email', $acct['contact']['email']), 'w6', 'text', [], false, true); ?>
+        <?php $box('number', 'Contact Number', $val('number', $acct['contact']['phone']), 'w3', 'tel'); ?>
       </div>
       <div class="df-row">
         <?php $box('date_of_birth', 'Date of Birth', $val('date_of_birth', $p['birth_date']), 'w3', 'date'); ?>

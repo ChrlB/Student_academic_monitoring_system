@@ -1,4 +1,3 @@
-/* View/script/account.js : opens/closes the two popups on the account page. */
 (function () {
   'use strict';
   var pw = document.getElementById('password-dialog');

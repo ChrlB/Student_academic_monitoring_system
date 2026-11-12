@@ -226,3 +226,6 @@ if ($attGroup === 'student') {
   $hrs = round(array_sum(array_column($recs, 'hours')), 1);
   $years = array_values(array_unique(array_column($all, 'year'))); rsort($years);
 }
+
+$GLOBALS['q'] = $q; $GLOBALS['dept'] = $dept; $GLOBALS['course'] = $course; $GLOBALS['view'] = $view;
+$GLOBALS['stu'] = $stu; $GLOBALS['event'] = $event; $GLOBALS['year'] = $year;

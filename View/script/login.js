@@ -28,13 +28,12 @@
   /* ---------- 2a. Banner (general errors) ---------- */
   function showAlert(type, text) {
     alertBox.className = 'alert alert--' + type; // 'error' or 'success'
-    alertBox.textContent = text; // textContent, never innerHTML: text can't run as code
+    alertBox.textContent = text; 
     alertBox.hidden = false;
   }
 
   /* ---------- 2b. Toast (success / info) ---------- */
   const ICONS = {
-    // fixed, trusted SVG strings (user text is never put in here)
     error:
       '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5h.01"/></svg>',
     success:
@@ -47,7 +46,7 @@
     if (!region) {
       showAlert(type === 'error' ? 'error' : 'success', text);
       return;
-    } // no container: use the banner
+    } 
 
     if (!ICONS[type]) type = 'info';
     duration = duration || (type === 'error' ? 6000 : 5000);
@@ -55,7 +54,7 @@
     const existing = Array.prototype.find.call(region.children, function (t) {
       return t.dataset.text === text && !t.classList.contains('is-leaving');
     });
-    if (existing) return; // same message is already showing
+    if (existing) return; 
 
     while (region.children.length >= MAX_TOASTS)
       region.firstElementChild.remove();
@@ -135,7 +134,6 @@
   const status = new URLSearchParams(window.location.search).get('status');
   if (status === 'loggedout') {
     showToast('success', 'You have been logged out.');
-    // remove ?status=... so a page refresh doesn't show the toast again
     try {
       window.history.replaceState(null, '', window.location.pathname);
     } catch (e) {

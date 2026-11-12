@@ -166,7 +166,7 @@ $userDAO->prepareStatement("saveFacultyFolderID","UPDATE
 $userDAO->prepareStatement("studentRowExists",
     "SELECT studentID FROM students WHERE studentID = ? AND YEAR(date_created) = ?;");
 $userDAO->prepareStatement("updateStudentProfile",
-    "UPDATE students SET middle_name = ?, date_of_birth = ?, gender = ?, address = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
+    "UPDATE students SET middle_name = ?, number = ?, date_of_birth = ?, gender = ?, address = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
 $userDAO->prepareStatement("updateStudentPassword",
     "UPDATE students SET password = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
 
@@ -233,8 +233,8 @@ $userDAO->prepareStatement("updateStudentPassword",
         ORDER BY date_cleared DESC LIMIT 50
     "
     );
-    $userDAO->prepareStatement("updateStudentProfileFull",
-        "UPDATE students SET middle_name = ?, email = ?, date_of_birth = ?, gender = ?, address = ?, place_of_birth = ?, civil_status = ?, sexual_orientation = ?, citizenship = ?, religion = ?, region = ?, province = ?, municipality = ?, zip_code = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
+        $userDAO->prepareStatement("updateStudentProfileFull",
+        "UPDATE students SET middle_name = ?, email = ?, number = ?, date_of_birth = ?, gender = ?, address = ?, place_of_birth = ?, civil_status = ?, sexual_orientation = ?, citizenship = ?, religion = ?, region = ?, province = ?, municipality = ?, zip_code = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
 
     $clearanceDAO->prepareStatement("getPieChartData",
     " SELECT
