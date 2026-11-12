@@ -1,8 +1,8 @@
 <?php
-
 require_once __DIR__ . '/../Services/auth.php';
 $_SESSION["page"] = "ACCOUNT";
 
+// Safe printing helper (htmlspecialchars). Guarded in case another file already defines it.
 if (!function_exists('e')) {
     function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 }
@@ -14,10 +14,23 @@ function yearLevelLabel($n): string {
     return $n . $suffix . ' Year';
 }
 
+function properName(string $s): string {
+    $s = trim(preg_replace('/\s+/u', ' ', $s));
+    if ($s === '') return '';
+    return preg_replace_callback('/(^|[\s\-\'’])(\p{Ll})/u', function ($m) {
+        return $m[1] . mb_strtoupper($m[2], 'UTF-8');
+    }, $s);
+}
+// Email shown when the student has no saved email yet: <school ID>@<school domain>
+function schoolEmailFor(string $userID): string {
+    $domain = defined('SCHOOL_EMAIL_DOMAIN') ? SCHOOL_EMAIL_DOMAIN : '@amscollege.edu.ph';   // one place to change: account_actions.php
+    return $userID !== '' ? $userID . $domain : '';
+}
+
 function buildFullName(array $r): string {
-    $first  = trim((string)($r['first_name']  ?? ''));
+    $first  = properName((string)($r['first_name']  ?? ''));
     $middle = trim((string)($r['middle_name'] ?? ''));
-    $last   = trim((string)($r['last_name']   ?? ''));
+    $last   = properName((string)($r['last_name']   ?? ''));
     $initial = $middle !== '' ? mb_strtoupper(mb_substr($middle, 0, 1)) . '.' : '';
     return trim(preg_replace('/\s+/', ' ', "$first $initial $last"));
 }
@@ -58,35 +71,32 @@ function getAccountInfo(): array {
         'isStudent'   => $isStudent,
         'role'        => $role,
         'schoolId'    => $userID,
-        'name'        => trim($s('first_name') . ' ' . $s('last_name')),
+        'name'        => trim(properName($s('first_name')) . ' ' . properName($s('last_name'))),
         'fullName'    => buildFullName($row),
         'phone'       => $s('number'),
         'programYear' => $programYear,
-
-        // Columns that exist in `students` today: first_name, middle_name, last_name, date_of_birth, gender
         'personal' => [
-            'first_name'   => $s('first_name'),
-            'last_name'    => $s('last_name'),
-            'middle_name'  => $s('middle_name'),
+            'first_name'   => properName($s('first_name')),
+            'last_name'    => properName($s('last_name')),
+            'middle_name'  => properName($s('middle_name')),
             'birth_date'   => $s('date_of_birth'),
-            'birth_place'  => $s('place_of_birth'),     // no column yet
-            'civil_status' => $s('civil_status'),       // no column yet
+            'birth_place'  => $s('place_of_birth'),    
+            'civil_status' => $s('civil_status'),       
             'sex'          => $s('gender', 'sex'),
-            'orientation'  => $s('sexual_orientation'), // no column yet
-            'citizenship'  => $s('citizenship'),        // no column yet
-            'religion'     => $s('religion'),           // no column yet
+            'orientation'  => $s('sexual_orientation'), 
+            'citizenship'  => $s('citizenship'),        
+            'religion'     => $s('religion'),           
         ],
         'contact' => [
             'phone' => $s('number'),
-            'email' => $s('email') ?: ($userID !== '' ? $userID . '@gordoncollege.edu.ph' : ''),   // stored email if the column exists, else derived from the ID
+            'email' => $s('email') ?: schoolEmailFor($userID),   // stored email if there is one, else derived from the ID
         ],
-        // `students` has ONE address column, so the whole text goes into the street line for now
         'address' => [
-            'region'       => $s('region'),             // no column yet
-            'province'     => $s('province'),           // no column yet
-            'municipality' => $s('municipality'),       // no column yet
+            'region'       => $s('region'),             
+            'province'     => $s('province'),           
+            'municipality' => $s('municipality'),       
             'street'       => $s('address'),
-            'zip'          => $s('zip_code'),           // no column yet
+            'zip'          => $s('zip_code'),           
         ],
     ];
 }

@@ -102,8 +102,8 @@ function field(string $label, string $value, string $w = ''): void { ?>
             <div class="sec-body">
               <div class="row-f">
                 <?php field('First Name',  $acct['personal']['first_name'],  'w3'); ?>
-                <?php field('Last Name',   $acct['personal']['last_name'],   'w3'); ?>
                 <?php field('Middle Name', $acct['personal']['middle_name'], 'w4'); ?>
+                <?php field('Last Name',   $acct['personal']['last_name'],   'w3'); ?>
               </div>
               <div class="row-f">
                 <?php field('Date of Birth',       $acct['personal']['birth_date'],   'w3'); ?>

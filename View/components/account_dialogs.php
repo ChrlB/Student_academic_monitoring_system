@@ -73,8 +73,8 @@ $box = function (string $name, string $label, string $value, string $w, string $
 
       <div class="df-row">
         <?php $box('', 'First Name',  $p['first_name'],  'w3', 'text', [], true); ?>
-        <?php $box('', 'Last Name',   $p['last_name'],   'w3', 'text', [], true); ?>
         <?php $box('middle_name', 'Middle Name', $val('middle_name', $p['middle_name']), 'w3'); ?>
+        <?php $box('', 'Last Name',   $p['last_name'],   'w3', 'text', [], true); ?>
       </div>
       <div class="df-row">
         <?php $box('email', 'Email Address', $val('email', $acct['contact']['email']), 'w6', 'text', [], false, true); ?>

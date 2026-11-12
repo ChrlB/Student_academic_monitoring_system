@@ -52,7 +52,7 @@
   padding: 10px 22px;
   min-height: 64px;
   border-radius: 16px;
-  background: linear-gradient(90deg, #2c58c8 0%, #1f7fa8 45%, #8fd072 100%);
+  background: linear-gradient(90deg, #2c58c8 0%, #6fb6ee 50%, #a8dcfa 100%);
   border: 1px solid rgba(255, 255, 255, 0.55);
 }
 .acc-banner svg {
