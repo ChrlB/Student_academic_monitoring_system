@@ -20,7 +20,7 @@
   display: flex;
   flex-direction: column;
   gap: calc(1.2 * var(--u));
-  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-size: calc(1 * var(--u));
   color: var(--white);
 }
@@ -396,7 +396,8 @@ main.att-main { overflow: hidden; }
 
 .att .icon-btn:active:not(:disabled) { transform: scale(.94); }
 
-.att .icon-btn.del { color: #ff3b3b; }
+.att .icon-btn.del { color: #fff; }
+.att:not(.sel-hidden) .icon-btn.del { color: #ff3b3b; }
 
 .att .icon-btn:disabled { opacity: .35; cursor: not-allowed; }
 
@@ -456,11 +457,23 @@ main.att-main { overflow: hidden; }
 .att .tbl td a { display: block; padding: calc(.4 * var(--u)) calc(.8 * var(--u)); }
 .att .rec tbody tr:hover td:not(.sel) { background: #e9dcf5; }
 .att .rec tbody tr:has(.rd:checked) td:not(.sel) { background: #cfb5ec; }
-.att .icon-btn.del:hover { background: rgba(255, 59, 59, .18); }
+.att:not(.sel-hidden) .icon-btn.del:hover { background: rgba(255, 59, 59, .18); }
 
-header { font-family: "Inter", system-ui, sans-serif; }
+header { font-family: "Montserrat", system-ui, sans-serif; }
 
 /* ---------- student view (read-only: no checkbox column) ---------- */
 .att.student .rec th.sel,
 .att.student .rec td.sel { display: none; }
 .att.student .rec-box { padding-left: calc(1.6 * var(--u)); }
+
+header a.att-back, header a.att-back:link, header a.att-back:visited, header a.att-back:hover, header a.att-back:active { display: inline-flex; align-items: center; gap: .6em; flex: none; cursor: pointer; color: #fff; text-decoration: none; background: none; border: 0; padding: 0; margin: 0; }
+header a.att-back svg { display: block; width: 22px; height: 22px; min-width: 0; max-width: none; flex: none; color: #fff; stroke: #fff; fill: none; }
+
+.att.sel-hidden .rec th.sel,
+.att.sel-hidden .rec td.sel { display: none; }
+.att.sel-hidden .rec-box { padding-left: calc(1.6 * var(--u)); }
+
+.att .detail-toolbar .dd { flex: none; }
+.att .detail-toolbar .dd[open] { z-index: 50; }
+.att .detail-toolbar .dd-menu { width: 100%; max-width: 100%; }
+.att .detail-toolbar .dd-menu li { white-space: normal; overflow-wrap: anywhere; }
