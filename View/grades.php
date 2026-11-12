@@ -323,9 +323,11 @@ $csrf = $gradesLogic->csrfToken();
     }
 
     .preview-toolbar .class-scope-btn {
-      width: 120px;
+      width: auto;
+      min-width: 150px;
       margin-top: 0;
       flex-shrink: 0;
+      white-space: nowrap;
     }
 
     .grade-content {
@@ -699,6 +701,23 @@ $csrf = $gradesLogic->csrfToken();
       align-content: start;
     }
 
+    .faculty-grades .grades-main:not(.grades-main--preview) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .faculty-grades .grades-main:not(.grades-main--preview) .grades-sidebar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      width: 100%;
+      padding-top: 0;
+    }
+
+    .faculty-grades .grades-main:not(.grades-main--preview) .grade-content {
+      grid-column: 1;
+    }
+
     .faculty-grades .back-btn,
     .faculty-grades .term-btn,
     .faculty-grades .class-scope-btn,
@@ -733,13 +752,17 @@ $csrf = $gradesLogic->csrfToken();
 
     .faculty-grades .class-grid {
       grid-auto-flow: column;
-      grid-auto-columns: 155px;
+      grid-auto-columns: max-content;
       grid-template-columns: none;
       grid-template-rows: minmax(112px, auto);
       width: fit-content;
       max-width: 100%;
       overflow-x: auto;
       overflow-y: hidden;
+    }
+
+    .faculty-grades .class-card h3 {
+      white-space: nowrap;
     }
 
     .faculty-grades .class-card {
@@ -907,6 +930,7 @@ $csrf = $gradesLogic->csrfToken();
                         <th scope="col">Subject Title</th>
                         <th scope="col">Midterm Grade</th>
                         <th scope="col">Final Grade</th>
+                        <th scope="col">Semester Grade</th>
                         <th scope="col">Remarks</th>
                       </tr>
                     </thead>
@@ -918,6 +942,9 @@ $csrf = $gradesLogic->csrfToken();
                           $finalGrade = $grade['final_grade'] !== null
                               ? number_format((float)$grade['final_grade'], 2)
                               : '—';
+                          $semesterGrade = $grade['midterm_grade'] !== null && $grade['final_grade'] !== null
+                              ? number_format(((float)$grade['midterm_grade'] + (float)$grade['final_grade']) / 2, 2)
+                              : '—';
                           $remarks = $grade['final_grade'] !== null
                               ? GradesLogic::percentageRemark((float)$grade['final_grade'])
                               : ($grade['midterm_grade'] !== null ? 'Final grade pending' : 'Grades pending');
@@ -927,6 +954,7 @@ $csrf = $gradesLogic->csrfToken();
                           <td><?= grades_e($grade['subject_name']) ?></td>
                           <td><?= grades_e($midtermGrade) ?></td>
                           <td><?= grades_e($finalGrade) ?></td>
+                          <td><?= grades_e($semesterGrade) ?></td>
                           <td><?= grades_e($remarks) ?></td>
                         </tr>
                       <?php endforeach; ?>
@@ -1038,6 +1066,7 @@ $csrf = $gradesLogic->csrfToken();
                                 <th scope="col">Name</th>
                                 <th scope="col">Midterm Grade</th>
                                 <th scope="col">Final Grade</th>
+                                <th scope="col">Semester Grade</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -1059,6 +1088,14 @@ $csrf = $gradesLogic->csrfToken();
                                     <input type="number" name="grades[<?= (int)$student['enrolled_subjectID'] ?>][final]"
                                       min="0" max="100" step="0.01" value="<?= grades_e($final) ?>"
                                       aria-label="Final grade for <?= grades_e($student['name']) ?>">
+                                  </td>
+                                  <td data-semester-grade aria-label="Semester grade for <?= grades_e($student['name']) ?>">
+                                    <?php if ($midterm !== '' && $midterm !== null && $final !== '' && $final !== null
+                                        && is_numeric($midterm) && is_numeric($final)): ?>
+                                      <?= number_format(((float)$midterm + (float)$final) / 2, 2) ?>
+                                    <?php else: ?>
+                                      —
+                                    <?php endif; ?>
                                   </td>
                                 </tr>
                               <?php endforeach; ?>
@@ -1131,5 +1168,33 @@ $csrf = $gradesLogic->csrfToken();
     </div>
   </div>
   <?php require_once __DIR__ . "/components/logout.php"; ?>
+  <?php if ($isFacultyAccount && $view === 'gradebook' && $class && $roster && $roster['rows']): ?>
+    <script>
+      document.querySelectorAll('.grade-table tbody tr').forEach(function (row) {
+        var midterm = row.querySelector('input[name$="[midterm]"]');
+        var final = row.querySelector('input[name$="[final]"]');
+        var semester = row.querySelector('[data-semester-grade]');
+
+        function updateSemesterGrade() {
+          if (midterm.value === '' || final.value === '') {
+            semester.textContent = '—';
+            return;
+          }
+
+          var midtermGrade = Number(midterm.value);
+          var finalGrade = Number(final.value);
+          if (!Number.isFinite(midtermGrade) || !Number.isFinite(finalGrade)) {
+            semester.textContent = '—';
+            return;
+          }
+
+          semester.textContent = ((midtermGrade + finalGrade) / 2).toFixed(2);
+        }
+
+        midterm.addEventListener('input', updateSemesterGrade);
+        final.addEventListener('input', updateSemesterGrade);
+      });
+    </script>
+  <?php endif; ?>
 </body>
 </html>

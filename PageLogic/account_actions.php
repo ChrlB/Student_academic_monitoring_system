@@ -1,21 +1,18 @@
 <?php
 
-
 require_once __DIR__ . '/../Services/session.php';
 require_once __DIR__ . '/../Services/csrf.php';
 
 const PW_MIN_LENGTH = 8;
 const PW_MAX_LENGTH = 72;      
-const PW_MAX_FAILS  = 5;      
-const PW_LOCK_MINUTES = 15;   
+const PW_MAX_FAILS  = 5;       
+const PW_LOCK_MINUTES = 15;    
 
-// Roles allowed to change their password from the account page.
 const PW_CHANGE_ROLES = ['student'];
 
 function canChangePassword(): bool {
     return in_array((string)($_SESSION['role'] ?? ''), PW_CHANGE_ROLES, true);
 }
-
 const PROFILE_EXTRA_COLUMNS = true;
 
 if (!defined('SCHOOL_EMAIL_DOMAIN')) define('SCHOOL_EMAIL_DOMAIN', '@gordoncollege.edu.ph');

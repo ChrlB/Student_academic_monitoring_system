@@ -47,51 +47,7 @@ $users = "SELECT
   FROM
       `students` as S";
 
-$cleranceUpdate = "SELECT
-        'faculty' AS category,
-        f.role AS item_name,
-        CONCAT(f.last_name, ', ', f.first_name) AS name,
-        fc.studentID AS studentID,
-        DATE(fc.date_cleared) AS date_cleared,
-        fc.remarks AS remarks,
-        fc.status AS status
-    FROM faculty_clearance AS fc
-    JOIN faculty AS f ON f.facultyID = fc.facultyID
-    JOIN students AS S ON S.studentID = fc.studentID
-    WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
 
-    UNION ALL
-
-    SELECT
-        'office',
-        o.name,
-        CONCAT(f.last_name, ', ', f.first_name),
-        oc.studentID,
-        DATE(oc.date_cleared),
-        oc.remarks,
-        oc.status
-    FROM office_clearance AS oc
-    JOIN office AS o ON o.officeID = oc.officeID
-    JOIN faculty AS f ON f.facultyID = o.facultyID
-    JOIN students AS S ON S.studentID = oc.studentID
-    WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
-
-    UNION ALL
-
-    SELECT
-        'subjects',
-        su.name,
-        es.subjectID,
-        es.studentID,
-        DATE(sc.date_cleared),
-        sc.remarks,
-        sc.status
-    FROM subject_clearance AS sc
-    JOIN enrolled_subjects AS es ON es.enrolled_subjectID = sc.enrolled_subjectID
-    JOIN subjects AS su ON su.subjectID = es.subjectID
-    JOIN students AS S ON S.studentID = es.studentID
-    WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
-";
 $prospectus = "SELECT
       `s`.`subjectID` AS `subjectID`,
       COALESCE(
@@ -215,16 +171,66 @@ $userDAO->prepareStatement("updateStudentPassword",
     "UPDATE students SET password = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
 
 
+
+
+
+
+
+
 // CLEARANCE 
 {
+    $cleranceUpdate = "SELECT
+            'faculty' AS category,
+            f.role AS item_name,
+            CONCAT(f.last_name, ', ', f.first_name) AS name,
+            fc.studentID AS studentID,
+            DATE(fc.date_cleared) AS date_cleared,
+            fc.remarks AS remarks,
+            fc.status AS status
+        FROM faculty_clearance AS fc
+        JOIN faculty AS f ON f.facultyID = fc.facultyID
+        JOIN students AS S ON S.studentID = fc.studentID
+        WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
 
+        UNION ALL
+
+        SELECT
+            'office',
+            o.name,
+            CONCAT(f.last_name, ', ', f.first_name),
+            oc.studentID,
+            DATE(oc.date_cleared),
+            oc.remarks,
+            oc.status
+        FROM office_clearance AS oc
+        JOIN office AS o ON o.officeID = oc.officeID
+        JOIN faculty AS f ON f.facultyID = o.facultyID
+        JOIN students AS S ON S.studentID = oc.studentID
+        WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
+
+        UNION ALL
+
+        SELECT
+            'subjects',
+            su.name,
+            es.subjectID,
+            es.studentID,
+            DATE(sc.date_cleared),
+            sc.remarks,
+            sc.status
+        FROM subject_clearance AS sc
+        JOIN enrolled_subjects AS es ON es.enrolled_subjectID = sc.enrolled_subjectID
+        JOIN subjects AS su ON su.subjectID = es.subjectID
+        JOIN students AS S ON S.studentID = es.studentID
+        WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
+    ";
 
 
     $clearanceDAO->prepareStatement("getClearanceUpdates",
     " SELECT category, item_name, name, studentID, date_cleared, remarks, status
-    FROM ($cleranceUpdate) AS updates
-    WHERE upper(status) in ('CLEARED','REJECTED')
-    ORDER BY date_cleared DESC LIMIT 50
+        FROM ($cleranceUpdate) AS updates
+        WHERE upper(`status`) in ('CLEARED','REJECTED')
+        ORDER BY date_cleared DESC LIMIT 50
     "
     );
         $userDAO->prepareStatement("updateStudentProfileFull",
@@ -632,6 +638,35 @@ $userDAO->prepareStatement("updateStudentPassword",
         WHERE ID = ? and uploaded_by = ?;
     ");
 
+
+    //faculty
+
+    $clearanceDAO->prepareStatement("getOffices","SELECT 
+            *
+        FROM `office` AS O
+            inner join faculty AS F
+            ON F.facultyID = O.facultyID
+        WHERE 
+            CONCAT( 'F',YEAR(F.date_created), LPAD(O.facultyID, 5, 0)) = ?;
+    ");
+
+    $clearanceDAO->prepareStatement("getSubjects","SELECT 
+            SS.`schedID`,
+            SS.`facultyID`,
+            SS.`enrollmentID`,
+            SS.`subjectID` as subjectID,
+            SS.`day`,
+            SS.`roomID`,
+            SS.`time_start`,
+            SS.`time_end`,
+            SS.`block`,
+            F.date_created
+        FROM `subject_schedules` AS SS
+            inner join faculty AS F
+            ON F.facultyID = SS.facultyID
+        WHERE 
+            CONCAT( 'F',YEAR(F.date_created), LPAD(SS.facultyID, 5, 0)) = ?;
+    ");
 }
 
 

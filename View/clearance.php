@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/../PageLogic/clearance_logic.php";
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -19,18 +20,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
     <div class="column" style="flex: 1;">
       <?php require_once __DIR__ . "/components/header.php"; ?>
       <main class="column scrollbar" style="gap:20px">
-        <!-- <div style="width:600px; height:400px; border:2px solid #444; border-radius:8px; overflow:hidden;">
-          <iframe src="serve.php?file=<= urlencode($file) ?>"
-                  style="width:100%; height:100%; border:0;"></iframe>
-          </div> -->
-
-          <!-- <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
-              <input type="file" name="document"
-                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    required>
-              <button type="submit">Upload document</button>
-          </form>
-        <img src="<?= BASE_PATH ?>/get-profile" width="150" height="150" alt="No profile picture yet"> -->
+        
         <?php if ($_SESSION["role"] == "student"): ?>
           <?php if ($student_view == "MAIN"): ?>
             <div class="row" style=" gap:20px">
@@ -114,7 +104,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             </div>
             <div class="updates_frame2  drop_shadow">
               <table class="updates_table">
-                <thead>
+                <thead style="position: relative;z-index: 1;">
                   <tr>
                     <th class="col_name">CATEGORY</th>
                     <th class="col_about">ABOUT</th>
@@ -122,9 +112,9 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <th class="col_status">STATUS</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody class="updates_records">
                   <?php foreach ($updates_record as $row): ?>
-                    <tr>
+                    <tr onclick="toggleRemark(this)" class="update_record">
                       <td title="<?= htmlspecialchars($row['category']) ?>">
                         <?= htmlspecialchars($row['category']) ?>
                       </td>
@@ -136,7 +126,12 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                         <span class="status_badge <?= statusClass($row['status']) ?>">
                           <?= htmlspecialchars(strtoupper($row['status'])) ?>
                         </span>
+                        <div class="remark" >
+                          <b>REMARKS</b>
+                          <p><?=  $row['remarks'] ?> </p>
+                        </div>
                       </td>
+                      
                     </tr>
                   <?php endforeach; ?>
                 </tbody>
@@ -717,17 +712,103 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     </div>
                   <?php endif ?>
                 </div>
-          <?php endif ?>                        
+          <?php endif ?>
+          
+          
+
         <?php elseif (in_array($_SESSION["role"], ["prof","dean","program coordinator","registrar"])):?>
-          <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
-            <input type="file" name="document"
-                  accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  required>
-            <button type="submit">Upload document</button>
-            <input type="hidden" name="docs_for" value="addOfficeRequirement">
-            <input type="hidden" name="ID" value="1">
-            <input type="hidden" name="page_uploader" value="<?php echo parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?>">
-          </form>
+          <?php if ($student_view == "MAIN"): ?>
+
+            <?php $offices = getOffices(); if(count($offices) > 0): ?>
+              <b class="view_title">OFFICE</b>
+              <div class="row" style=" gap:20px; flex-wrap: wrap; width:100%">
+                <?php foreach($offices as $office):?>
+                  <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
+                    <img src="<?= BASE_PATH ?>/View/resources/image1.png" class="clearance_categ_box_upper_part">
+                    
+                    <div class="clearance_categ_box_buttom_part column">
+                      <b><?php echo $office['name'] ?></b>
+                    </div>
+                    <input type="hidden" name="view" value="OFFICE">
+                  </form>
+                <?php endforeach?>
+              </div>
+
+            <?php endif ?>
+
+
+            <?php $subjects_handling = getSubjects(); if(count($subjects_handling) > 0): ?>
+              <b class="view_title">SUBJECTS</b>
+              <div class="row" style=" gap:20px; flex-wrap: wrap; width:100%">
+                <?php foreach($subjects_handling as $subject):?>
+                  <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
+                    <img src="<?= BASE_PATH ?>/View/resources/image1.png" class="clearance_categ_box_upper_part">
+                    
+                    <div class="clearance_categ_box_buttom_part column">
+                      <b><?php echo $subject['subjectID'] ?></b>
+                    </div>
+                    <input type="hidden" name="view" value="SUBJECT">
+                  </form>
+                <?php endforeach?>
+              </div>
+              
+            <?php endif ?>
+
+            <?php if(in_array($_SESSION["role"],["dean","program coordinator"])): ?>
+              <b class="view_title">FACULTY</b>
+              <div class="row" style=" gap:20px; flex-wrap: wrap; width:100%">
+                <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
+                  <img src="<?= BASE_PATH ?>/View/resources/image1.png" class="clearance_categ_box_upper_part">
+                  
+                  <div class="clearance_categ_box_buttom_part column">
+                    <b><?php echo $_SESSION["role"] ?></b>
+                  </div>
+                  <input type="hidden" name="view" value="FACULTY">
+                </form>
+              </div>
+              
+            <?php endif ?>
+            
+            subject
+            <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
+              <input type="file" name="document"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    required>
+              <button type="submit">Upload document</button>
+              <input type="hidden" name="docs_for" value="addSubjectRequirement">
+              <input type="hidden" name="ID" value="CSC112A ">
+              <input type="hidden" name="page_uploader" value="<?php echo parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?>">
+            </form>
+            registrar
+            <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
+              <input type="file" name="document"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    required>
+              <button type="submit">Upload document</button>
+              <input type="hidden" name="docs_for" value="addFacultyRequirement">
+              <input type="hidden" name="ID" value="1">
+              <input type="hidden" name="page_uploader" value="<?php echo parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?>">
+            </form>
+            faculty
+            <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
+              <input type="file" name="document"
+                    accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    required>
+              <button type="submit">Upload document</button>
+              <input type="hidden" name="docs_for" value="addOfficeRequirement">
+              <input type="hidden" name="ID" value="1">
+              <input type="hidden" name="page_uploader" value="<?php echo parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH) ?>">
+            </form>
+
+          
+          <?php elseif($student_view == "OFFICE"): ?>
+          <?php elseif($student_view == "SUBJECT"): ?>
+          <?php elseif($student_view == "FACULTY"): ?>
+
+          <?php endif ?>
+
+
+
           <!-- INSERT INTO `subject_clearance_requirements` (`ID`, `enrolled_subjectID`, `fileID`, `file_name`, `file_size`, `uploaded_at`, `uploaded_by`) VALUES (NULL, '', '', '', '', CURRENT_TIMESTAMP, '') -->
         <?php endif ?>
 
@@ -817,6 +898,16 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             noFiles.textContent = 'Please attach at least one file.';
           }
         });
+    <?php elseif($student_view == "UPDATES"): ?>
+      function toggleRemark(row) {
+        const remark = row.querySelector('.remark');
+        const wasOpen = remark.classList.contains('open');
+
+        document.querySelectorAll('.remark.open')
+          .forEach(el => el.classList.remove('open'));
+
+        if (!wasOpen) remark.classList.add('open');
+      }
     <?php endif ?>
   </script>
   <?php require_once __DIR__ . "/components/logout.php"; ?>
