@@ -158,20 +158,24 @@ INSERT INTO `enrollment_period` (`enrollmentID`, `program`, `acad_year`, `sem`, 
 --
 
 CREATE TABLE `events` (
-  `eventID` int NOT NULL,
-  `eventName` varchar(150) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `eventDate` date NOT NULL,
-  `status` enum('UPCOMING','ACTIVE','FINISHED','CANCELLED') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'UPCOMING',
-  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP
+  `eventID` int(10) UNSIGNED NOT NULL,
+  `eventName` varchar(250) NOT NULL,
+  `program` varchar(50) DEFAULT NULL,
+  `department` varchar(255) DEFAULT NULL,
+  `datetime_Start` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `datetime_End` datetime DEFAULT NULL,
+  `eventCoordinator` int(50) DEFAULT NULL,
+  `status` enum('ACTIVE','FINISHED','RESCHEDULE','PENDING') NOT NULL DEFAULT 'PENDING'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 
 --
 -- Dumping data for table `events`
 --
 
-INSERT INTO `events` (`eventID`, `eventName`, `eventDate`, `status`, `created_at`) VALUES
-(1, 'Student 2026 Tech Expo Day 1', '2026-11-11', 'FINISHED', '2026-11-12 09:38:08'),
-(2, 'Student 2026 Tech Expo Day 2', '2026-11-12', 'ACTIVE', '2026-11-12 09:38:08');
+INSERT INTO `events` (`eventID`, `eventName`, `program`, `department`, `datetime_Start`, `datetime_End`, `eventCoordinator`, `status`) VALUES
+(1, 'student 2026 tech expo day1', 'BSCS', NULL, '2026-11-12 13:01:06', '2026-11-12 18:00:00', 0, 'FINISHED'),
+(2, 'student 2026 tech expo day2', 'BSCS', NULL, '2026-11-12 13:01:06', NULL, 0, 'ACTIVE');
 
 -- --------------------------------------------------------
 
