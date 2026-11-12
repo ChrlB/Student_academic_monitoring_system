@@ -30,8 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Scanner Logic variables (Faculty only)
   let html5QrCode = null;
+  let handling = false;   // true while one scan is being sent, so one QR is never counted twice
 
-const startScanner = () => {
+  const startScanner = () => {
     const readerDiv = document.getElementById('qr-reader');
     const staticIcon = document.getElementById('qrStaticIcon');
     const studentInput = document.getElementById('scannerStudentId');
@@ -52,6 +53,8 @@ const startScanner = () => {
       { facingMode: "environment" },
       { fps: 10, qrbox: { width: 220, height: 220 } },
       (decodedText) => {
+        if (handling) return;
+        handling = true;
         if (studentInput) studentInput.value = decodedText;
 
         if (navigator.vibrate) {
@@ -64,6 +67,10 @@ const startScanner = () => {
       (errorMessage) => {}
     ).catch((err) => {
       console.error("Unable to start scanning.", err);
+      readerDiv.style.display = 'none';
+      if (staticIcon) staticIcon.style.display = 'block';
+      if (retakeBtn) retakeBtn.textContent = 'Scan';
+      showScannerAlert('Camera unavailable. Type the ID instead.', 'error');
     });
   };
 
@@ -78,6 +85,7 @@ const startScanner = () => {
 
     if (!currentEventID) {
       showScannerAlert("Please select an active event first.", "error");
+      handling = false;
       if (autoRestart) {
         setTimeout(startScanner, 2000);
       }
@@ -86,12 +94,14 @@ const startScanner = () => {
 
     if (!studentID) {
       showScannerAlert("Please enter or scan a Student ID.", "error");
+      handling = false;
       if (autoRestart) {
         setTimeout(startScanner, 2000);
       }
       return;
     }
 
+    // Post to the page you are on (the scan handler lives in attendance_logic.php, loaded by this page)
     fetch(window.location.pathname, {
       method: 'POST',
       headers: {
@@ -100,11 +110,19 @@ const startScanner = () => {
       body: new URLSearchParams({
         'att_action': 'scan',
         'studentID': studentID,
-        'eventID': currentEventID
+        'eventID': eventSelect.value
       })
     })
-    .then(response => response.json())
-    .then(data => {
+    .then(response => response.text())
+    .then(text => {
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        console.error('Server returned non-JSON response:', text);
+        throw new Error('Server returned an invalid response (Check F12 Console).');
+      }
+
       if (data.status === 'success' || data.status === 'info') {
         showScannerAlert(data.message, data.status === 'success' ? 'success' : 'info');
         
@@ -116,7 +134,7 @@ const startScanner = () => {
         if (autoRestart) {
           setTimeout(() => {
             startScanner();
-          }, 1500); // 1.5 second pause so you can read the success message
+          }, 1500);
         }
       } else {
         showScannerAlert(data.message || 'Error recording attendance.', 'error');
@@ -127,11 +145,12 @@ const startScanner = () => {
     })
     .catch(error => {
       console.error('Network or server error during scan submission:', error);
-      showScannerAlert('Network connection error.', 'error');
+      showScannerAlert('Server response error. Check Console (F12).', 'error');
       if (autoRestart) {
         setTimeout(startScanner, 2500);
       }
-    });
+    })
+    .finally(() => { handling = false; });
   };
 
   /**
@@ -159,32 +178,32 @@ const startScanner = () => {
 
     if (retakeBtn) retakeBtn.textContent = 'Scan'; // Revert back to Scan when stopped
 
-    if (html5QrCode && html5QrCode.isScanning) {
-      html5QrCode.stop().then(() => {
-        if (readerDiv) readerDiv.style.display = 'none';
-        if (staticIcon) staticIcon.style.display = 'block';
-      }).catch(err => console.error("Failed to stop scanner.", err));
-    } else {
+    const showIcon = () => {
       if (readerDiv) readerDiv.style.display = 'none';
       if (staticIcon) staticIcon.style.display = 'block';
-    }
+    };
+
+    const running = html5QrCode && (html5QrCode.isScanning || (html5QrCode.getState && html5QrCode.getState() === 2));
+    if (!running) { showIcon(); return Promise.resolve(); }
+
+    return html5QrCode.stop().then(showIcon).catch(err => console.error("Failed to stop scanner.", err));
   };
 
   // Button Event Handlers for Modal
   const retakeBtn = document.getElementById('qrRetake');
   if (retakeBtn) {
     retakeBtn.addEventListener('click', () => {
-      stopScanner();
-      setTimeout(startScanner, 200);
+      stopScanner().then(startScanner);
     });
   }
 
   const cancelBtn = document.getElementById('qrCancel');
   if (cancelBtn && modal) {
     cancelBtn.addEventListener('click', () => {
-      stopScanner();
-      modal.style.display = 'none';
-      location.reload(); // Refresh background list so new records show up when closing modal
+      stopScanner().finally(() => {
+        modal.style.display = 'none';
+        location.reload(); // Refresh background list so new records show up when closing modal
+      });
     });
   }
 
@@ -192,7 +211,9 @@ const startScanner = () => {
   if (recordBtn) {
     recordBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      stopScanner(); 
+      if (handling) return;      // ignore double clicks while a scan is being sent
+      handling = true;
+      stopScanner();
 
       const studentInput = document.getElementById('scannerStudentId');
       const studentID = studentInput ? studentInput.value.trim() : '';
