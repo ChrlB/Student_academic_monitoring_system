@@ -677,6 +677,23 @@ $csrf = $logic->csrf();
                                 </div>
 
                                 <div class="form-group">
+                                    <label>PREREQUISITES (OPTIONAL)</label>
+                                    <div class="prereq-picker" id="prereq-picker">
+                                        <input type="search" id="prereq-search" class="form-control" placeholder="Search subject code or name..." autocomplete="off">
+                                        <div class="prereq-options" id="prereq-options">
+                                            <?php foreach ($logic->prerequisiteOptions as $option): ?>
+                                                <label class="prereq-option" data-search="<?= enroll_e(strtolower($option['subjectID'] . ' ' . $option['name'])) ?>">
+                                                    <input type="checkbox" name="prerequisites[]" value="<?= enroll_e($option['subjectID']) ?>">
+                                                    <span><?= enroll_e($option['subjectID'] . ' - ' . $option['name']) ?></span>
+                                                </label>
+                                            <?php endforeach; ?>
+                                        </div>
+                                        <div class="prereq-selected" id="prereq-selected">No prerequisites selected</div>
+                                    </div>
+                                    <small style="color:rgba(255,255,255,.65);">Search and check one or more subjects. Leave empty if none.</small>
+                                </div>
+
+                                <div class="form-group">
                                     <label>UNITS</label>
                                     <input type="number" name="unit" id="sf-unit" class="form-control" min="1" max="5" value="3" required>
                                 </div>
@@ -723,6 +740,7 @@ $csrf = $logic->csrf();
                                             <th>YEAR</th>
                                             <th>SEM</th>
                                             <th>UNITS</th>
+                                            <th>PREREQUISITES</th>
                                             <th>ACTION</th>
                                         </tr>
                                     </thead>
@@ -730,7 +748,7 @@ $csrf = $logic->csrf();
                                     <tbody>
                                         <?php if (empty($logic->allSubjects)): ?>
                                             <tr>
-                                                <td colspan="7" style="text-align:center; color: rgba(255,255,255,0.6);">
+                                                <td colspan="8" style="text-align:center; color: rgba(255,255,255,0.6);">
                                                     No subjects yet.
                                                 </td>
                                             </tr>
@@ -744,6 +762,7 @@ $csrf = $logic->csrf();
                                                 <td><?= (int)$s['year'] ?></td>
                                                 <td><?= (int)$s['sem_available'] ?></td>
                                                 <td><?= (int)$s['unit'] ?></td>
+                                                <td class="subject-prereq-cell"><?= $s['prerequisite_labels'] !== '' ? nl2br(enroll_e(str_replace('||', "\n", $s['prerequisite_labels']))) : '<span style="opacity:.6;">None</span>' ?></td>
 
                                                 <td>
                                                     <div style="display: flex; gap: 5px;">
@@ -758,7 +777,8 @@ $csrf = $logic->csrf();
                                                             data-program="<?= enroll_e($s['program']) ?>"
                                                             data-unit="<?= (int)$s['unit'] ?>"
                                                             data-year="<?= (int)$s['year'] ?>"
-                                                            data-sem="<?= (int)$s['sem_available'] ?>">
+                                                            data-sem="<?= (int)$s['sem_available'] ?>"
+                                                            data-prereqs="<?= enroll_e(json_encode(array_filter(explode(', ', $s['prerequisite_codes'])))) ?>">
                                                             Edit
                                                         </button>
 
@@ -784,6 +804,15 @@ $csrf = $logic->csrf();
                     </div>
 
 
+                    <style>
+                    .prereq-picker{position:relative;background:rgba(34,17,49,.55);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:10px}
+                    .prereq-options{display:none;max-height:190px;overflow:auto;margin-top:8px;border:1px solid rgba(255,255,255,.12);border-radius:8px;padding:6px}.prereq-picker.open .prereq-options{display:block}
+                    .prereq-option{display:flex;gap:9px;align-items:center;padding:7px 8px;border-radius:6px;color:#fff;cursor:pointer;font-size:13px}
+                    .prereq-option:hover{background:rgba(255,255,255,.1)}
+                    .prereq-option input{accent-color:#b77be0}
+                    .prereq-selected{font-size:12px;color:rgba(255,255,255,.7);margin-top:8px}
+                    </style>
+
                     <script>
                     (function () {
                         var form = document.getElementById('subject-form');
@@ -803,6 +832,29 @@ $csrf = $logic->csrf();
                             cancel: document.getElementById('sf-cancel')
                         };
 
+                        var prereqChecks = Array.from(document.querySelectorAll('#prereq-options input[type="checkbox"]'));
+                        var prereqSearch = document.getElementById('prereq-search');
+                        var prereqSelected = document.getElementById('prereq-selected');
+
+                        function updatePrereqSummary() {
+                            var chosen = prereqChecks.filter(function (c) { return c.checked; }).map(function (c) { return c.parentElement.querySelector('span').textContent; });
+                            prereqSelected.textContent = chosen.length ? chosen.join(', ') : 'No prerequisites selected';
+                        }
+
+                        prereqChecks.forEach(function (c) { c.addEventListener('change', updatePrereqSummary); });
+                        prereqSearch.addEventListener('focus', function () { document.getElementById('prereq-picker').classList.add('open'); });
+                        prereqSearch.addEventListener('click', function () { document.getElementById('prereq-picker').classList.add('open'); });
+                        document.addEventListener('click', function (event) { if (!document.getElementById('prereq-picker').contains(event.target)) document.getElementById('prereq-picker').classList.remove('open'); });
+                        prereqSearch.addEventListener('input', function () {
+                            var q = prereqSearch.value.toLowerCase().trim();
+                            document.querySelectorAll('.prereq-option').forEach(function (item) { item.style.display = item.dataset.search.indexOf(q) !== -1 ? 'flex' : 'none'; });
+                        });
+
+                        function setPrerequisites(values) {
+                            prereqChecks.forEach(function (c) { c.checked = values.indexOf(c.value) !== -1; });
+                            updatePrereqSummary();
+                        }
+
                         function clearHighlight() {
                             document.querySelectorAll('tr.is-editing').forEach(function (r) {
                                 r.classList.remove('is-editing');
@@ -811,6 +863,7 @@ $csrf = $logic->csrf();
 
                         function resetForm() {
                             form.reset();
+                            setPrerequisites([]);
                             el.title.textContent = 'Add New Subject';
                             el.action.value = 'add_subject';
                             el.syllabus.value = '';
@@ -835,6 +888,9 @@ $csrf = $logic->csrf();
                                 el.unit.value = d.unit;
                                 el.year.value = d.year;
                                 el.sem.value = d.sem;
+                                var selectedPrereqs = [];
+                                try { selectedPrereqs = JSON.parse(d.prereqs || '[]'); } catch (e) {}
+                                setPrerequisites(selectedPrereqs);
                                 el.submit.textContent = 'Update Subject';
                                 el.cancel.style.display = 'block';
 
@@ -860,6 +916,7 @@ $csrf = $logic->csrf();
                         });
 
                         el.cancel.addEventListener('click', resetForm);
+
                     })();
                     </script>
 
@@ -871,3 +928,4 @@ $csrf = $logic->csrf();
 
 </body>
 </html>
+                                            

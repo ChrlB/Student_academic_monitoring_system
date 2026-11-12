@@ -35,6 +35,7 @@ class EnrollmentLogic
     // Registrar
     public $allPeriods = [];
     public $allSubjects = [];
+    public $prerequisiteOptions = [];
     public $editSubject = null;
 
     public $error = '';
@@ -572,6 +573,12 @@ class EnrollmentLogic
         ")->fetchAll();
 
         // Syllabus is the writable table; prospectus is a VIEW.
+        $this->prerequisiteOptions = $this->pdo->query("
+            SELECT subjectID, name
+            FROM subjects
+            ORDER BY subjectID
+        ")->fetchAll();
+
         $this->allSubjects = $this->pdo->query("
             SELECT
                 sy.id,
@@ -580,10 +587,14 @@ class EnrollmentLogic
                 sy.unit,
                 sy.year,
                 sy.program,
-                sy.sem_available
+                sy.sem_available,
+                COALESCE(GROUP_CONCAT(DISTINCT sp.prerequisite ORDER BY sp.prerequisite SEPARATOR ', '), '') AS prerequisite_codes,
+                COALESCE(GROUP_CONCAT(DISTINCT CONCAT(ps.subjectID, ' - ', ps.name) ORDER BY ps.subjectID SEPARATOR '||'), '') AS prerequisite_labels
             FROM syllabus sy
-            JOIN subjects s
-                ON s.subjectID = sy.subjectID
+            JOIN subjects s ON s.subjectID = sy.subjectID
+            LEFT JOIN subject_prerequisite sp ON sp.subjectID = sy.subjectID
+            LEFT JOIN subjects ps ON ps.subjectID = sp.prerequisite
+            GROUP BY sy.id, s.subjectID, s.name, sy.unit, sy.year, sy.program, sy.sem_available
             ORDER BY sy.program, sy.year, sy.sem_available, s.subjectID
         ")->fetchAll();
     }
@@ -930,6 +941,32 @@ class EnrollmentLogic
         return $out;
     }
 
+    private function savePrerequisites($subjectID, $data)
+    {
+        $selected = $data['prerequisites'] ?? [];
+        if (!is_array($selected)) $selected = [];
+        $selected = array_values(array_unique(array_filter(array_map('trim', $selected))));
+        $selected = array_values(array_diff($selected, [$subjectID]));
+
+        if ($selected) {
+            $placeholders = implode(',', array_fill(0, count($selected), '?'));
+            $check = $this->pdo->prepare("SELECT subjectID FROM subjects WHERE subjectID IN ($placeholders)");
+            $check->execute($selected);
+            $valid = $check->fetchAll(PDO::FETCH_COLUMN);
+            if (count($valid) !== count($selected)) {
+                throw new Exception('One or more selected prerequisite subjects are invalid.');
+            }
+        }
+
+        $this->pdo->prepare("DELETE FROM subject_prerequisite WHERE subjectID = ?")->execute([$subjectID]);
+        if (!$selected) return;
+
+        $insert = $this->pdo->prepare("INSERT INTO subject_prerequisite (subjectID, prerequisite) VALUES (?, ?)");
+        foreach ($selected as $prerequisite) {
+            $insert->execute([$subjectID, $prerequisite]);
+        }
+    }
+
     private function createSubject($data)
     {
         try {
@@ -975,6 +1012,7 @@ class EnrollmentLogic
                 $d['unit']
             ]);
 
+            $this->savePrerequisites($d['subjectID'], $data);
             $this->pdo->commit();
 
             $this->flash('ok', 'Subject added successfully.');
@@ -1029,6 +1067,7 @@ class EnrollmentLogic
                 $syllabusID
             ]);
 
+            $this->savePrerequisites($realSubjectID, $data);
             $this->pdo->commit();
 
             $this->flash('ok', 'Subject updated successfully.');
