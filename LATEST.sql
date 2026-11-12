@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 12, 2026 at 10:44 AM
+-- Generation Time: Nov 12, 2026 at 12:32 PM
 -- Server version: 8.0.34
 -- PHP Version: 8.2.12
 
@@ -48,9 +48,10 @@ INSERT INTO `adviser_student` (`id`, `facultyID`, `studentID`) VALUES
 --
 
 CREATE TABLE `attendance` (
-  `attendanceID` int NOT NULL,
+  `ID` int NOT NULL,
   `eventID` int NOT NULL,
-  `userID` int NOT NULL,
+  `facultyID` int UNSIGNED NOT NULL,
+  `studentID` int NOT NULL,
   `timein` datetime DEFAULT NULL,
   `timeout` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -78,8 +79,8 @@ CREATE TABLE `clearance_updates` (
 --
 
 CREATE TABLE `departments` (
-  `department` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL
+  `department` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -99,11 +100,11 @@ CREATE TABLE `enrolled_subjects` (
   `enrolled_subjectID` int NOT NULL,
   `enrollmentID` int UNSIGNED NOT NULL,
   `studentID` int UNSIGNED NOT NULL,
-  `subjectID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `subjectID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `midterm_grade` decimal(5,2) DEFAULT NULL,
   `final_grade` decimal(5,2) DEFAULT NULL,
-  `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
-  `rejection_remarks` text COLLATE utf8mb4_unicode_ci,
+  `status` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending',
+  `rejection_remarks` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
   `reviewed_by` int UNSIGNED DEFAULT NULL,
   `reviewed_at` datetime DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -132,12 +133,12 @@ INSERT INTO `enrolled_subjects` (`enrolled_subjectID`, `enrollmentID`, `studentI
 
 CREATE TABLE `enrollment_period` (
   `enrollmentID` int UNSIGNED NOT NULL,
-  `program` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `acad_year` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `program` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `acad_year` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `sem` tinyint NOT NULL,
   `open_date` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `close_date` datetime DEFAULT NULL,
-  `status` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'open',
+  `status` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'open',
   `date_created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `student_window_open` tinyint DEFAULT '1'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -158,16 +159,15 @@ INSERT INTO `enrollment_period` (`enrollmentID`, `program`, `acad_year`, `sem`, 
 --
 
 CREATE TABLE `events` (
-  `eventID` int(10) UNSIGNED NOT NULL,
-  `eventName` varchar(250) NOT NULL,
-  `program` varchar(50) DEFAULT NULL,
-  `department` varchar(255) DEFAULT NULL,
-  `datetime_Start` datetime NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `eventID` int NOT NULL,
+  `eventName` varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `program` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `department` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `datetime_Start` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `datetime_End` datetime DEFAULT NULL,
-  `eventCoordinator` int(50) DEFAULT NULL,
-  `status` enum('ACTIVE','FINISHED','RESCHEDULE','PENDING') NOT NULL DEFAULT 'PENDING'
+  `eventCoordinator` int DEFAULT NULL,
+  `status` enum('ACTIVE','FINISHED','RESCHEDULE','PENDING') COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'PENDING'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 
 --
 -- Dumping data for table `events`
@@ -185,22 +185,22 @@ INSERT INTO `events` (`eventID`, `eventName`, `program`, `department`, `datetime
 
 CREATE TABLE `faculty` (
   `facultyID` int UNSIGNED NOT NULL,
-  `first_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `middle_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `last_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `password` varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `folderID` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `role` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `department` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `program` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `first_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `middle_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `folderID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `role` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `department` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `program` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `date_created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `address` varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `number` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `address` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `number` varchar(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `date_of_birth` date NOT NULL,
-  `gender` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `gender` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `image_data` mediumblob,
-  `mime_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active'
+  `mime_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -225,8 +225,8 @@ CREATE TABLE `faculty_clearance` (
   `facultyID` int UNSIGNED NOT NULL,
   `studentID` int UNSIGNED NOT NULL,
   `date_cleared` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `remarks` varchar(250) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cleared'
+  `remarks` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cleared'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -246,12 +246,12 @@ INSERT INTO `faculty_clearance` (`faculty_clearanceID`, `facultyID`, `studentID`
 CREATE TABLE `faculty_clearance_requirements` (
   `ID` int UNSIGNED NOT NULL,
   `faculty_clearanceID` int UNSIGNED NOT NULL,
-  `fileID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `file_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `fileID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_size` int UNSIGNED NOT NULL,
   `uploaded_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `uploaded_by` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `mime_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL
+  `uploaded_by` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mime_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -269,9 +269,9 @@ INSERT INTO `faculty_clearance_requirements` (`ID`, `faculty_clearanceID`, `file
 
 CREATE TABLE `office` (
   `officeID` int UNSIGNED NOT NULL,
-  `name` varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `facultyID` int UNSIGNED NOT NULL,
-  `roomID` varchar(5) COLLATE utf8mb4_unicode_ci NOT NULL
+  `roomID` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -292,8 +292,8 @@ CREATE TABLE `office_clearance` (
   `officeID` int UNSIGNED NOT NULL,
   `studentID` int UNSIGNED NOT NULL,
   `date_cleared` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `remarks` varchar(250) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cleared'
+  `remarks` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cleared'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -312,12 +312,12 @@ INSERT INTO `office_clearance` (`office_clearanceID`, `officeID`, `studentID`, `
 CREATE TABLE `office_clearance_requirements` (
   `ID` int UNSIGNED NOT NULL,
   `office_clearanceID` int UNSIGNED NOT NULL,
-  `fileID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `file_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `fileID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_size` int UNSIGNED NOT NULL,
   `uploaded_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `uploaded_by` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `mime_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL
+  `uploaded_by` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mime_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -334,9 +334,9 @@ INSERT INTO `office_clearance_requirements` (`ID`, `office_clearanceID`, `fileID
 --
 
 CREATE TABLE `programs` (
-  `program` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `department` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL
+  `program` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `department` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -357,9 +357,9 @@ INSERT INTO `programs` (`program`, `name`, `department`) VALUES
 CREATE TABLE `projects` (
   `projectID` int UNSIGNED NOT NULL,
   `enrolled_subjectID` int NOT NULL,
-  `name` varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `deadline` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active'
+  `status` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -378,11 +378,11 @@ INSERT INTO `projects` (`projectID`, `enrolled_subjectID`, `name`, `deadline`, `
 CREATE TABLE `project_documents` (
   `ID` int UNSIGNED NOT NULL,
   `projectID` int UNSIGNED NOT NULL,
-  `fileID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `file_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `fileID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_size` int UNSIGNED NOT NULL,
   `uploaded_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `uploaded_by` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL
+  `uploaded_by` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -394,9 +394,9 @@ CREATE TABLE `project_documents` (
 CREATE TABLE `project_task` (
   `taskID` int UNSIGNED NOT NULL,
   `projectID` int UNSIGNED NOT NULL,
-  `task_title` varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `task_title` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `deadline` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `satatus` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending'
+  `satatus` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -429,8 +429,8 @@ CREATE TABLE `prospectus` (
 --
 
 CREATE TABLE `rooms` (
-  `roomID` varchar(5) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `status` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'available'
+  `roomID` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'available'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -455,32 +455,32 @@ INSERT INTO `rooms` (`roomID`, `status`) VALUES
 
 CREATE TABLE `students` (
   `studentID` int UNSIGNED NOT NULL,
-  `first_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `middle_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `last_name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `password` varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `folderID` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `program` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `first_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `middle_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `last_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `password` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `folderID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `program` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `date_created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `year_level` tinyint NOT NULL,
-  `block` varchar(5) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `address` varchar(250) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `number` varchar(15) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `block` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `address` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `number` varchar(15) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `date_of_birth` date NOT NULL,
-  `gender` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `gender` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `image_data` mediumblob,
-  `mime_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
-  `email` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `place_of_birth` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `civil_status` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `sexual_orientation` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `citizenship` varchar(40) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `religion` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `region` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `province` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `municipality` varchar(60) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
-  `zip_code` char(4) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT ''
+  `mime_type` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'active',
+  `email` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `place_of_birth` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `civil_status` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `sexual_orientation` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `citizenship` varchar(40) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `religion` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `region` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `province` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `municipality` varchar(60) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '',
+  `zip_code` char(4) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -521,9 +521,9 @@ INSERT INTO `student_enrollment_control` (`id`, `enrollmentID`, `studentID`, `wi
 --
 
 CREATE TABLE `subjects` (
-  `subjectID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `name` varchar(200) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `department` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL
+  `subjectID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `department` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -554,8 +554,8 @@ CREATE TABLE `subject_clearance` (
   `subject_clearanceID` int UNSIGNED NOT NULL,
   `enrolled_subjectID` int NOT NULL,
   `date_cleared` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `remarks` varchar(250) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cleared'
+  `remarks` varchar(250) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'cleared'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -576,13 +576,13 @@ INSERT INTO `subject_clearance` (`subject_clearanceID`, `enrolled_subjectID`, `d
 
 CREATE TABLE `subject_clearance_requirements` (
   `ID` int UNSIGNED NOT NULL,
-  `subjectID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `fileID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `file_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `subjectID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `fileID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_size` int UNSIGNED NOT NULL,
   `uploaded_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `uploaded_by` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `mime_type` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL
+  `uploaded_by` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `mime_type` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -600,12 +600,12 @@ INSERT INTO `subject_clearance_requirements` (`ID`, `subjectID`, `fileID`, `file
 
 CREATE TABLE `subject_modules` (
   `ID` int UNSIGNED NOT NULL,
-  `subjectID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `fileID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `file_name` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `subjectID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `fileID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `file_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `file_size` int UNSIGNED NOT NULL,
   `uploaded_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `uploaded_by` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL
+  `uploaded_by` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
@@ -616,8 +616,8 @@ CREATE TABLE `subject_modules` (
 
 CREATE TABLE `subject_prerequisite` (
   `id` int UNSIGNED NOT NULL,
-  `subjectID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `prerequisite` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL
+  `subjectID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `prerequisite` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -642,12 +642,12 @@ CREATE TABLE `subject_schedules` (
   `schedID` int UNSIGNED NOT NULL,
   `facultyID` int UNSIGNED NOT NULL,
   `enrollmentID` int UNSIGNED NOT NULL,
-  `subjectID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `day` varchar(20) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `roomID` varchar(5) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `subjectID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `day` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `roomID` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `time_start` time NOT NULL,
   `time_end` time NOT NULL,
-  `block` varchar(5) COLLATE utf8mb4_unicode_ci NOT NULL
+  `block` varchar(5) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
@@ -666,8 +666,8 @@ INSERT INTO `subject_schedules` (`schedID`, `facultyID`, `enrollmentID`, `subjec
 
 CREATE TABLE `syllabus` (
   `id` int NOT NULL,
-  `subjectID` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
-  `program` varchar(50) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `subjectID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `program` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `sem_available` tinyint UNSIGNED NOT NULL,
   `year` tinyint NOT NULL,
   `unit` tinyint NOT NULL
@@ -783,8 +783,9 @@ ALTER TABLE `adviser_student`
 -- Indexes for table `attendance`
 --
 ALTER TABLE `attendance`
-  ADD PRIMARY KEY (`attendanceID`,`eventID`,`userID`),
-  ADD KEY `fk_attendance_event_idx` (`eventID`);
+  ADD PRIMARY KEY (`ID`,`eventID`,`studentID`),
+  ADD KEY `fk_attendance_event_idx` (`eventID`),
+  ADD KEY `facultyID` (`facultyID`);
 
 --
 -- Indexes for table `departments`
@@ -996,7 +997,7 @@ ALTER TABLE `adviser_student`
 -- AUTO_INCREMENT for table `attendance`
 --
 ALTER TABLE `attendance`
-  MODIFY `attendanceID` int NOT NULL AUTO_INCREMENT;
+  MODIFY `ID` int NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `enrolled_subjects`
@@ -1145,6 +1146,7 @@ ALTER TABLE `adviser_student`
 -- Constraints for table `attendance`
 --
 ALTER TABLE `attendance`
+  ADD CONSTRAINT `attendance_ibfk_1` FOREIGN KEY (`facultyID`) REFERENCES `faculty` (`facultyID`),
   ADD CONSTRAINT `fk_attendance_events` FOREIGN KEY (`eventID`) REFERENCES `events` (`eventID`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 --
