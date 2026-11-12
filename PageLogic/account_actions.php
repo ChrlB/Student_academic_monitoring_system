@@ -1,11 +1,13 @@
 <?php
+
+
 require_once __DIR__ . '/../Services/session.php';
 require_once __DIR__ . '/../Services/csrf.php';
 
 const PW_MIN_LENGTH = 8;
 const PW_MAX_LENGTH = 72;      
-const PW_MAX_FAILS  = 5;       
-const PW_LOCK_MINUTES = 15;    
+const PW_MAX_FAILS  = 5;      
+const PW_LOCK_MINUTES = 15;   
 
 // Roles allowed to change their password from the account page.
 const PW_CHANGE_ROLES = ['student'];
@@ -16,7 +18,6 @@ function canChangePassword(): bool {
 
 const PROFILE_EXTRA_COLUMNS = true;
 
-// the school email domain (same constant the login/reset files use)
 if (!defined('SCHOOL_EMAIL_DOMAIN')) define('SCHOOL_EMAIL_DOMAIN', '@gordoncollege.edu.ph');
 
 /* ---------- small helpers ---------- */
@@ -142,8 +143,6 @@ function changePassword($post) {
 }
 
 /* ---------- 2. edit profile ---------- */
-
-// Single source of truth: field => [label, type, max length or options, required, needs extra column]
 function profileRules(): array {
     return [
         'middle_name'        => ['Middle Name',        'text',   50,  false, false],
@@ -189,13 +188,18 @@ function validateProfileValue(string $field, array $rule, string $raw): array {
         return [$v, null];
     }
     if ($type === 'phone') {
-        // digits with an optional leading +, spaces, dashes and brackets: 0909 090 9009, 0909-090-9009, +63 909 090 9009
-        $digits = preg_replace('/\D/', '', $v);
-        if (!preg_match('/^\+?[0-9(][0-9 ()\-]*$/', $v) || strlen($digits) < 7 || strlen($digits) > 15) {
-            return ['', 'Enter a valid contact number, e.g. 0909 123 4567.'];
+        // Philippine mobile number: 09XX XXX XXXX (11 digits) or +63 9XX XXX XXXX. Spaces, dashes and brackets are ignored.
+        if (!preg_match('/^\+?[0-9][0-9 ()\-]*$/', $v)) {
+            return ['', "$label can only contain digits (spaces and dashes are fine)."];
         }
-        if (mb_strlen($v) > $limit) return ['', "$label is too long ($limit characters at most)."];
-        return [$v, null];
+        $digits = preg_replace('/\D/', '', $v);
+        if (preg_match('/^639\d{9}$/', $digits) && $v[0] === '+') {
+            $digits = '0' . substr($digits, 2);              // +63 909... -> 0909...
+        }
+        if (!preg_match('/^09\d{9}$/', $digits)) {
+            return ['', "$label must be 11 digits and start with 09, e.g. 0909 123 4567."];
+        }
+        return [$digits, null];                              // saved as 09XXXXXXXXX
     }
     if ($type === 'zip') {
         return preg_match('/^\d{4}$/', $v) ? [$v, null] : ['', 'Zip Code must be 4 digits.'];

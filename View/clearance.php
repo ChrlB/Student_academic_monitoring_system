@@ -1,14 +1,8 @@
 <?php
 require_once __DIR__ . "/../PageLogic/clearance_logic.php";
-
-
-
-
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,9 +12,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/clearance.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
-
 <body>
-
   <?php require_once __DIR__ . "/components/popup_message.php"; ?>
   <div class="row main_box">
     <?php require_once __DIR__ . "/components/navigation.php"; ?>
@@ -118,7 +110,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           <?php elseif ($student_view == "UPDATES"): ?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">CLEARANCE UPDATES</b>
-               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+              <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
             <div class="updates_frame2  drop_shadow">
               <table class="updates_table">
@@ -153,7 +145,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           <?php elseif ($student_view === "SUBJECTS"): $subjects = getSubjectsClearance($search,$status)?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">SUBJECTS</b>
-               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+              <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
             <form class="row" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
               <input type="hidden" name="view" value="SUBJECTS">
@@ -351,7 +343,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           <?php elseif ($student_view === "FACULTY"): $faculties = getFacultyClearance($search,$status);?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">FACULTY</b>
-               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+              <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
             <form class="row" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
               <input type="hidden" name="view" value="FACULTY">
@@ -391,7 +383,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           <?php elseif ($student_view === "FACULTY-REQUIREMENTS"): $faculty_info = getFacultyRequireMents($search); ?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">FACULTY</b>
-               <a href="<?= BASE_PATH ?>/clearance?view=FACULTY" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+              <a href="<?= BASE_PATH ?>/clearance?view=FACULTY" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
             <div class="row subject_container">
               <div class="column">
@@ -539,7 +531,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           <?php elseif ($student_view === "OFFICE"): $offices = getOfficeClearance($search,$status);?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">OFFICE</b>
-               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+              <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
             <form class="row" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
               <input type="hidden" name="view" value="OFFICE">

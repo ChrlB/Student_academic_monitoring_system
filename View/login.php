@@ -73,7 +73,6 @@ function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | 
         <label for="school-id">School ID</label>
         <div class="field<?= $idError !== '' ? ' is-invalid' : '' ?>">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="M5.8 16c.6-1.5 1.8-2.2 3.2-2.2s2.6.7 3.2 2.2M15 10h3.5M15 13.5h3.5"/></svg>
-          <!-- value: the ID typed before a failed login; autofocus: the field that needs attention -->
           <input type="text" id="school-id" name="username"
                 value="<?= e($typedId) ?>"
                 placeholder="Enter your school ID" maxlength="20"
