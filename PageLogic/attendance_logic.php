@@ -185,7 +185,7 @@ function att_records(array $stu): array {
       IFNULL(CONCAT('Mr./Ms. ', f.last_name, ', ', f.first_name), 'TBA') as instructor_name
     FROM attendance a
     JOIN events e ON a.eventID = e.eventID
-    LEFT JOIN faculty f ON a.userID = f.facultyID
+    LEFT JOIN faculty f ON a.facultyID = f.facultyID
     WHERE a.studentID = ? 
     ORDER BY e.datetime_Start DESC
   ");
