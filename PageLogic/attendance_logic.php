@@ -183,17 +183,18 @@ function att_records(array $stu): array {
   
   $stmt = $db_connection->prepare("
     SELECT 
-      a.ID as record_id,
+      a.attendanceID as record_id,
       e.eventName as event_name,
       YEAR(e.datetime_Start) as event_year,
       a.timein,
       a.timeout,
       e.datetime_Start,
+      e.datetime_End,
       CONCAT('Mr./Ms. ', f.last_name, ', ', f.first_name) as instructor_name
     FROM attendance a
     JOIN events e ON a.eventID = e.eventID
-    JOIN faculty f ON a.facultyID = f.facultyID
-    WHERE a.studentID = ?
+    JOIN faculty f ON a.userID  = f.facultyID
+    WHERE a.studentID = ? 
     ORDER BY e.datetime_Start DESC
   ");
   
