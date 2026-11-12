@@ -83,6 +83,40 @@
   color: #fff;
   box-sizing: content-box;
   
+  .updates_records{
+    tr{
+      position: relative;
+    }
+    tr:hover{
+      background-color: #e9b8e565 ;
+      cursor: pointer;
+    }
+    .remark {
+      padding: 15px 25px;
+      position: absolute;
+      top: 100%;
+      right: 0;
+      z-index: 10;
+      width: 500px;
+      min-height: 100px;
+      background-color: #1F193D;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s;
+      text-wrap: wrap;
+      overflow: auto;
+      border-radius: 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content:start;
+      align-items: start;
+      transition: opacity 0.3s;
+    }
+    .remark.open {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
 }
 
 .updates_table {
@@ -98,7 +132,7 @@
   padding: 8px 6px 14px;
   font-size: 20px;
   text-align: center;
-  background: rgba(132, 84, 142, .65);
+  background: rgba(132, 84, 142, 1);
 }
 
 .updates_table td {

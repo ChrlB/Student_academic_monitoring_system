@@ -244,6 +244,10 @@ html {
   background: #c52d22; 
 }
 
+.header_username{
+  color: white;
+}
+
 @keyframes fadeOut {
     0% { opacity: 1; top: -20px;}
     8% { top: 20px;}

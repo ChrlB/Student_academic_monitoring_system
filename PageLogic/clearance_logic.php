@@ -13,8 +13,10 @@ $search = "ALL";
 $status = "ALL";
 
 
-$allowedViews = ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE', 'UPDATES',
-                'SUBJECT-REQUIREMENTS','FACULTY-REQUIREMENTS','OFFICE-REQUIREMENTS'];
+$allowedViews = ($_SESSION["role"] == 'student')
+    ? ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE', 'UPDATES', 'SUBJECT-REQUIREMENTS','FACULTY-REQUIREMENTS','OFFICE-REQUIREMENTS']
+    : ['MAIN', 'SUBJECT', 'FACULTY', 'OFFICE'];
+
 $student_view = strtoupper($_GET['view'] ?? 'MAIN');
 if (!in_array($student_view, $allowedViews, true)) {
     $student_view = 'MAIN';
@@ -136,6 +138,20 @@ function getOfficeRequireMents($officeID){
 function getUploadedOfficeRequireMents($officeID){
     global $clearanceDAO;
     $records = $clearanceDAO->executeQuery("getUploadedOfficeRequireMents",[ $officeID ,$_SESSION['userID'],$_SESSION['userID']]);
+
+    return $records;
+}
+
+function getOffices(){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getOffices",[ $_SESSION['userID']]);
+
+    return $records;
+}
+
+function getSubjects(){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getSubjects",[ $_SESSION['userID']]);
 
     return $records;
 }
