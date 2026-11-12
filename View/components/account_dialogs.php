@@ -1,8 +1,4 @@
 <?php
-/* View/components/account_dialogs.php
-   The two popups of the account page. Needs $acct (getAccountInfo()) and $dlg (takeDialogState()).
-   Include once, before </body>, together with View/script/account.js and View/style/account_dialogs.css. */
-
 /** @var array $acct  set by View/account.php (the editor can't see that, so it flags it as undefined) */
 /** @var array $dlg   set by View/account.php */
 
@@ -15,7 +11,6 @@ $p = $acct['personal']; $a = $acct['address'];
 $extra = defined('PROFILE_EXTRA_COLUMNS') && PROFILE_EXTRA_COLUMNS;
 $defaultPwMsg = 'All fields are required. Password must be at least eight (8) characters or more.';
 
-// one editable (or locked) box. $locked: shown but not sent. $needsColumn: disabled until the migration is done.
 $box = function (string $name, string $label, string $value, string $w, string $type = 'text', array $opts = [], bool $locked = false, bool $needsColumn = false) use ($extra) {
     $off = $locked || ($needsColumn && !$extra);
     ?>
@@ -30,7 +25,7 @@ $box = function (string $name, string $label, string $value, string $w, string $
         </select>
       <?php else: ?>
         <input type="<?= e($type) ?>" <?= $off ? 'disabled' : 'name="' . e($name) . '"' ?> value="<?= e($value) ?>"
-               <?= $type === 'date' ? 'max="' . date('Y-m-d') . '" min="1900-01-01"' : '' ?> autocomplete="off">
+              <?= $type === 'date' ? 'max="' . date('Y-m-d') . '" min="1900-01-01"' : '' ?> autocomplete="off">
       <?php endif; ?>
     </label>
     <?php
@@ -38,7 +33,6 @@ $box = function (string $name, string $label, string $value, string $w, string $
 ?>
 
 <?php if (canChangePassword()): ?>
-<!-- ============ Change Password ============ -->
 <dialog id="password-dialog" class="dlg dlg-light" aria-labelledby="pw-title" <?= $pwErr !== '' ? 'data-open' : '' ?>>
   <form method="post" action="<?= e(accountUrl('/change-password')) ?>" novalidate autocomplete="off">
     <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
@@ -67,7 +61,6 @@ $box = function (string $name, string $label, string $value, string $w, string $
 <?php endif; ?>
 
 <?php if ($acct['isStudent']): ?>
-<!-- ============ Edit Profile (students) ============ -->
 <dialog id="profile-dialog" class="dlg dlg-dark" aria-labelledby="pr-title" <?= $prErr !== '' ? 'data-open' : '' ?>>
   <form method="post" action="<?= e(accountUrl('/edit-profile')) ?>" novalidate autocomplete="off">
     <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
@@ -77,11 +70,6 @@ $box = function (string $name, string $label, string $value, string $w, string $
         Edit Personal Information
       </h2>
       <p class="dlg-msg dlg-msg-dark" id="pr-msg" role="alert" <?= $prErr === '' ? 'hidden' : '' ?>><?= e($prErr) ?></p>
-      <?php if (!$extra): ?>
-        <p class="dlg-note">Greyed-out fields can’t be saved yet. First and last name are managed by the school.</p>
-      <?php else: ?>
-        <p class="dlg-note">First and last name are managed by the school.</p>
-      <?php endif; ?>
 
       <div class="df-row">
         <?php $box('', 'First Name',  $p['first_name'],  'w3', 'text', [], true); ?>
@@ -90,6 +78,7 @@ $box = function (string $name, string $label, string $value, string $w, string $
       </div>
       <div class="df-row">
         <?php $box('email', 'Email Address', $val('email', $acct['contact']['email']), 'w6', 'text', [], false, true); ?>
+        <?php $box('number', 'Contact Number', $val('number', $acct['contact']['phone']), 'w3', 'tel'); ?>
       </div>
       <div class="df-row">
         <?php $box('date_of_birth', 'Date of Birth', $val('date_of_birth', $p['birth_date']), 'w3', 'date'); ?>
@@ -119,3 +108,10 @@ $box = function (string $name, string $label, string $value, string $w, string $
   </form>
 </dialog>
 <?php endif; ?>
+
+<!-- ============ Profile Picture (the camera button on the avatar) ============ -->
+<!-- account.js opens the file picker, shrinks the picture in the browser, then submits this form to POST /upload-profile -->
+<form id="photo-form" method="post" action="<?= e(accountUrl('/upload-profile')) ?>" enctype="multipart/form-data" hidden>
+  <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
+  <input type="file" id="photo-input" name="profile_picture" accept="image/jpeg,image/png,image/webp">
+</form>

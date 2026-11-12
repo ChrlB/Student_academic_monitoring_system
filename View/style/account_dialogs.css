@@ -323,3 +323,26 @@
     flex: 0 0 100%;
   }
 }
+
+/* ---------- profile picture ---------- */
+.avatar-btn.is-busy {
+  opacity: 0.55;
+  cursor: progress;
+}
+.photo-note {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 9999;
+  max-width: min(360px, calc(100vw - 36px));
+  padding: 11px 16px;
+  border: 1px solid #ff8da1;
+  border-radius: 12px;
+  background: rgba(110, 10, 40, 0.92);
+  color: #ffe1e7;
+  font:
+    600 0.9rem/1.4 'Inter',
+    system-ui,
+    sans-serif;
+  box-shadow: 0 10px 30px rgba(10, 2, 30, 0.45);
+}

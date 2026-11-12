@@ -8,7 +8,12 @@ if (isLoggedIn()) {
 }
 $flashError   = $_SESSION['error']   ?? '';
 $flashMessage = $_SESSION['message'] ?? '';
-unset($_SESSION['error'], $_SESSION['message']);
+$fieldErrors  = $_SESSION['login_errors'] ?? [];   
+$typedId      = $_SESSION['login_old']    ?? '';   
+unset($_SESSION['error'], $_SESSION['message'], $_SESSION['login_errors'], $_SESSION['login_old']);
+
+$idError = (string)($fieldErrors['username'] ?? '');
+$pwError = (string)($fieldErrors['password'] ?? '');
 
 function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 ?>
@@ -17,7 +22,7 @@ function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AMS | Login</title>
+  <title>AMS | Academic Monitoring System</title>
   <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -28,8 +33,6 @@ function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | 
 <body data-flash-error="<?= e($flashError) ?>" data-flash-message="<?= e($flashMessage) ?>">
 
   <main class="page">
-
-    <!-- ============ LEFT: intro ============ -->
     <section class="hero">
       <h1 class="hero-title">Academic<br>Monitoring System</h1>
       <p class="hero-lead">Track your academic progress, manage your records, and stay on top of your goal.</p>
@@ -54,7 +57,6 @@ function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | 
       </ul>
     </section>
 
-    <!-- ============ RIGHT: login card ============ -->
     <section class="card" aria-labelledby="login-title">
 
       <div class="brand brand--card">
@@ -69,25 +71,33 @@ function e($text): string { return htmlspecialchars((string)$text, ENT_QUOTES | 
         <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
 
         <label for="school-id">School ID</label>
-        <div class="field">
+        <div class="field<?= $idError !== '' ? ' is-invalid' : '' ?>">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="M5.8 16c.6-1.5 1.8-2.2 3.2-2.2s2.6.7 3.2 2.2M15 10h3.5M15 13.5h3.5"/></svg>
+          <!-- value: the ID typed before a failed login; autofocus: the field that needs attention -->
           <input type="text" id="school-id" name="username"
+                value="<?= e($typedId) ?>"
                 placeholder="Enter your school ID" maxlength="20"
-                autocomplete="username" autocapitalize="characters" spellcheck="false" required>
+                autocomplete="username" autocapitalize="characters" spellcheck="false" required
+                aria-describedby="school-id-error" aria-invalid="<?= $idError !== '' ? 'true' : 'false' ?>"
+                <?= $idError !== '' ? 'autofocus' : '' ?>>
         </div>
+        <p class="field-error" id="school-id-error" role="alert" <?= $idError === '' ? 'hidden' : '' ?>><?= e($idError) ?></p>
 
         <label for="password">Password</label>
-        <div class="field">
+        <div class="field<?= $pwError !== '' ? ' is-invalid' : '' ?>">
           <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2.5"/><path d="M8 10.5V8a4 4 0 018 0v2.5"/></svg>
           <input type="password" id="password" name="password"
                 placeholder="Enter your password"
-                autocomplete="current-password" required>
+                autocomplete="current-password" required
+                aria-describedby="password-error" aria-invalid="<?= $pwError !== '' ? 'true' : 'false' ?>"
+                <?= ($idError === '' && $typedId !== '') ? 'autofocus' : '' ?>>
           <button type="button" id="toggle-password" class="toggle"
                   aria-label="Show password" aria-pressed="false">
             <svg class="eye-off" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M4 20L20 4"/></svg>
             <svg class="eye-on" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
+        <p class="field-error" id="password-error" role="alert" <?= $pwError === '' ? 'hidden' : '' ?>><?= e($pwError) ?></p>
 
         <button type="submit" class="btn">Login</button>
       </form>

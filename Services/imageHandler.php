@@ -1,5 +1,8 @@
 <?php
 
+require_once __DIR__ . '/session.php';
+require_once __DIR__ . '/csrf.php';
+
 class ImageUploadService
 {
     private int $maxUploadSizeInBytes;
@@ -88,38 +91,63 @@ class ImageUploadService
         ];
     }
 }
-require_once __DIR__."/session.php";
+
+// Send the person back to the account page with a message (shown once by popup_message).
+function profileUploadDone(string $key, string $text): void {
+    $_SESSION[$key] = $text;                       // $key is 'message' or 'error'
+    header('Location: ' . BASE_PATH . '/account');
+    exit;
+}
 
 function uploadProfile(){
   global $userDAO; 
 
-  $loggedInUserId = $_SESSION['userID'] ; 
-
-  if (isset($_FILES['profile_picture'])) {
-      $imageUploadService = new ImageUploadService();
-      $processedImage = $imageUploadService->processUploadedImage($_FILES['profile_picture']);
-
-      if (!$processedImage['success']) {
-          $_SESSION["error"] = $processedImage['message'];
-      } else {
-          $imageBinaryData = $processedImage['imageBinaryData'];
-          $savedMimeType = $processedImage['mimeType'];
-         
-
-          $upload_for = ($_SESSION['role'] == "student")
-                ? "uploadStudentProfile"
-                : "uploadFacultyProfile";
-
-          $rows_affected = $userDAO->executeUpdate($upload_for, [ $imageBinaryData, $savedMimeType, $loggedInUserId]);
-
-          if ($rows_affected > 0) $_SESSION["message"] = 'Profile Picture Saved!';
-            
-      }
-
-      
-      header('Location: '.BASE_PATH.'/dashboard');
+  // Not logged in: nothing to save.
+  if (empty($_SESSION['userID'])) {
+      header('Location: ' . BASE_PATH . '/login');
       exit;
   }
+  $loggedInUserId = $_SESSION['userID'];
+
+  // A file bigger than the server's post_max_size makes PHP drop the whole request ($_POST and $_FILES stay empty).
+  if (empty($_POST) && empty($_FILES) && (int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 0) {
+      profileUploadDone('error', 'That picture is too large. Please choose a smaller one.');
+  }
+
+  // Same CSRF check as the login and account forms: other sites cannot change someone's picture.
+  if (!csrfValid($_POST['csrf_token'] ?? null)) {
+      profileUploadDone('error', 'Your session expired. Please try again.');
+  }
+
+  if (!isset($_FILES['profile_picture'])) {
+      profileUploadDone('error', 'Choose a picture first.');
+  }
+
+  $imageUploadService = new ImageUploadService();
+  $processedImage = $imageUploadService->processUploadedImage($_FILES['profile_picture']);
+
+  if (!$processedImage['success']) {
+      profileUploadDone('error', $processedImage['message']);
+  }
+
+  $imageBinaryData = $processedImage['imageBinaryData'];
+  $savedMimeType = $processedImage['mimeType'];
+
+  $upload_for = (($_SESSION['role'] ?? '') === "student")
+        ? "uploadStudentProfile"
+        : "uploadFacultyProfile";
+
+  try {
+      $rows_affected = $userDAO->executeUpdate($upload_for, [ $imageBinaryData, $savedMimeType, $loggedInUserId]);
+  } catch (Throwable $e) {
+      error_log('Profile picture save failed: ' . $e->getMessage());
+      profileUploadDone('error', 'Could not save the picture. Please try again.');
+  }
+
+  if ($rows_affected > 0) {
+      profileUploadDone('message', 'Profile picture saved!');
+  }
+  profileUploadDone('error', 'The picture was not saved. Please try again.');
 }
 
 function getProfilePic(){
