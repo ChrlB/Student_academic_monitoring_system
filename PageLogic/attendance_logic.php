@@ -42,12 +42,86 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
   exit;
 }
 
+# --- Handles QR Code Scanning & Attendance Logging ---
+if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['att_action'] ?? '') === 'scan') {
+  header('Content-Type: application/json');
+  $rawStudentID = trim($_POST['studentID'] ?? '');
+  $eventID      = trim($_POST['eventID'] ?? '');
+  $facultyID    = $attUserID; // Automatically pulls the logged-in faculty/manager ID
+
+  // Extract numeric studentID if formatted with year prefix (e.g., "2024-00012")
+  $studentID = $rawStudentID;
+  if (strpos($rawStudentID, '-') !== false) {
+    $parts = explode('-', $rawStudentID);
+    $studentID = end($parts);
+  }
+  $studentID = (int)$studentID;
+
+  if ($studentID > 0 && !empty($eventID)) {
+    try {
+      // Check existing attendance record for this student and event name/ID
+      $checkStmt = $db_connection->prepare("
+        SELECT a.ID, a.timein, a.timeout 
+        FROM attendance a
+        JOIN events e ON a.eventID = e.eventID
+        WHERE a.studentID = ? AND (e.eventID = ? OR e.eventName = ?)
+      ");
+      $checkStmt->execute([$studentID, $eventID, $eventID]);
+      $row = $checkStmt->fetch(PDO::FETCH_ASSOC);
+
+      if ($row) {
+        // If already timed in but no timeout recorded yet, record timeout
+        if (empty($row['timeout'])) {
+          $updateStmt = $db_connection->prepare("UPDATE attendance SET timeout = NOW() WHERE ID = ?");
+          $updateStmt->execute([$row['ID']]);
+          echo json_encode([
+            'status' => 'success', 
+            'type' => 'timeout', 
+            'message' => 'Timeout recorded successfully for ID: ' . $rawStudentID
+          ]);
+        } else {
+          echo json_encode([
+            'status' => 'info', 
+            'message' => 'Student has already completed time-in and time-out for this event.'
+          ]);
+        }
+      } else {
+        // Resolve eventID if $eventID passed is the event name string
+        $resolvedEventID = $eventID;
+        if (!is_numeric($eventID)) {
+          $evLookup = $db_connection->prepare("SELECT eventID FROM events WHERE eventName = ? LIMIT 1");
+          $evLookup->execute([$eventID]);
+          $resolvedEventID = $evLookup->fetchColumn();
+        }
+
+        if ($resolvedEventID) {
+          // Insert new time-in record
+          $insertStmt = $db_connection->prepare("INSERT INTO attendance (eventID, facultyID, studentID, timein) VALUES (?, ?, ?, NOW())");
+          $insertStmt->execute([$resolvedEventID, $facultyID, $studentID]);
+          echo json_encode([
+            'status' => 'success', 
+            'type' => 'timein', 
+            'message' => 'Time-in logged successfully for ID: ' . $rawStudentID
+          ]);
+        } else {
+          echo json_encode(['status' => 'error', 'message' => 'Invalid event specified.']);
+        }
+      }
+    } catch (Exception $e) {
+      echo json_encode(['status' => 'error', 'message' => 'Database error: ' . $e->getMessage()]);
+    }
+  } else {
+    echo json_encode(['status' => 'error', 'message' => 'Invalid student ID or missing event ID.']);
+  }
+  exit;
+}
+
 #Escapes output text
 if (!function_exists('e')) {
   function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 }
 
-#Loads departments and programs from database
+#Loads departments and programs from database[cite: 6]
 $progStmt = $db_connection->query("SELECT program, department FROM programs");
 $allProgs = $progStmt->fetchAll();
 $ATT_DEPT_COURSES = [];
@@ -55,11 +129,24 @@ foreach ($allProgs as $p) {
   $ATT_DEPT_COURSES[$p['department']][] = $p['program'];
 }
 
-#Loads event names from database
-$eventNamesStmt = $db_connection->query("SELECT DISTINCT name FROM events ORDER BY name ASC");
+#Loads event names from database (using eventName column)[cite: 13]
+$eventNamesStmt = $db_connection->query("SELECT DISTINCT eventName FROM events ORDER BY eventName ASC");
 $ATT_EVENT_NAMES = $eventNamesStmt->fetchAll(PDO::FETCH_COLUMN);
 
-#Fetches student list and profiles
+#Finds the active event based on status = 'ACTIVE', or falls back to latest event[cite: 13]
+$activeEventStmt = $db_connection->query("
+  SELECT eventName FROM events 
+  WHERE status = 'ACTIVE' 
+  ORDER BY datetime_Start DESC LIMIT 1
+");
+$currentActiveEvent = $activeEventStmt->fetchColumn();
+
+if (!$currentActiveEvent && !empty($ATT_EVENT_NAMES)) {
+  $fallbackStmt = $db_connection->query("SELECT eventName FROM events ORDER BY datetime_Start DESC LIMIT 1");
+  $currentActiveEvent = $fallbackStmt->fetchColumn();
+}
+
+#Fetches student list and profiles[cite: 6]
 function att_students(): array {
   global $db_connection;
   
@@ -90,24 +177,24 @@ function att_students(): array {
   return $out;
 }
 
-#Fetches attendance records for a specific student
+#Fetches attendance records for a specific student[cite: 6]
 function att_records(array $stu): array {
   global $db_connection;
   
   $stmt = $db_connection->prepare("
     SELECT 
       a.ID as record_id,
-      e.name as event_name,
-      YEAR(e.datetime_start) as event_year,
+      e.eventName as event_name,
+      YEAR(e.datetime_Start) as event_year,
       a.timein,
       a.timeout,
-      e.datetime_start,
+      e.datetime_Start,
       CONCAT('Mr./Ms. ', f.last_name, ', ', f.first_name) as instructor_name
     FROM attendance a
     JOIN events e ON a.eventID = e.eventID
     JOIN faculty f ON a.facultyID = f.facultyID
     WHERE a.studentID = ?
-    ORDER BY e.datetime_start DESC
+    ORDER BY e.datetime_Start DESC
   ");
   
   $rawStudentID = explode('-', $stu['id'])[1] ?? $stu['id'];
@@ -146,7 +233,7 @@ function att_records(array $stu): array {
   return $out;
 }
 
-#Sets up request state and filters
+#Sets up request state and filters[cite: 6]
 $students = $students ?? att_students();
 $q      = trim($_GET['q'] ?? '');
 $dept   = isset($ATT_DEPT_COURSES[$_GET['dept'] ?? '']) ? $_GET['dept'] : null;
@@ -160,7 +247,7 @@ $stu    = $sid && isset($students[$sid]) ? $students[$sid] : null;
 $event  = in_array($_GET['event'] ?? '', $ATT_EVENT_NAMES, true) ? $_GET['event'] : null;
 $year   = in_array((int)($_GET['year'] ?? 0), [2025, 2026], true) ? (int)$_GET['year'] : null;
 
-#Builds query URL parameters
+#Builds query URL parameters[cite: 6]
 function att_url(array $over = []): string {
   global $q, $dept, $course, $view, $stu, $event, $year;
   $p = ['dept' => $dept, 'course' => $course, 'q' => $q ?: null, 'view' => $view === 'list' ? 'list' : null,
@@ -169,7 +256,7 @@ function att_url(array $over = []): string {
   return '?' . http_build_query(array_filter($p, fn($v) => $v !== null && $v !== ''));
 }
 
-#Renders filter dropdown component
+#Renders filter dropdown component[cite: 6]
 function att_dropdown(string $label, string $allText, array $items, $current, string $param, array $extra = []): void {
   echo '<details class="dd"><summary class="dd-btn' . ($current !== null ? ' has-value' : '') . '"><span>' . e($current ?? $label) . '</span>'
      . '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 9v6l-4 2v-8z"/></svg></summary><ul class="dd-menu">';
@@ -180,7 +267,7 @@ function att_dropdown(string $label, string $allText, array $items, $current, st
   echo '</ul></details>';
 }
 
-#Builds student view URL parameters
+#Builds student view URL parameters[cite: 6]
 function sa_url(array $over = []): string {
   global $sa_event, $sa_year;
   $p = ['event' => $sa_event, 'year' => $sa_year];
@@ -188,7 +275,7 @@ function sa_url(array $over = []): string {
   return '?' . http_build_query(array_filter($p, fn($v) => $v !== null && $v !== ''));
 }
 
-#Renders student view dropdown component
+#Renders student view dropdown component[cite: 6]
 function sa_dropdown(string $label, string $allText, array $items, $current, string $param): void {
   echo '<details class="dd"><summary class="dd-btn' . ($current !== null ? ' has-value' : '') . '"><span>' . e($current ?? $label) . '</span>'
      . '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 9v6l-4 2v-8z"/></svg></summary><ul class="dd-menu">';
@@ -199,7 +286,7 @@ function sa_dropdown(string $label, string $allText, array $items, $current, str
   echo '</ul></details>';
 }
 
-#Processes view branch logic and data
+#Processes view branch logic and data[cite: 6]
 if ($attGroup === 'student') {
   $me       = $students[array_key_first($students)] ?? null;
   $sa_all   = $me ? att_records($me) : [];
@@ -229,3 +316,4 @@ if ($attGroup === 'student') {
 
 $GLOBALS['q'] = $q; $GLOBALS['dept'] = $dept; $GLOBALS['course'] = $course; $GLOBALS['view'] = $view;
 $GLOBALS['stu'] = $stu; $GLOBALS['event'] = $event; $GLOBALS['year'] = $year;
+$GLOBALS['currentActiveEvent'] = $currentActiveEvent ?? null;
