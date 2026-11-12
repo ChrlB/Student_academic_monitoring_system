@@ -172,48 +172,6 @@
       </main>
     </div>
   </div>
-  <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const att = document.getElementById('att');
-    const backBtn = att && att.querySelector('.back-btn');
-    if (!backBtn) return;
-
-    const header = document.querySelector('header');
-    const title = header && [...header.querySelectorAll('*')].find(el => !el.children.length && /^\s*ATTENDANCE/i.test(el.textContent));
-
-    if (title) {
-      const link = document.createElement('a');
-      link.className = 'att-back';
-      link.href = backBtn.getAttribute('href');
-      link.title = backBtn.title;
-      link.setAttribute('aria-label', backBtn.title);
-      link.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
-      const node = [...title.childNodes].find(n => n.nodeType === 3 && /ATTENDANCE/i.test(n.nodeValue));
-      const word = node.splitText(node.nodeValue.search(/ATTENDANCE/i));
-      word.splitText(10);
-      word.parentNode.insertBefore(link, word);
-      link.append(word);
-      backBtn.remove();
-    }
-
-    const del = att.querySelector('.icon-btn.del');
-    if (!del) return;
-    att.classList.add('sel-hidden');
-    del.addEventListener('click', e => {
-      if (att.classList.contains('sel-hidden')) {
-        e.preventDefault();
-        att.classList.remove('sel-hidden');
-        return;
-      }
-      const checked = att.querySelectorAll('.rd:checked').length;
-      if (!checked) {
-        e.preventDefault();
-        att.classList.add('sel-hidden');
-        return;
-      }
-      if (!confirm(`Delete ${checked} selected record${checked === 1 ? '' : 's'}?`)) e.preventDefault();
-    });
-  });
-  </script>
+  <script src="<?= BASE_PATH ?>/View/script/attendance.js" defer></script>
 </body>
 </html>
