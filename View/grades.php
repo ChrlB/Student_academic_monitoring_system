@@ -297,9 +297,9 @@ $csrf = $gradesLogic->csrfToken();
 
     .class-scope-btn {
       background: rgba(60,52,65,0.75);
-      min-height: 38px;
-      padding: 10px 12px;
-      margin-top: 4px;
+      min-height: 40px;
+      padding: 10px 20px;
+      margin-top: 20px;
       text-transform: uppercase;
       cursor: pointer;
     }
@@ -315,17 +315,17 @@ $csrf = $gradesLogic->csrfToken();
 
     .preview-toolbar-actions {
       display: flex;
-      align-items: flex-start;
+      align-items: flex-end;
+      flex-direction: column;
       justify-content: flex-end;
-      flex-wrap: wrap;
       gap: 10px;
       min-width: 0;
+      transform: translateY(-40px);
     }
 
     .preview-toolbar .class-scope-btn {
       width: auto;
       min-width: 150px;
-      margin-top: 0;
       flex-shrink: 0;
       white-space: nowrap;
     }
@@ -368,6 +368,7 @@ $csrf = $gradesLogic->csrfToken();
       max-width: 100%;
       min-height: 42px;
       padding: 10px 12px;
+      margin-top: 20px;
       background: rgba(60,52,65,0.75);
       text-transform: uppercase;
       font-size: 0.9rem;
@@ -664,23 +665,6 @@ $csrf = $gradesLogic->csrfToken();
       text-align: center;
     }
 
-    .faculty-grades .grades-add-shell {
-      padding: 0;
-      border: 0;
-      border-radius: 0;
-      background: transparent;
-      box-shadow: none;
-    }
-
-    .faculty-grades .grades-add-panel {
-      min-height: 100%;
-      padding: 12px 18px 18px;
-      border: 0;
-      border-radius: 0;
-      background: transparent;
-      box-shadow: none;
-    }
-
     .faculty-grades .grades-toolbar {
       min-height: 98px;
       margin-bottom: 20px;
@@ -695,6 +679,24 @@ $csrf = $gradesLogic->csrfToken();
       border-radius: 12px;
       background: rgba(255, 255, 255, 0.12);
       box-shadow: 0 5px 14px rgba(24, 14, 27, 0.2);
+    }
+
+    .faculty-grades__profile {
+      display: flex;
+      flex: 0 0 auto;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      color: #fff;
+      font-size: 0.8rem;
+    }
+
+    .faculty-grades .profile_icon {
+      width: 40px;
+      height: 40px;
+      border: 1.5px solid #D9D9D9;
+      border-radius: 50%;
+      object-fit: cover;
     }
 
     .faculty-grades .grades-sidebar {
@@ -788,6 +790,10 @@ $csrf = $gradesLogic->csrfToken();
       border-color: rgba(255, 255, 255, 0.62);
     }
 
+    .faculty-grades .grade-table th,  .faculty-grades .grade-table td{
+      text-align: center;
+    }
+
     @media (max-width: 1100px) {
       .grades-main {
         grid-template-columns: minmax(0, 1fr);
@@ -812,6 +818,7 @@ $csrf = $gradesLogic->csrfToken();
       }
 
       .preview-toolbar-actions {
+        align-items: flex-start;
         justify-content: flex-start;
       }
 
@@ -842,7 +849,7 @@ $csrf = $gradesLogic->csrfToken();
   <?php require_once __DIR__ . "/components/popup_message.php"; ?>
   <div class="row main_box">
     <?php require_once __DIR__ . "/components/navigation.php"; ?>
-    <div class="column" style="flex: 1;">
+    <div class="column" style="flex: 1; min-width: 0;">
       <main class="column scrollbar<?= $isStudentAccount ? ' student-grades-main' : '' ?>">
       <?php if ($_SESSION['role'] === 'student'): ?>
         <section class="student-grades" aria-labelledby="student-grades-title">
@@ -978,6 +985,12 @@ $csrf = $gradesLogic->csrfToken();
                   <small>Manage Student Grades</small>
                 </div>
               </div>
+              <?php if (isset($_SESSION['user'])): ?>
+                <div class="faculty-grades__profile">
+                  <img src="<?= BASE_PATH ?>/get-profile" alt="" class="profile_icon">
+                  <b><?= grades_e($_SESSION['user']) ?></b>
+                </div>
+              <?php endif; ?>
             </div>
 
             <?php if ($flash): ?>

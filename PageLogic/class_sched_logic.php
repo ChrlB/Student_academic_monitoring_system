@@ -6,7 +6,8 @@ if (session_status() === PHP_SESSION_NONE) {
 $_SESSION["page"] = "SCHEDULE";
 require_once __DIR__ . '/../PDAO/DAO.php';
 
-
+// Schedule module. Tables: subject_schedules, enrollment_period, subjects, rooms, faculty, students.
+// subject_schedules.day holds codes: M, T, W, TH, F, S, SU (e.g. MTH).
 class ScheduleLogic
 {
     const WEEK  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -27,22 +28,27 @@ class ScheduleLogic
     public $group;    // manager | faculty | student
     public $userID;
 
+    const DB_HOST = 'localhost';
+    const DB_PORT = 3306;
+    const DB_NAME = 'ams_db2';
+    const DB_USER = 'root';
+    const DB_PASS = '';
+
     public function __construct()
     {
-        global $db_connection;
+        global $db_connection, $pdo, $conn, $db;
 
-        if (isset($db_connection) && $db_connection instanceof PDO) {
-            $this->pdo = $db_connection;
-        } else {
+        foreach ([$db_connection ?? null, $pdo ?? null, $conn ?? null, $db ?? null] as $c) {
+            if ($c instanceof PDO) { $this->pdo = $c; break; }
+        }
+
+        if (!$this->pdo) {
             try {
                 $this->pdo = new PDO(
-                    "mysql:host=localhost;port=3306;dbname=ams_db;charset=utf8mb4",
-                    "root",
-                    "",
-                    [
-                        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                    ]
+                    'mysql:host=' . self::DB_HOST . ';port=' . self::DB_PORT . ';dbname=' . self::DB_NAME . ';charset=utf8mb4',
+                    self::DB_USER,
+                    self::DB_PASS,
+                    [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]
                 );
             } catch (PDOException $e) {
                 error_log('Schedule DB connection failed: ' . $e->getMessage());
@@ -50,12 +56,32 @@ class ScheduleLogic
             }
         }
 
-        $this->role   = strtolower(trim($_SESSION['role'] ?? 'student'));
-        $this->userID = (int)($_SESSION['userID'] ?? 0);
+        $role = self::sessionPick(['role', 'user_role', 'userRole', 'type', 'user_type', 'account_type']);
+        $real = self::sessionPick(['real_userID', 'realUserID']);
+        $this->role = strtolower(trim((string)($role ?? 'student')));
+        if ($real !== null) {
+            $this->userID = (int)$real;
+        } else {
+            $uid = self::sessionPick(['userID', 'user_id', 'userId', 'id', 'studentID', 'student_id', 'facultyID', 'faculty_id']);
+            $this->userID = (int)substr(preg_replace('/\D/', '', (string)$uid), -5);
+        }
         $this->group  = self::roleGroup($this->role);
     }
 
+    // Roles
 
+    private static function sessionPick(array $keys)
+    {
+        foreach ($keys as $k) {
+            if (isset($_SESSION[$k]) && !is_array($_SESSION[$k]) && $_SESSION[$k] !== '') return $_SESSION[$k];
+        }
+        if (isset($_SESSION['user']) && is_array($_SESSION['user'])) {
+            foreach ($keys as $k) {
+                if (isset($_SESSION['user'][$k]) && $_SESSION['user'][$k] !== '') return $_SESSION['user'][$k];
+            }
+        }
+        return null;
+    }
 
     public static function roleGroup($role)
     {
@@ -65,13 +91,15 @@ class ScheduleLogic
         return 'student';
     }
 
-    /** Only the program coordinator and the dean may create or edit schedules. */
+    // Only coordinators and deans can edit.
     public function canManage()
     {
         return (bool)preg_match('/coordinator|dean/', $this->role);
     }
 
-   
+    // Day codes / formatting helpers
+
+    // Day codes or names to a list of weekdays.
     public static function parseDays($raw)
     {
         $found = [];
@@ -125,6 +153,7 @@ class ScheduleLogic
 
     public static function classType($subjectID, $name)
     {
+        if (stripos((string)$name, '(GEC)') !== false || preg_match('/^GEC?\d/i', trim((string)$subjectID))) return 'GEC';
         if (stripos((string)$name, '(LAB)') !== false) return 'LAB';
         if (stripos((string)$name, '(LEC)') !== false) return 'LEC';
         return preg_match('/L$/i', trim((string)$subjectID)) ? 'LAB' : 'LEC';
@@ -132,7 +161,9 @@ class ScheduleLogic
 
     public static function typeLabel($type)
     {
-        return $type === 'LAB' ? 'LABORATORY (LAB)' : 'LECTURE (LEC)';
+        if ($type === 'LAB') return 'LABORATORY (LAB)';
+        if ($type === 'GEC') return 'GENERAL EDUCATION (GEC)';
+        return 'LECTURE (LEC)';
     }
 
     public static function semesterLabel($acad, $sem)
@@ -146,7 +177,7 @@ class ScheduleLogic
         return ucwords(strtolower(trim((string)$s)));
     }
 
-    
+    // Lookups for dropdowns
 
     private function all($sql, array $params = [])
     {
@@ -170,14 +201,29 @@ class ScheduleLogic
         return $rows;
     }
 
-    /** Returns a valid "acad|sem" key, falling back to the newest semester. */
+    // Valid semester key, else the default.
     public function selectedSemester($requested)
     {
         $list = $this->semesters();
         foreach ($list as $s) {
             if ($s['key'] === $requested) return $requested;
         }
-        return $list ? $list[0]['key'] : '';
+        if (!$list) return '';
+
+        $sql = "SELECT DISTINCT ep.acad_year, ep.sem
+                FROM subject_schedules ss
+                JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID";
+        $params = [];
+        if ($this->group === 'faculty') {
+            $sql .= " WHERE ss.facultyID = :uid";
+            $params[':uid'] = $this->userID;
+        } elseif ($this->group === 'student') {
+            $sql .= self::STUDENT_JOIN . " WHERE st.studentID = :uid";
+            $params[':uid'] = $this->userID;
+        }
+        $sql .= " ORDER BY ep.acad_year DESC, ep.sem DESC LIMIT 1";
+        $with = $this->all($sql, $params);
+        return $with ? $with[0]['acad_year'] . '|' . $with[0]['sem'] : $list[0]['key'];
     }
 
     public static function splitSemester($key)
@@ -186,7 +232,7 @@ class ScheduleLogic
         return [$p[0] ?? '', (int)($p[1] ?? 0)];
     }
 
-    /** Program + block pairs, value = "BSCS|1A", label = "BSCS 1A". */
+    // Program + block pairs.
     public function blocks()
     {
         $rows = $this->all(
@@ -232,7 +278,11 @@ class ScheduleLogic
         return $r[0] ?? null;
     }
 
-    
+    // Schedule reads
+
+    // Students see every class of their own program + block.
+    const STUDENT_JOIN = " JOIN students st ON st.program = ep.program AND st.block = ss.block";
+
     const BASE_SELECT =
         "SELECT ss.schedID, ss.subjectID, s.name AS subject_name, ss.facultyID,
                 CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
@@ -254,7 +304,7 @@ class ScheduleLogic
         return $r;
     }
 
-    /** Role-filtered schedules for one semester ("acad|sem"). Manager view can filter by block text. */
+    // Schedules for one semester, filtered by role.
     public function schedules($semKey, $search = '')
     {
         list($acad, $sem) = self::splitSemester($semKey);
@@ -265,14 +315,21 @@ class ScheduleLogic
             $sql .= " AND ss.facultyID = :uid";
             $params[':uid'] = $this->userID;
         } elseif ($this->group === 'student') {
-            $st = $this->studentInfo();
-            if (!$st) return [];
-            $sql .= " AND ep.program = :prog AND ss.block = :blk";
-            $params[':prog'] = $st['program'];
-            $params[':blk']  = $st['block'];
-        } elseif ($search !== '') {
-            $sql .= " AND CONCAT(ep.program, ss.block) LIKE :q";
-            $params[':q'] = '%' . str_replace([' ', '%', '_'], '', $search) . '%';
+            $sql = preg_replace('/^SELECT /', 'SELECT DISTINCT ', self::BASE_SELECT)
+                 . self::STUDENT_JOIN
+                 . " WHERE ep.acad_year = :ay AND ep.sem = :sem AND st.studentID = :uid";
+            $params[':uid'] = $this->userID;
+        }
+
+        if ($search !== '') {
+            if ($this->group === 'manager') {
+                $sql .= " AND CONCAT(ep.program, ss.block) LIKE :q";
+                $params[':q'] = '%' . str_replace([' ', '%', '_'], '', $search) . '%';
+            } else {
+                $sql .= " AND (ss.subjectID LIKE :q OR s.name LIKE :q OR ss.roomID LIKE :q OR ss.block LIKE :q
+                               OR CONCAT(f.first_name, ' ', f.last_name) LIKE :q)";
+                $params[':q'] = '%' . str_replace(['%', '_'], '', $search) . '%';
+            }
         }
 
         $sql .= " ORDER BY ss.time_start, ss.schedID";
@@ -285,7 +342,7 @@ class ScheduleLogic
         return $rows ? $this->decorate($rows[0]) : null;
     }
 
-    /** Groups rows into Monday..Sunday buckets (a row with several days appears in each). */
+    // Group rows by weekday.
     public function week(array $rows)
     {
         $w = array_fill_keys(self::WEEK, []);
@@ -295,19 +352,17 @@ class ScheduleLogic
         return $w;
     }
 
-    /** Paginated, searchable roster for a class. */
+    // Paginated student roster.
     public function classStudents(array $row, $q, $page, $per = 6)
     {
-        $where  = "es.subjectID = :sub AND es.enrollmentID = :eid AND es.status = 'approved'
-                   AND st.program = :prog AND st.block = :blk";
-        $params = [':sub' => $row['subjectID'], ':eid' => $row['enrollmentID'],
-                   ':prog' => $row['program'], ':blk' => $row['block']];
+        $where  = "st.program = :prog AND st.block = :blk";
+        $params = [':prog' => $row['program'], ':blk' => $row['block']];
         if ($q !== '') {
             $where .= " AND (CAST(st.studentID AS CHAR) LIKE :q
                          OR CONCAT(st.last_name, ', ', st.first_name, ' ', st.middle_name) LIKE :q)";
             $params[':q'] = '%' . $q . '%';
         }
-        $from = "FROM enrolled_subjects es JOIN students st ON st.studentID = es.studentID WHERE $where";
+        $from = "FROM students st WHERE $where";
 
         $total = (int)($this->all("SELECT COUNT(DISTINCT st.studentID) AS n $from", $params)[0]['n'] ?? 0);
         $pages = max(1, (int)ceil($total / $per));
@@ -326,7 +381,7 @@ class ScheduleLogic
         return ['rows' => $rows, 'total' => $total, 'page' => $page, 'pages' => $pages, 'offset' => $off];
     }
 
-   
+    // Writes
 
     private function normTime($t)
     {
@@ -365,6 +420,7 @@ class ScheduleLogic
         return array_values(array_unique($out));
     }
 
+    // Create (id null) or update a schedule.
     public function save($id, array $in)
     {
         $errors = [];
@@ -431,6 +487,7 @@ class ScheduleLogic
         return ['ok' => true, 'errors' => []];
     }
 
+    // Request handling (POST -> redirect -> GET), flash + CSRF
 
     public function csrf()
     {
@@ -460,7 +517,19 @@ class ScheduleLogic
         exit;
     }
 
-    /** Call before any output. */
+    public function delete($id)
+    {
+        try {
+            $st = $this->pdo->prepare("DELETE FROM subject_schedules WHERE schedID = :id");
+            $st->execute([':id' => (int)$id]);
+            return $st->rowCount() > 0;
+        } catch (PDOException $e) {
+            error_log('Schedule delete failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    // Run before any output.
     public function handlePost()
     {
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') return;
@@ -496,6 +565,15 @@ class ScheduleLogic
             $_SESSION['sched_old']   = $_POST;
             $_SESSION['sched_flash'] = ['type' => !empty($res['conflict']) ? 'conflict' : 'error', 'msgs' => $res['errors']];
             $this->go($self, ['view' => 'edit', 'id' => $id]);
+        }
+
+        if ($action === 'delete' && $id > 0) {
+            $row = $this->find($id);
+            $ok  = $row && $this->delete($id);
+            $_SESSION['sched_flash'] = $ok
+                ? ['type' => 'ok', 'msgs' => ['Schedule deleted.']]
+                : ['type' => 'error', 'msgs' => ['Could not delete the schedule.']];
+            $this->go($self, $row ? ['sem' => $row['acad_year'] . '|' . $row['sem']] : []);
         }
 
         $this->go($self, []);
