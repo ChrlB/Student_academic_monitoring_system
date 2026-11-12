@@ -26,6 +26,9 @@ $attStudentKey = ($attGroup === 'student' && preg_match('/^(\d{4})(\d{5})$/', $a
 
 $_SESSION["page"] = ($attGroup === 'student') ? "ATTENDANCE | Student" : "ATTENDANCE | Faculty";
 
+#While testing: true shows the real database error in the scan popup. Set to false before going live.
+const ATT_DEBUG = true;
+
 #Handles record deletion (Fixed to use attendanceID primary key)
 if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['att_action'] ?? '') === 'delete') {
   if (session_status() !== PHP_SESSION_ACTIVE) session_start();
@@ -87,8 +90,8 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
     $row = $chk->fetch(PDO::FETCH_ASSOC);
 
     if (!$row) {
-      // attendance.userID is the faculty/manager who scanned
-      $db_connection->prepare("INSERT INTO attendance (eventID, userID, studentID, timein) VALUES (?, ?, ?, NOW())")
+      // attendance.facultyID is the faculty/manager who scanned
+      $db_connection->prepare("INSERT INTO attendance (eventID, facultyID, studentID, timein) VALUES (?, ?, ?, NOW())")
                     ->execute([$eventID, $attFacultyID, $studentID]);
       $respond('success', "Time-in logged for $who.", ['type' => 'timein']);
     }
@@ -101,7 +104,7 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
     $respond('info', "$who has already completed time-in and time-out for this event.");
   } catch (Exception $e) {
     error_log('Attendance scan failed: ' . $e->getMessage());
-    $respond('error', 'Database error. Please try again.');
+    $respond('error', ATT_DEBUG ? 'Database error: ' . $e->getMessage() : 'Database error. Please try again.');
   }
 }
 
