@@ -33,7 +33,8 @@
   width: 60px;
   height: 100%;
   /* height: 95vh; */
-  overflow-x: hidden;
+  overflow: hidden;
+  
   
   background-color: rgba(0, 0,0, 0.2);
   margin-right: 0px;
@@ -112,6 +113,8 @@
   
 }
 .navbar:hover{
+  overflow-y: auto;
+  scrollbar-width: thin;
   width: 200px;
   height: 100%;
   .nav_logo{

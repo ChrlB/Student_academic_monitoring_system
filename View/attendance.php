@@ -1,5 +1,6 @@
 <?php
   require_once __DIR__."/../PageLogic/attendance_logic.php";
+  require_once __DIR__."/components/qr_modal.php";
 ?>
 
 <!DOCTYPE html>
@@ -8,22 +9,24 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS - Attendance</title>
-  <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
-<link rel="stylesheet" href="<?= BASE_PATH?>/View/style/general.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="<?= BASE_PATH?>/View/style/attendance.css">
+    <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
+  <link rel="stylesheet" href="<?= BASE_PATH?>/View/style/general.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="<?= BASE_PATH?>/View/style/attendance.css">
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 
 <body>
   <?php require_once __DIR__."/components/popup_message.php"; ?>
   <div class="row main_box">
+    
     <?php require_once __DIR__."/components/navigation.php"; ?>
     <div class="column" style="flex: 1; min-width: 0;">
       <?php require_once __DIR__."/components/header.php"; ?>
       <main class="column scrollbar att-main">
-<div class="att<?= $attGroup === 'student' ? ' student' : '' ?>" id="att">
+<div class="att<?= $attGroup === 'student' ? ' student' : '' ?>" id="att" data-qr="<?= e(BASE_PATH) ?>/attendance-qr" data-qr-icon="<?= BASE_PATH ?>/View/resources/qr.png">
 <?php if ($attGroup === 'student'): /* =============== STUDENT VIEW (read-only) =============== */ ?>
   <section class="view">
     <div class="detail-head">
