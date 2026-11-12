@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 12, 2026 at 12:32 PM
+-- Generation Time: Nov 12, 2026 at 12:53 PM
 -- Server version: 8.0.34
 -- PHP Version: 8.2.12
 
@@ -455,6 +455,8 @@ INSERT INTO `rooms` (`roomID`, `status`) VALUES
 
 CREATE TABLE `students` (
   `studentID` int UNSIGNED NOT NULL,
+  `qr_image_data` mediumblob,
+  `qr_mime_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `first_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `middle_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
   `last_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -487,9 +489,9 @@ CREATE TABLE `students` (
 -- Dumping data for table `students`
 --
 
-INSERT INTO `students` (`studentID`, `first_name`, `middle_name`, `last_name`, `password`, `folderID`, `program`, `date_created`, `year_level`, `block`, `address`, `number`, `date_of_birth`, `gender`, `image_data`, `mime_type`, `status`, `email`, `place_of_birth`, `civil_status`, `sexual_orientation`, `citizenship`, `religion`, `region`, `province`, `municipality`, `zip_code`) VALUES
-(1, 'fred', 'martinez', 'cruz', '$2y$10$lUbCRz5DEY3CM9FI17WS.u0uJ.Uqvli9VsqrPTkE2UlA94rP3f9uO', NULL, 'BSCS', '2026-10-27 00:00:00', 1, '1A', 'olongapo city', '090909090', '2026-10-29', 'male', NULL, NULL, 'active', '', '', '', '', '', '', '', '', '', ''),
-(2, 'irish', 'werty', 'james', '$2y$10$lUbCRz5DEY3CM9FI17WS.u0uJ.Uqvli9VsqrPTkE2UlA94rP3f9uO', NULL, 'BSCS', '2026-11-02 00:00:00', 1, '1A', 'subic', '0909090909', '2006-10-29', 'female', NULL, NULL, 'active', '', '', '', '', '', '', '', '', '', '');
+INSERT INTO `students` (`studentID`, `qr_image_data`, `qr_mime_type`, `first_name`, `middle_name`, `last_name`, `password`, `folderID`, `program`, `date_created`, `year_level`, `block`, `address`, `number`, `date_of_birth`, `gender`, `image_data`, `mime_type`, `status`, `email`, `place_of_birth`, `civil_status`, `sexual_orientation`, `citizenship`, `religion`, `region`, `province`, `municipality`, `zip_code`) VALUES
+(1, NULL, NULL, 'fred', 'martinez', 'cruz', '$2y$10$lUbCRz5DEY3CM9FI17WS.u0uJ.Uqvli9VsqrPTkE2UlA94rP3f9uO', NULL, 'BSCS', '2026-10-27 00:00:00', 1, '1A', 'olongapo city', '090909090', '2026-10-29', 'male', NULL, NULL, 'active', '', '', '', '', '', '', '', '', '', ''),
+(2, NULL, NULL, 'irish', 'werty', 'james', '$2y$10$lUbCRz5DEY3CM9FI17WS.u0uJ.Uqvli9VsqrPTkE2UlA94rP3f9uO', NULL, 'BSCS', '2026-11-02 00:00:00', 1, '1A', 'subic', '0909090909', '2006-10-29', 'female', NULL, NULL, 'active', '', '', '', '', '', '', '', '', '', '');
 
 -- --------------------------------------------------------
 
