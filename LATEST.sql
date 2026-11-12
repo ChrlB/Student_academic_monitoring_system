@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 12, 2026 at 12:53 PM
+-- Generation Time: Nov 12, 2026 at 01:24 PM
 -- Server version: 8.0.34
 -- PHP Version: 8.2.12
 
@@ -48,7 +48,7 @@ INSERT INTO `adviser_student` (`id`, `facultyID`, `studentID`) VALUES
 --
 
 CREATE TABLE `attendance` (
-  `ID` int NOT NULL,
+  `attendanceID` int NOT NULL,
   `eventID` int NOT NULL,
   `facultyID` int UNSIGNED NOT NULL,
   `studentID` int NOT NULL,
@@ -785,7 +785,7 @@ ALTER TABLE `adviser_student`
 -- Indexes for table `attendance`
 --
 ALTER TABLE `attendance`
-  ADD PRIMARY KEY (`ID`,`eventID`,`studentID`),
+  ADD PRIMARY KEY (`attendanceID`,`eventID`,`studentID`),
   ADD KEY `fk_attendance_event_idx` (`eventID`),
   ADD KEY `facultyID` (`facultyID`);
 
@@ -999,7 +999,7 @@ ALTER TABLE `adviser_student`
 -- AUTO_INCREMENT for table `attendance`
 --
 ALTER TABLE `attendance`
-  MODIFY `ID` int NOT NULL AUTO_INCREMENT;
+  MODIFY `attendanceID` int NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `enrolled_subjects`
