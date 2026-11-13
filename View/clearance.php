@@ -102,7 +102,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <b class="view_title">CLEARANCE UPDATES</b>
               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
-            <div class="updates_frame2  drop_shadow">
+            <div class="updates_frame2  ">
               <table class="updates_table">
                 <thead style="position: relative;z-index: 1;">
                   <tr>
@@ -163,9 +163,9 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 
                 <form class="row clearance_box  drop_shadow" action="<?= BASE_PATH ?>/clearance" method="get">
                   <div class="column">
-                    <b style="font-size: 50px;"><?= $subject["subjectID"].' - '.$subject["name"] ?></b>
-                    <b style="font-size: 30px;"><?= $subject["prof_name"] ?></b>
-                    <b style="font-size: 30px;"><?= $subject["room"] ?></b>
+                    <b style="font-size: 30px;"><?= $subject["subjectID"].' - '.$subject["name"] ?></b>
+                    <b style="font-size: 20px;"><?= $subject["prof_name"] ?></b>
+                    <b style="font-size: 20px;"><?= $subject["room"] ?></b>
                   </div>
                   <div >
                     <input type="hidden" name="view" value="SUBJECT-REQUIREMENTS">
@@ -361,8 +361,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 
                 <form class="row clearance_box" action="<?= BASE_PATH ?>/clearance" method="get">
                   <div class="column">
-                    <b style="font-size: 50px;"><?= strtoupper($faculty["role"]) ?></b>
-                    <b style="font-size: 30px;"><?= $faculty["prof_name"] ?></b>
+                    <b style="font-size: 30px;"><?= strtoupper($faculty["role"]) ?></b>
+                    <b style="font-size: 20px;"><?= $faculty["prof_name"] ?></b>
                   </div>
                   <div >
                     <button type="submit" onclick="this.form.submit()" style="background-color: transparent; border:0px;">
@@ -549,8 +549,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 
                 <form class="row clearance_box" action="<?= BASE_PATH ?>/clearance" method="get">
                   <div class="column">
-                    <b style="font-size: 50px;"><?= strtoupper($office["name"]) ?></b>
-                    <b style="font-size: 30px;"><?= strtoupper($office["prof_name"]) ?></b>
+                    <b style="font-size: 30px;"><?= strtoupper($office["name"]) ?></b>
+                    <b style="font-size: 20px;"><?= strtoupper($office["prof_name"]) ?></b>
                   </div>
                   <div >
                     <button type="submit" onclick="this.form.submit()" style="background-color: transparent; border:0px;">
@@ -571,8 +571,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             </div>
             <div class="row subject_container">
               <div class="column">
-                <b>NAME: <?= $office_info[0]["name"] ?></b>
-                <b>ROLE: <?= $office_info[0]["prof_name"]?></b>
+                <b>NAME: <?= $office_info[0]["role"] ?></b>
+                <b>ROLE: <?= $office_info[0]["name"]?></b>
                 
                 
               </div>
@@ -598,12 +598,12 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <div class="row" style="gap:20px; flex-wrap:wrap; justify-content:center" >
                 <?php foreach($office_info as $requirement): if ($requirement["file_name"] === null) continue;?>
                   <div class="row file_container"  >
-                    <div class="row" style="align-items:center;">
+                    <div class="row" style="align-items:center; overflow:hidden">
                       <img src="<?= BASE_PATH?>/View/resources/Document.png" alt="" class="file_icons">
-                      <b><?= $requirement["file_name"]?></b>
+                      <b class="filename"><?= $requirement["file_name"]?></b>
                     </div>
                     
-                    <b><?= $requirement['file_size'] ?></b>
+                    <b class="file_size"><?= $requirement['file_size'] ?></b>
                     <!-- <div class="row" style="align-items:center;">
                       <a href=""><img src="<= BASE_PATH?>/View/resources/Eye.png" alt="" class="file_icons"></a>
                       <a href=""><img src="<= BASE_PATH?>/View/resources/Download.png" alt="" class="file_icons"></a>
@@ -717,7 +717,9 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           
 
         <?php elseif (in_array($_SESSION["role"], ["prof","dean","program coordinator","registrar"])):?>
-          <?php if ($student_view == "MAIN"): ?>
+          <?php if($student_view == "MAIN"): ?>
+
+            
 
             <?php $offices = getOffices(); if(count($offices) > 0): ?>
               <b class="view_title">OFFICE</b>
@@ -736,24 +738,6 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
             <?php endif ?>
 
-
-            <?php $subjects_handling = getSubjects(); if(count($subjects_handling) > 0): ?>
-              <b class="view_title">SUBJECTS</b>
-              <div class="row" style=" gap:20px; flex-wrap: wrap; width:100%">
-                <?php foreach($subjects_handling as $subject):?>
-                  <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
-                    <img src="<?= BASE_PATH ?>/View/resources/image1.png" class="clearance_categ_box_upper_part">
-                    
-                    <div class="clearance_categ_box_buttom_part column">
-                      <b><?php echo $subject['subjectID'] ?></b>
-                    </div>
-                    <input type="hidden" name="view" value="SUBJECT">
-                  </form>
-                <?php endforeach?>
-              </div>
-              
-            <?php endif ?>
-
             <?php if(in_array($_SESSION["role"],["dean","program coordinator"])): ?>
               <b class="view_title">FACULTY</b>
               <div class="row" style=" gap:20px; flex-wrap: wrap; width:100%">
@@ -768,6 +752,77 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               </div>
               
             <?php endif ?>
+
+
+            <?php $subjects_handling = getSubjects(); $filtered_subjects_handling = getSubjects($department,$search,$block,$year); ?>
+              
+              
+              <form class="column" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
+                <input type="hidden" name="view" value="MAIN">
+                <div class="row" style="gap:60px;">
+                  <b class="view_title">SUBJECTS</b>
+                  <div class="row searchbar_frame " style="width: max-content;">
+                    <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($search === "ALL" ? '':$search) ?>">
+                    <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
+                        <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons" style="padding:5px">
+                    </button>
+                  </div>
+                </div>
+                
+
+                <div class="row" style="gap: 20px; align-items:center; " >
+                  DEPT
+                  <select name="filter" class="filter" onchange="this.form.submit()">
+                    
+                    <?php $options = []; foreach( $subjects_handling as $subject): if(!in_array($subject["department"],$options)): $options[] = $subject["department"];?>
+                      <option  value="<?= $subject["department"] ?>" <?php if($department == $subject["department"]) echo 'selected'?>><?= $subject["department"] ?></option>
+                    <?php endif; endforeach ?>
+                  </select>
+                  
+                  BLOCK
+                  <select name="blockfilter" class="filter" onchange="this.form.submit()">
+                    <option  value="ALL" <?php if($block == $subject["block"]) echo 'selected'?>>ALL</option>
+                    <?php $options = []; foreach( $subjects_handling as $subject): if(!in_array($subject["block"],$options)): $options[] = $subject["block"];?>
+                      <option  value="<?= $subject["block"] ?>" <?php if($block == $subject["block"]) echo 'selected'?>><?= $subject["block"] ?></option>
+                    <?php endif; endforeach ?>
+                  </select>
+
+                  YEAR
+                  <select name="yearfilter" class="filter" onchange="this.form.submit()">
+                    <option  value="ALL" <?php if($year == $subject["year"]) echo 'selected'?>>ALL</option>
+                    <?php $options = []; foreach( $subjects_handling as $subject): if(!in_array($subject["year"],$options)): $options[] = $subject["year"];?>
+                      <option  value="<?= $subject["year"] ?>" <?php if($year == $subject["year"]) echo 'selected'?>><?= $subject["year"] ?></option>
+                    <?php endif; endforeach ?>
+                  </select>
+
+                  PROGRAM
+                  <select name="programfilter" class="filter" onchange="this.form.submit()">
+                    <?php $options = []; foreach( $subjects_handling as $subject): if(!in_array($subject["program"],$options)): $options[] = $subject["program"];?>
+                      <option  value="<?= $subject["program"] ?>" <?php if($program == $subject["program"]) echo 'selected'?>><?= $subject["program"] ?></option>
+                    <?php endif; endforeach ?>
+                  </select>
+                </div >
+                
+              </form>
+
+              <div class="row" style=" gap:20px; flex-wrap: wrap; width:100%; ">
+                <?php foreach($filtered_subjects_handling as $subject):?>
+                  <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
+                    <img src="<?= BASE_PATH ?>/View/resources/image1.png" class="clearance_categ_box_upper_part">
+                    
+                    <div class="clearance_categ_box_buttom_part column">
+                      <b><?php echo $subject['subjectID'] ?></b>
+                    </div>
+                    <input type="hidden" name="view" value="SUBJECT">
+                    <input type="hidden" name="subject" value="<?=  $subject['subjectID'] ?>">
+                  </form>
+                <?php endforeach?>
+                
+              </div>
+              
+            
+
+            
             
             subject
             <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
@@ -801,8 +856,25 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             </form>
 
           
+          
           <?php elseif($student_view == "OFFICE"): ?>
           <?php elseif($student_view == "SUBJECT"): ?>
+            <?php $offices = getOffices(); if(count($offices) > 0): ?>
+              <b class="view_title">OFFICE</b>
+              <div class="row" style=" gap:20px; flex-wrap: wrap; width:100%">
+                <?php foreach($offices as $office):?>
+                  <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
+                    <img src="<?= BASE_PATH ?>/View/resources/image1.png" class="clearance_categ_box_upper_part">
+                    
+                    <div class="clearance_categ_box_buttom_part column">
+                      <b><?php echo $office['name'] ?></b>
+                    </div>
+                    <input type="hidden" name="view" value="OFFICE">
+                  </form>
+                <?php endforeach?>
+              </div>
+
+            <?php endif ?>
           <?php elseif($student_view == "FACULTY"): ?>
 
           <?php endif ?>
