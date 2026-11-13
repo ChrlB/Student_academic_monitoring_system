@@ -29,7 +29,7 @@ class ScheduleLogic
 
     const DB_HOST = 'localhost';
     const DB_PORT = 3306;
-    const DB_NAME = 'ams_db2';
+    const DB_NAME = 'ams_db';
     const DB_USER = 'root';
     const DB_PASS = '';
 

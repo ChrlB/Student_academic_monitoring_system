@@ -58,7 +58,7 @@ class EnrollmentLogic
             $this->pdo = $db_connection;
         } else {
             $this->pdo = new PDO(
-                "mysql:host=localhost;port=3306;dbname=ams_db2;charset=utf8mb4",
+                "mysql:host=localhost;port=3306;dbname=ams_db;charset=utf8mb4",
                 "root",
                 "",
                 [
