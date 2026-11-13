@@ -665,8 +665,12 @@ $userDAO->prepareStatement("updateStudentPassword",
             SS.`block`,
             F.date_created,
             S.department,
+            S.name,
             SY.year,
-            SY.program
+            SY.program,
+            EP.acad_year,
+            EP.sem,
+            concat(EP.acad_year,' - ',EP.sem,' sem') as acad_year_sem
         FROM `subject_schedules` AS SS
             inner join faculty AS F
             ON F.facultyID = SS.facultyID
@@ -674,12 +678,62 @@ $userDAO->prepareStatement("updateStudentPassword",
             ON S.subjectID = SS.`subjectID`
             inner join syllabus AS SY
             ON SY.subjectID = SS.`subjectID`
+            inner join enrollment_period AS EP
+            ON EP.enrollmentID = SS.`enrollmentID`
         WHERE 
             (S.department = ? OR 'ALL' = ?)
             AND (SS.`subjectID` = ? OR 'ALL' = ?)
             AND ( SS.`block` = ? OR 'ALL' = ?)
             AND ( SY.year = ? OR 'ALL' = ?)
+            AND ( concat(EP.acad_year,' - ',EP.sem) = ? OR 'ALL' = ?)
             AND CONCAT('F', YEAR(F.date_created), LPAD(SS.facultyID, 5, '0')) = ?;
+           
+    ");
+
+    $clearanceDAO->prepareStatement("getStudentsForSubjectClearance","SELECT 
+            (ES.`enrolled_subjectID`) as enrolled_subjectID,
+            ES.`enrollmentID`,
+            CONCAT( YEAR(ST.date_created), LPAD( ES.`studentID`, 5, '0')) as studentID,
+            CONCAT(ST.last_name, ', ', ST.first_name,' ',ST.middle_name) as student_name,
+            ES.`subjectID`,
+            ES.`midterm_grade`,
+            ES.`final_grade`,
+            IFNULL(SC.`status`, 'Not Yet Cleared') AS status,
+            SS.`block`,
+            S.department,
+            S.name,
+            SY.year,
+            SY.program,
+            EP.acad_year,
+            EP.sem,
+            IFNULL(SC.date_cleared, 'Not Yet Cleared') AS date_cleared,
+            concat(EP.acad_year,' - ',EP.sem,' sem') as acad_year_sem
+        FROM `enrolled_subjects` AS ES
+            INNER JOIN students AS ST
+                ON ST.studentID = ES.`studentID`
+            INNER JOIN subjects AS S
+                ON S.subjectID = ES.`subjectID`
+            INNER JOIN syllabus AS SY
+                ON SY.subjectID = ES.`subjectID`
+                AND SY.program = ST.program
+            INNER JOIN enrollment_period AS EP
+                ON EP.enrollmentID = ES.`enrollmentID`
+            INNER JOIN `subject_schedules` AS SS
+                ON SS.enrollmentID = ES.`enrollmentID`
+                AND SS.subjectID = ES.`subjectID`
+            INNER JOIN faculty AS F
+                ON F.facultyID = SS.facultyID
+            LEFT JOIN subject_clearance AS SC
+                ON SC.enrolled_subjectID = ES.`enrolled_subjectID`
+        WHERE 
+            (S.department = ? OR 'ALL' = ?)
+            AND (ES.`subjectID` = ? OR 'ALL' = ?)
+            AND ( SS.`block` = ? OR 'ALL' = ?)
+            AND ( SY.year = ? OR 'ALL' = ?)
+            AND ( concat(EP.acad_year,' - ',EP.sem) = ? OR 'ALL' = ?)
+            AND CONCAT('F', YEAR(F.date_created), LPAD(SS.facultyID, 5, '0')) = ?;
+
+
     ");
 }
 

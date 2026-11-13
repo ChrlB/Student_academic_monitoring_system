@@ -15,7 +15,7 @@ $department = 'ALL';
 $block = 'ALL';
 $year = 'ALL';
 $program = 'ALL';
-
+$acadyear = 'ALL';
 
 $allowedViews = ($_SESSION["role"] == 'student')
     ? ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE', 'UPDATES', 'SUBJECT-REQUIREMENTS','FACULTY-REQUIREMENTS','OFFICE-REQUIREMENTS']
@@ -57,11 +57,14 @@ if($_SESSION["role"] == "student"){
 
     $program = trim($_GET['programfilter'] ?? '');
     if ($program === '') { $program = 'ALL'; }  
+
+    $acadyear = trim($_GET['acadyearfilter'] ?? '');
+    if ($acadyear === '') { $acadyear = 'ALL'; }
     
     // echo $subjectID.$status;
 // }elseif(in_array($student_view, ["SUBJECT-REQUIREMENTS", "FACULTY-REQUIREMENTS", "OFFICE-REQUIREMENTS"])){
 //     $search = trim($_GET['search'] ?? '');
-// }
+// }    
 
 function statusClass(string $status): string{
     return strtoupper($status) === 'CLEARED' ? 'status_cleared' : 'status_rejected';
@@ -167,7 +170,7 @@ function getOffices(){
     return $records;
 }
 
-function getSubjects($department = 'ALL', $subjectID = 'ALL',$block = 'ALL',$year = 'ALL'){
+function getSubjects($department = 'ALL', $subjectID = 'ALL',$block = 'ALL',$year = 'ALL',$acad_year = 'ALL'){
     global $clearanceDAO;
 
     $records = $clearanceDAO->executeQuery("getSubjects",[
@@ -175,6 +178,21 @@ function getSubjects($department = 'ALL', $subjectID = 'ALL',$block = 'ALL',$yea
         $subjectID,$subjectID,
         $block,$block, 
         $year,$year,
+        $acad_year,$acad_year,
+        $_SESSION['userID']]);
+
+    return $records;
+}
+
+function getStudentsForSubjectClearance($department = 'ALL', $subjectID = 'ALL',$block = 'ALL',$year = 'ALL',$acad_year = 'ALL'){
+    global $clearanceDAO;
+
+    $records = $clearanceDAO->executeQuery("getStudentsForSubjectClearance",[
+        $department,$department,
+        $subjectID,$subjectID,
+        $block,$block, 
+        $year,$year,
+        $acad_year,$acad_year,
         $_SESSION['userID']]);
 
     return $records;
