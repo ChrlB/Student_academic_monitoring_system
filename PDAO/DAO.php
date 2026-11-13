@@ -10,7 +10,7 @@ $options = [
   PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
 ];
 
-$db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root", "", $options);
+$db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db2", "root", "", $options);
 
 
 $userDAO = new PHPDAO($db_connection);
@@ -62,7 +62,7 @@ $prospectus = "SELECT
       `s`.`year` AS `year`
   FROM
       `syllabus` AS `s`
-  LEFT JOIN `ams_db`.`subject_prerequisite` AS `sp`
+  LEFT JOIN `ams_db2`.`subject_prerequisite` AS `sp`
   ON
       `sp`.`subjectID` = `s`.`subjectID`
   GROUP BY
