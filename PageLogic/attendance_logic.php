@@ -37,7 +37,10 @@ if ($attGroup !== 'student') {
   elseif (strpos($attRole, 'admin')       !== false) $attPos = 'admin';
   else                                               $attPos = 'faculty';
 }
-$attCanEdit   = in_array($attPos, ['coordinator', 'admin'], true);   // add / edit / delete
+$attLabels = ['coordinator' => 'Coordinator', 'dean' => 'Dean', 'registrar' => 'Registrar', 'admin' => 'Admin'];
+$attLabel  = strtoupper(($attGroup === 'student') ? 'Student' : ($attLabels[$attPos] ?? (ucwords($attRole) ?: 'Faculty')));
+$_SESSION["page"] = "ATTENDANCE | " . $attLabel;
+$attCanEdit   = in_array($attPos, ['coordinator', 'admin', 'dean', 'faculty'], true);   // add / edit / delete
 $attMyProgram = null; $attMyDept = null;
 if ($attGroup !== 'student' && $attFacultyID > 0) {
   $fq = $db_connection->prepare("SELECT program, department FROM faculty WHERE facultyID = ?");
@@ -47,9 +50,9 @@ if ($attGroup !== 'student' && $attFacultyID > 0) {
   $attMyDept    = $fr['department'] ?? null;
 }
 $attCanScan   = in_array($attPos, ['coordinator', 'faculty', 'dean'], true);
-$attScoped = ($attPos === 'coordinator' && $attMyProgram);
+$attScoped = false;
 $evpage    = ($attGroup !== 'student' && !empty($_GET['events']));
-if ($evpage) $_SESSION["page"] = "EVENTS | Faculty";
+if ($evpage) $_SESSION["page"] = "EVENTS | " . $attLabel;
 
 #The functions below read these through $GLOBALS
 $GLOBALS['attPos'] = $attPos; $GLOBALS['attCanEdit'] = $attCanEdit; $GLOBALS['attScoped'] = $attScoped;
@@ -66,7 +69,7 @@ const ATT_EVENT_STATUSES = ['ACTIVE', 'INACTIVE', 'FINISHED', 'RESCHEDULE', 'PEN
 if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['att_action'] ?? '') === 'delete') {
   if (session_status() !== PHP_SESSION_ACTIVE) session_start();
   if (!$attCanEdit) {
-    $_SESSION['error'] = 'Only a program coordinator can delete attendance records.';
+    $_SESSION['error'] = 'You are not allowed to delete attendance records.';
     header('Location: '.($_SERVER['REQUEST_URI'] ?? ''));
     exit;
   }
@@ -422,7 +425,7 @@ function att_events(): array {
 function att_handle_event_action(PDO $db, string $act): void {
   global $attCanEdit, $attScoped, $attMyProgram, $attMyDept;
   if (!$attCanEdit) {
-    $_SESSION['error'] = 'Only a program coordinator can add, edit or delete events.';
+    $_SESSION['error'] = 'You are not allowed to add, edit or delete events.';
     return;
   }
   try {
