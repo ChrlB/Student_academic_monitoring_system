@@ -5,7 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* ---------- 1. QR button, to the left of the profile ---------- */
   const profile = header && header.querySelector('.profile_icon')?.closest('.column');
-  if (profile && !header.querySelector('.att-qr')) {
+  const canQr = !att || att.dataset.canQr !== '0';
+  if (canQr && profile && !header.querySelector('.att-qr')) {
     const group = document.createElement('div');
     group.className = 'att-hright';
 

@@ -18,18 +18,17 @@ function att_role_group(string $role): string {
 
 $attRole   = strtolower(trim($_SESSION['role'] ?? 'student'));
 $attUserRaw    = (string)($_SESSION['userID'] ?? '');
-// faculty userID = "F" + year + 5-digit facultyID (F202400012); students = year + 5-digit studentID (202600001)
 $attGroup  = att_role_group($attRole);          
-// real_userID is the numeric facultyID (DAO.php); fall back to cutting it out of "F202400012"
 $attFacultyID  = ($attGroup !== 'student') ? (int)($_SESSION['real_userID'] ?? substr($attUserRaw, 5)) : 0;
 $attStudentKey = ($attGroup === 'student' && preg_match('/^(\d{4})(\d{5})$/', $attUserRaw, $attM)) ? $attM[1] . '-' . $attM[2] : null;  // "2026-00001"
 
 $_SESSION["page"] = ($attGroup === 'student') ? "ATTENDANCE | Student" : "ATTENDANCE | Faculty";
 
 #Position inside the faculty:
-#  program coordinator -> works with their own program: view, add, edit and delete
-#  dean / registrar    -> view everything, but cannot add, edit or delete
-#  any other faculty   -> view only, like the dean and registrar
+#  program coordinator -> access to everything
+#  dean    -> view everything and scan, but cannot add, edit or delete
+#  registrar -> view only
+#  any other faculty   -> view only and scan
 $attPos = 'student';
 if ($attGroup !== 'student') {
   if     (strpos($attRole, 'coordinator') !== false) $attPos = 'coordinator';
@@ -47,13 +46,15 @@ if ($attGroup !== 'student' && $attFacultyID > 0) {
   $attMyProgram = $fr['program']    ?? null;
   $attMyDept    = $fr['department'] ?? null;
 }
-$attScoped = ($attPos === 'coordinator' && $attMyProgram);          // a coordinator only sees / manages their own program
-$evpage    = ($attGroup !== 'student' && !empty($_GET['events']));  // the Events page (?events=1)
+$attCanScan   = in_array($attPos, ['coordinator', 'faculty', 'dean'], true);
+$attScoped = ($attPos === 'coordinator' && $attMyProgram);
+$evpage    = ($attGroup !== 'student' && !empty($_GET['events']));
 if ($evpage) $_SESSION["page"] = "EVENTS | Faculty";
 
 #The functions below read these through $GLOBALS
 $GLOBALS['attPos'] = $attPos; $GLOBALS['attCanEdit'] = $attCanEdit; $GLOBALS['attScoped'] = $attScoped;
 $GLOBALS['attMyProgram'] = $attMyProgram; $GLOBALS['attMyDept'] = $attMyDept; $GLOBALS['evpage'] = $evpage;
+$GLOBALS['attCanScan'] = $attCanScan;
 
 #While testing: true shows the real database error in the scan popup. Set to false before going live.
 const ATT_DEBUG = true;
@@ -110,7 +111,7 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
     exit;
   };
 
-  if ($attFacultyID <= 0) $respond('error', 'Your faculty account could not be identified.');
+  if (!$attCanScan) $respond('error', 'You are not allowed to record attendance.');
 
   $rawStudentID = trim($_POST['studentID'] ?? '');
   $eventKey     = trim($_POST['eventID'] ?? '');       // an eventID or an event name
