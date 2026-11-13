@@ -754,24 +754,33 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             <?php endif ?>
 
 
-            <?php $subjects_handling = getSubjects(); $filtered_subjects_handling = getSubjects($department,$search,$block,$year); ?>
+            <?php $subjects_handling = getSubjects(); if(count($subjects_handling) > 0): $filtered_subjects_handling = getSubjects($department,$search,$block,$year); ?>
               
               
               <form class="column" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
                 <input type="hidden" name="view" value="MAIN">
-                <div class="row" style="gap:60px;">
+                <div class="row" style="justify-content:space-between; align-items:center; " >
                   <b class="view_title">SUBJECTS</b>
-                  <div class="row searchbar_frame " style="width: max-content;">
+                  <div class="row searchbar_frame " style="width: 50%;">
                     <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($search === "ALL" ? '':$search) ?>">
                     <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
                         <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons" style="padding:5px">
                     </button>
                   </div>
+                  <div  class="row" style="gap:20px; align-items:center; ">
+                    <b>ACAD-YEAR:</b>
+                    <select name="programfilter" class="filter" onchange="this.form.submit()">
+                      <?php $options = []; foreach( $subjects_handling as $subject): if(!in_array($subject["program"],$options)): $options[] = $subject["program"];?>
+                        <option  value="<?= $subject["program"] ?>" <?php if($program == $subject["program"]) echo 'selected'?>><?= $subject["program"] ?></option>
+                      <?php endif; endforeach ?>
+                    </select>
+                  </div>
+                  
                 </div>
                 
 
-                <div class="row" style="gap: 20px; align-items:center; " >
-                  DEPT
+                <div class="row" style="gap: 20px; align-items:center; border-bottom: 2px solid white; padding-bottom: 20px;" >
+                  <b>DEPT:</b>
                   <select name="filter" class="filter" onchange="this.form.submit()">
                     
                     <?php $options = []; foreach( $subjects_handling as $subject): if(!in_array($subject["department"],$options)): $options[] = $subject["department"];?>
@@ -779,7 +788,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <?php endif; endforeach ?>
                   </select>
                   
-                  BLOCK
+                  <b>BLOCK:</b>
                   <select name="blockfilter" class="filter" onchange="this.form.submit()">
                     <option  value="ALL" <?php if($block == $subject["block"]) echo 'selected'?>>ALL</option>
                     <?php $options = []; foreach( $subjects_handling as $subject): if(!in_array($subject["block"],$options)): $options[] = $subject["block"];?>
@@ -787,7 +796,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <?php endif; endforeach ?>
                   </select>
 
-                  YEAR
+                  <b>YEAR:</b>
                   <select name="yearfilter" class="filter" onchange="this.form.submit()">
                     <option  value="ALL" <?php if($year == $subject["year"]) echo 'selected'?>>ALL</option>
                     <?php $options = []; foreach( $subjects_handling as $subject): if(!in_array($subject["year"],$options)): $options[] = $subject["year"];?>
@@ -795,7 +804,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <?php endif; endforeach ?>
                   </select>
 
-                  PROGRAM
+                  <b>PROGRAM:</b>
                   <select name="programfilter" class="filter" onchange="this.form.submit()">
                     <?php $options = []; foreach( $subjects_handling as $subject): if(!in_array($subject["program"],$options)): $options[] = $subject["program"];?>
                       <option  value="<?= $subject["program"] ?>" <?php if($program == $subject["program"]) echo 'selected'?>><?= $subject["program"] ?></option>
@@ -821,7 +830,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               </div>
               
             
-
+            <?php endif ?>      
             
             
             subject
@@ -856,7 +865,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             </form>
 
           
-          
+            
           <?php elseif($student_view == "OFFICE"): ?>
           <?php elseif($student_view == "SUBJECT"): ?>
             <?php $offices = getOffices(); if(count($offices) > 0): ?>
