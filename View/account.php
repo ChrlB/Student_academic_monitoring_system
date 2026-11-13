@@ -17,10 +17,17 @@ function field(string $label, string $value, string $w = ''): void { ?>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS | Student Account</title>
+<<<<<<< HEAD
   <link rel="icon" type="image/x-icon" href=" <?= BASE_PATH ?>/View/resources/favicon1.jpg">
   <link rel="stylesheet" href=" <?= BASE_PATH ?>/View/style/general.css">
   <link rel="stylesheet" href=" <?= BASE_PATH ?>/View/style/account.css">
   <link rel="stylesheet" href=" <?= BASE_PATH ?>/View/style/account_dialogs.css">
+=======
+  <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
+  <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/general.css">
+  <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/account.css">
+  <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/account_dialogs.css">
+>>>>>>> 79337d764742a6c424576ef70ea9129bae842bab
 </head>
 <body>
 
@@ -40,7 +47,7 @@ function field(string $label, string $value, string $w = ''): void { ?>
 
           <section class="acc-card acc-profile">
             <div class="avatar">
-              <img src="/get-profile" alt="Profile picture" class="avatar-img" onerror="this.remove()">
+              <img src="<?= BASE_PATH ?>/get-profile" alt="Profile picture" class="avatar-img" onerror="this.remove()">
               <button type="button" class="avatar-btn" data-action="upload-photo" aria-label="Change profile picture">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg>
               </button>     
@@ -145,7 +152,7 @@ function field(string $label, string $value, string $w = ''): void { ?>
   </div>
 
   <?php require_once __DIR__ . "/components/account_dialogs.php"; ?>
-  <script src="/View/script/account.js" defer></script>
+  <script src="<?= BASE_PATH ?>/View/script/account.js" defer></script>
   <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>

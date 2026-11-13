@@ -51,6 +51,13 @@ function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v)
     ksort($times);
     $type = $v['class_type'] ?? 'LEC';
     $days = (array)($v['days'] ?? []);
+    $kind = $v['subject_kind'] ?? null;
+    if ($kind === null) {
+        $kind = 'normal';
+        foreach ($subjects as $s) {
+            if (($v['subject'] ?? null) === $s['subjectID']) { $kind = $s['kind']; break; }
+        }
+    }
     ob_start(); ?>
     <div class="sp-field">
       <label for="<?= $uid ?>-block">Block / Section <span class="sp-req">*</span></label>
@@ -72,13 +79,21 @@ function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v)
     </div>
 
     <div class="sp-field">
+      <span class="sp-label">Subject Category</span>
+      <div class="sp-radios" role="radiogroup" aria-label="Subject category">
+        <label class="sp-radio"><input type="radio" name="subject_kind" value="normal" <?= $kind === 'normal' ? 'checked' : '' ?>> <span>NORMAL SUBJECT</span></label>
+        <label class="sp-radio"><input type="radio" name="subject_kind" value="prereq" <?= $kind === 'prereq' ? 'checked' : '' ?>> <span>PREREQUISITE SUBJECT</span></label>
+      </div>
+    </div>
+
+    <div class="sp-field">
       <label for="<?= $uid ?>-subject">Subject <span class="sp-req">*</span></label>
       <select id="<?= $uid ?>-subject" name="subject" required>
         <option value="">Select subject</option>
         <?php foreach ($subjects as $s): ?>
-          <option value="<?= sched_e($s['subjectID']) ?>" data-type="<?= sched_e($s['type']) ?>"
+          <option value="<?= sched_e($s['subjectID']) ?>" data-type="<?= sched_e($s['type']) ?>" data-kind="<?= sched_e($s['kind']) ?>"
             <?= ($v['subject'] ?? null) === $s['subjectID'] ? 'selected' : '' ?>>
-            <?= sched_e(trim($s['subjectID']) . ' — ' . $s['name']) ?>
+            <?= sched_e(trim($s['subjectID']) . ' — ' . $s['name'] . ($s['requires'] ? ' (requires ' . $s['requires'] . ')' : '')) ?>
           </option>
         <?php endforeach; ?>
       </select>
@@ -409,9 +424,13 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
                 <article class="day-card">
                   <h3><?= sched_e($it['subject_name']) ?></h3>
                   <div class="day-card__body day-card__body--left">
-                    <span><?= sched_e($it['range']) ?></span>
-                    <span>Room <?= sched_e($it['roomID']) ?></span>
-                    <span><?= $group === 'faculty' ? sched_e($it['block_label']) : sched_e($it['faculty_name']) ?></span>
+                    <p class="tile-row"><strong>Time:</strong> <?= sched_e($it['range']) ?></p>
+                    <p class="tile-row"><strong>Room:</strong> <?= sched_e($it['roomID']) ?></p>
+                    <?php if ($group === 'faculty'): ?>
+                      <p class="tile-row"><strong>Grade &amp; Section:</strong> <?= sched_e($it['block_label']) ?></p>
+                    <?php else: ?>
+                      <p class="tile-row"><strong>Prof:</strong> <?= sched_e($it['faculty_name']) ?></p>
+                    <?php endif; ?>
                   </div>
                 </article>
               <?php endforeach; ?>
@@ -553,17 +572,20 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
   // Filter subjects by class type.
   document.querySelectorAll('[data-sched-form]').forEach(function (form) {
     var subject = form.querySelector('select[name="subject"]');
+    function val(name, fallback) {
+      var c = form.querySelector('input[name="' + name + '"]:checked');
+      return c ? c.value : fallback;
+    }
     function apply() {
-      var checked = form.querySelector('input[name="class_type"]:checked');
-      var type = checked ? checked.value : 'LEC';
+      var type = val('class_type', 'LEC'), kind = val('subject_kind', 'normal');
       Array.prototype.forEach.call(subject.options, function (o) {
         if (!o.value) return;
-        var hide = o.dataset.type !== type;
+        var hide = o.dataset.type !== type || o.dataset.kind !== kind;
         o.hidden = hide; o.disabled = hide;
         if (hide && o.selected) subject.value = '';
       });
     }
-    form.querySelectorAll('input[name="class_type"]').forEach(function (r) { r.addEventListener('change', apply); });
+    form.querySelectorAll('input[name="class_type"], input[name="subject_kind"]').forEach(function (r) { r.addEventListener('change', apply); });
     apply();
   });
 
