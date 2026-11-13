@@ -16,8 +16,7 @@
           <button type="button" class="qr-btn" id="qrCancel">Close</button>
         </div>
 
-      <?php else: ?>
-        
+      <?php elseif (!empty($attCanScan)): ?>      
         <!-- =============== FACULTY VIEW: Camera Scanner & Database Form =============== -->
         <form id="qrAttendanceForm" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
         <input type="hidden" name="att_action" value="scan">
@@ -26,6 +25,7 @@
         <div style="width: 100%; max-width: 280px; margin-bottom: 15px; text-align: left;">
             <label for="eventSelect" style="font-size: 12px; color: rgba(255,255,255,0.7); display: block; margin-bottom: 4px;">Select Event:</label>
             <select id="eventSelect" name="eventID" style="width: 100%; padding: 8px 10px; background: #231f2c; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #fff; outline: none; font-size: 13px;">
+            
             <option value="">-- Choose Event --</option>
             <?php foreach ($ATT_EVENT_NAMES as $eventName): ?>
                 <option value="<?= e($eventName) ?>" <?= ($eventName === ($currentActiveEvent ?? '')) ? 'selected' : '' ?>>

@@ -26,7 +26,7 @@
     <div class="column" style="flex: 1; min-width: 0;">
       <?php require_once __DIR__."/components/header.php"; ?>
       <main class="column scrollbar att-main">
-<div class="att<?= $attGroup === 'student' ? ' student' : '' ?><?= ($attGroup !== 'student' && !$attCanEdit) ? ' ro' : '' ?>" id="att"<?php if ($evpage): ?> data-back="<?= e(att_url(['events' => null])) ?>"<?php endif; ?> data-qr="<?= e(BASE_PATH) ?>/attendance-qr" data-qr-icon="<?= BASE_PATH ?>/View/resources/qr.png">
+<div class="att<?= $attGroup === 'student' ? ' student' : '' ?>" id="att" data-qr="<?= e(BASE_PATH) ?>/attendance-qr" data-qr-icon="<?= BASE_PATH ?>/View/resources/qr.png" data-can-qr="<?= ($attGroup === 'student' || $attCanScan) ? '1' : '0' ?>">
 <?php if ($evpage): /* =============== EVENTS PAGE =============== */ ?>
   <section class="view">
     <div class="toolbar">
