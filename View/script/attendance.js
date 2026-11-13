@@ -246,6 +246,74 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  /* ---------- Events page: the title goes back, rows open the event dialog ---------- */
+  const evBack = att.dataset.back;
+  if (evBack && header) {
+    const t = [...header.querySelectorAll('*')].find(el => !el.children.length && /^\s*EVENTS/i.test(el.textContent));
+    const n = t && [...t.childNodes].find(x => x.nodeType === 3 && /EVENTS/i.test(x.nodeValue));
+    if (n) {
+      const word = n.splitText(n.nodeValue.search(/EVENTS/i));
+      word.splitText(6);
+      const link = document.createElement('a');
+      link.className = 'att-back';
+      link.href = evBack;
+      link.title = 'Back to attendance list';
+      word.parentNode.insertBefore(link, word);
+      link.append(word);
+    }
+  }
+
+  const evDlg = document.getElementById('ev-dlg');
+  if (evDlg) {
+    const f = id => document.getElementById(id);
+    const form = f('ev-form'), fields = [...evDlg.querySelectorAll('input[type=text],input[type=date],input[type=time],select')];
+
+    // mode: 'add' | 'edit' | 'view'
+    const openDlg = (mode, d = {}) => {
+      form.noValidate = false;
+      f('ev-action').value = mode === 'edit' ? 'edit_event' : 'add_event';
+      f('ev-id').value     = d.id || '';
+      f('ev-title').textContent = mode === 'add' ? 'ADD EVENT' : (mode === 'edit' ? 'EDIT EVENT' : 'VIEW EVENT');
+      f('ev-name').value   = d.name   || '';
+      f('ev-date').value   = d.date   || '';
+      f('ev-status').value = d.status || 'ACTIVE';
+      f('ev-start').value  = d.start  || '08:00';
+      f('ev-end').value    = d.end    || '18:00';
+      f('ev-coord').value  = d.coord  || '';
+      fields.forEach(x => { x.disabled = mode === 'view'; });
+      f('ev-ok').hidden     = mode === 'view';
+      f('ev-delete').hidden = mode !== 'edit';
+      f('ev-delete').dataset.att = d.att || 0;
+      f('ev-cancel').textContent = mode === 'view' ? 'Close' : 'Cancel';
+      if (!evDlg.open) evDlg.showModal();
+      if (mode !== 'view') f('ev-name').focus();
+    };
+
+    const add = f('ev-add');
+    if (add) add.addEventListener('click', () => openDlg('add'));
+
+    const openRow = row => openDlg(row.dataset.edit === '1' ? 'edit' : 'view', {
+      id: row.dataset.id, name: row.dataset.name, date: row.dataset.date, status: row.dataset.status,
+      start: row.dataset.start, end: row.dataset.end, coord: row.dataset.coord, att: row.dataset.att
+    });
+    att.querySelectorAll('.ev-row').forEach(row => {
+      row.addEventListener('click', () => openRow(row));
+      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRow(row); } });
+    });
+
+    f('ev-cancel').addEventListener('click', () => evDlg.close());
+    evDlg.addEventListener('click', e => { if (e.target === evDlg) evDlg.close(); });   // click outside
+
+    f('ev-delete').addEventListener('click', () => {
+      const n = parseInt(f('ev-delete').dataset.att, 10) || 0;
+      const extra = n ? `\n\nThis also deletes its ${n} attendance record${n === 1 ? '' : 's'}.` : '';
+      if (!confirm('Delete this event?' + extra)) return;
+      f('ev-action').value = 'delete_event';
+      form.noValidate = true;
+      form.submit();
+    });
+  }
+
   /* ---------- 3. Delete button: first click shows checkboxes, second deletes ---------- */
   const del = att.querySelector('.icon-btn.del');
   if (del) {
