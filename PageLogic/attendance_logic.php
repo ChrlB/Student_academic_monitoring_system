@@ -190,18 +190,13 @@ if ($attScoped) {
 $eventNamesStmt = $db_connection->query("SELECT DISTINCT eventName FROM events ORDER BY eventName ASC");
 $ATT_EVENT_NAMES = $eventNamesStmt->fetchAll(PDO::FETCH_COLUMN);
 
-#Finds the active event based on status = 'ACTIVE', or falls back to latest event
+#Finds the active event based strictly on status = 'ACTIVE'
 $activeEventStmt = $db_connection->query("
   SELECT eventName FROM events 
   WHERE status = 'ACTIVE' 
   ORDER BY datetime_Start DESC LIMIT 1
 ");
 $currentActiveEvent = $activeEventStmt->fetchColumn();
-
-if (!$currentActiveEvent && !empty($ATT_EVENT_NAMES)) {
-  $fallbackStmt = $db_connection->query("SELECT eventName FROM events ORDER BY datetime_Start DESC LIMIT 1");
-  $currentActiveEvent = $fallbackStmt->fetchColumn();
-}
 
 #Fetches student list and profiles
 function att_students(): array {
