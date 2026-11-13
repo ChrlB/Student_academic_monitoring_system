@@ -6,8 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 $_SESSION["page"] = "SCHEDULE";
 require_once __DIR__ . '/../PDAO/DAO.php';
 
-// Schedule module. Tables: subject_schedules, enrollment_period, subjects, rooms, faculty, students.
-// subject_schedules.day holds codes: M, T, W, TH, F, S, SU (e.g. MTH).
+
 class ScheduleLogic
 {
     const WEEK  = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -251,9 +250,16 @@ class ScheduleLogic
 
     public function subjects()
     {
-        $rows = $this->all("SELECT subjectID, name FROM subjects ORDER BY subjectID");
+        $rows = $this->all(
+            "SELECT s.subjectID, s.name,
+                    EXISTS (SELECT 1 FROM subject_prerequisite p WHERE p.prerequisite = s.subjectID) AS is_prereq,
+                    (SELECT GROUP_CONCAT(TRIM(p2.prerequisite) SEPARATOR ', ')
+                       FROM subject_prerequisite p2 WHERE p2.subjectID = s.subjectID) AS requires
+             FROM subjects s ORDER BY s.subjectID"
+        );
         foreach ($rows as &$r) {
             $r['type'] = self::classType($r['subjectID'], $r['name']);
+            $r['kind'] = $r['is_prereq'] ? 'prereq' : 'normal';
         }
         return $rows;
     }
