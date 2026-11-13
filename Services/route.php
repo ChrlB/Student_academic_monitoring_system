@@ -62,7 +62,6 @@ $router->get('/login',  fn() => require __DIR__ . '/../View/login.php');
 
 $router->get('/account',  fn() => require __DIR__ . '/../View/account.php');
 $router->get('/attendance', fn() => require __DIR__ . '/../View/attendance.php');
-$router->post('/attendance', fn() => require __DIR__ . '/../View/attendance.php');
 $router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
 $router->post('/class-sched', fn() => require __DIR__ . '/../View/class_sched.php');
 $router->get('/clearance',  fn() => require __DIR__ . '/../View/clearance.php');
@@ -77,6 +76,7 @@ $router->get('/grades', fn() => require __DIR__ . '/../View/grades.php');
 $router->post('/grades', fn() => require __DIR__ . '/../View/grades.php');
 $router->get('/projects',  fn() => require __DIR__ . '/../View/projects.php');
 $router->get('/syllabus',  fn() => require __DIR__ . '/../View/syllabus.php');
+$router->post('/syllabus', fn() => require __DIR__ . '/../PageLogic/syllabus_logic.php');
 
 $router->get('/registration',  fn() => require __DIR__ . '/../View/registration.php');
 $router->post('/registration',  fn($request) => require __DIR__ . '/../View/registration.php');
