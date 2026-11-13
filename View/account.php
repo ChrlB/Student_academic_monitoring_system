@@ -17,10 +17,10 @@ function field(string $label, string $value, string $w = ''): void { ?>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS | Student Account</title>
-  <link rel="icon" type="image/x-icon" href="/View/resources/favicon1.jpg">
-  <link rel="stylesheet" href="/View/style/general.css">
-  <link rel="stylesheet" href="/View/style/account.css">
-  <link rel="stylesheet" href="/View/style/account_dialogs.css">
+  <link rel="icon" type="image/x-icon" href=" <?= BASE_PATH ?>/View/resources/favicon1.jpg">
+  <link rel="stylesheet" href=" <?= BASE_PATH ?>/View/style/general.css">
+  <link rel="stylesheet" href=" <?= BASE_PATH ?>/View/style/account.css">
+  <link rel="stylesheet" href=" <?= BASE_PATH ?>/View/style/account_dialogs.css">
 </head>
 <body>
 
