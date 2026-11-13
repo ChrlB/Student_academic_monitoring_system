@@ -26,8 +26,76 @@
     <div class="column" style="flex: 1; min-width: 0;">
       <?php require_once __DIR__."/components/header.php"; ?>
       <main class="column scrollbar att-main">
-<div class="att<?= $attGroup === 'student' ? ' student' : '' ?>" id="att" data-qr="<?= e(BASE_PATH) ?>/attendance-qr" data-qr-icon="<?= BASE_PATH ?>/View/resources/qr.png">
-<?php if ($attGroup === 'student'): /* =============== STUDENT VIEW (read-only) =============== */ ?>
+<div class="att<?= $attGroup === 'student' ? ' student' : '' ?>" id="att" data-qr="<?= e(BASE_PATH) ?>/attendance-qr" data-qr-icon="<?= BASE_PATH ?>/View/resources/qr.png" data-can-qr="<?= ($attGroup === 'student' || $attCanScan) ? '1' : '0' ?>">
+<?php if ($evpage): /* =============== EVENTS PAGE =============== */ ?>
+  <section class="view">
+    <div class="toolbar">
+      <?php if ($attCanEdit): ?>
+        <button type="button" class="ev-btn" id="ev-add"><span class="ev-dot"></span>ADD EVENTS</button>
+      <?php endif; ?>
+    </div>
+
+    <div class="content-box"><div class="scroll">
+      <?php if (!$events): ?>
+        <p class="empty">No events yet.</p>
+      <?php else: foreach ($events as $ev): ?>
+        <div class="ev-row" role="button" tabindex="0"
+             title="<?= $ev['canEdit'] ? 'Click to edit' : 'Click to view' ?>"
+             data-id="<?= (int)$ev['id'] ?>" data-name="<?= e($ev['name']) ?>" data-date="<?= e($ev['ymd']) ?>"
+             data-start="<?= e($ev['start24']) ?>" data-end="<?= e($ev['end24']) ?>" data-status="<?= e($ev['status']) ?>"
+             data-coord="<?= e($ev['coord']) ?>" data-att="<?= (int)$ev['att'] ?>" data-edit="<?= $ev['canEdit'] ? '1' : '0' ?>">
+          <span class="ev-name"><?= e($ev['name']) ?></span>
+          <span><?= e($ev['scope']) ?></span>
+          <span><?= e($ev['date']) ?></span>
+          <span><?= e($ev['start']) ?></span>
+          <span><?= e($ev['end']) ?></span>
+          <span class="ev-st st-<?= e(strtolower($ev['status'])) ?>"><?= e(ucfirst(strtolower($ev['status']))) ?></span>
+        </div>
+      <?php endforeach; endif; ?>
+    </div></div>
+  </section>
+
+  <!-- Add / Edit / View event -->
+  <dialog class="ev-dlg" id="ev-dlg">
+    <form method="post" action="<?= e(att_url()) ?>" id="ev-form" autocomplete="off">
+      <input type="hidden" name="att_action" id="ev-action" value="add_event">
+      <input type="hidden" name="eventID" id="ev-id" value="">
+      <h2 id="ev-title">ADD EVENT</h2>
+
+      <label class="ev-field"><span>EVENT NAME</span>
+        <input type="text" name="eventName" id="ev-name" placeholder="eg.CCS WEEK" maxlength="250" required></label>
+
+      <div class="ev-two">
+        <label class="ev-field"><span>DATE</span>
+          <input type="date" name="date" id="ev-date" required></label>
+        <label class="ev-field"><span>STATUS</span>
+          <select name="status" id="ev-status" required>
+            <?php foreach (ATT_EVENT_STATUSES as $st): ?><option value="<?= e($st) ?>"><?= e($st) ?></option><?php endforeach; ?>
+          </select></label>
+      </div>
+
+      <div class="ev-two">
+        <label class="ev-field"><span>START</span>
+          <input type="time" name="start" id="ev-start" value="08:00" required></label>
+        <label class="ev-field"><span>END</span>
+          <input type="time" name="end" id="ev-end" value="18:00" required></label>
+      </div>
+
+      <label class="ev-field"><span>EVENT COORDINATOR</span>
+        <input type="text" name="coordinator" id="ev-coord" list="ev-faculty" placeholder="ex. Mr. Johniel Zar Mendoza" maxlength="200"></label>
+      <datalist id="ev-faculty">
+        <?php foreach ($ATT_FACULTY_NAMES as $fn): ?><option value="<?= e($fn) ?>"></option><?php endforeach; ?>
+      </datalist>
+
+      <div class="ev-btns">
+        <button type="button" class="ev-b del" id="ev-delete" hidden>Delete</button>
+        <button type="button" class="ev-b cancel" id="ev-cancel">Cancel</button>
+        <button type="submit" class="ev-b ok" id="ev-ok">Confirm</button>
+      </div>
+    </form>
+  </dialog>
+
+<?php elseif ($attGroup === 'student'): /* =============== STUDENT VIEW (read-only) =============== */ ?>
   <section class="view">
     <div class="detail-head">
       <div class="detail-title"><?= e("{$me['id']}, {$me['name']}, {$me['dept']}, {$me['course']}") ?></div>
@@ -88,6 +156,7 @@
         <a href="<?= e(att_url(['view' => null])) ?>" class="<?= $view === 'grid' ? 'active' : '' ?>" title="Grid view" aria-label="Grid view">
           <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg></a>
       </div>
+      <a class="ev-btn ev-link" href="<?= e(att_url(['events' => 1])) ?>"><span class="ev-dot"></span>EVENTS</a>
       <span class="count"><?= count($rows) ?> student<?= count($rows) === 1 ? '' : 's' ?></span>
     </div>
 
@@ -163,11 +232,13 @@
         </table>
         <?php if (!$recs): ?><p class="empty">No records for this filter.</p><?php endif; ?>
       </div>
+      <?php if ($attCanEdit): ?>
       <div class="rec-actions">
         <button type="submit" class="icon-btn del" title="Delete selected" aria-label="Delete selected">
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 7h14l-1.2 13a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8zM9 3h6l1 2H8z"/></svg>
         </button>
       </div>
+      <?php endif; ?>
     </form>
   </section>
 <?php endif; ?>

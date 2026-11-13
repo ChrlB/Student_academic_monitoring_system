@@ -4,17 +4,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const modal  = document.getElementById('qrModal');
 
   /* ---------- 1. QR button, to the left of the profile ---------- */
+  // data-can-qr is "0" when the role may not scan (dean, registrar); students and scanners get "1"
   const profile = header && header.querySelector('.profile_icon')?.closest('.column');
-  if (profile && !header.querySelector('.att-qr')) {
+  const canQr   = !att || att.dataset.canQr !== '0';
+
+  if (canQr && profile && !header.querySelector('.att-qr')) {
     const group = document.createElement('div');
     group.className = 'att-hright';
 
     const qr = document.createElement('a');
     qr.className = 'att-qr';
-    qr.href = '#'; 
+    qr.href = '#';
     qr.title = 'QR Code';
     qr.setAttribute('aria-label', 'QR Code');
-    
+
     const qrIconSrc = (att && att.dataset.qrIcon) || 'View/resources/qr.png';
     qr.innerHTML = `<img src="${qrIconSrc}" alt="QR">`;
 
@@ -28,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     group.append(qr, profile);
   }
 
-  // Scanner Logic variables (Faculty only)
+  /* ---------- Scanner (only exists in the page for roles that may scan) ---------- */
   let html5QrCode = null;
   let handling = false;   // true while one scan is being sent, so one QR is never counted twice
 
@@ -76,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /**
    * Sends scanned/typed student ID asynchronously to PHP backend handler
-   * @param {string} studentID 
+   * @param {string} studentID
    * @param {boolean} autoRestart - Whether to restart the scanner automatically after success
    */
   const processScannedAttendance = (studentID, autoRestart = false) => {
@@ -125,7 +128,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (data.status === 'success' || data.status === 'info') {
         showScannerAlert(data.message, data.status === 'success' ? 'success' : 'info');
-        
+
         // Clear input box for next entry
         const studentInput = document.getElementById('scannerStudentId');
         if (studentInput) studentInput.value = '';
@@ -222,6 +225,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  /* ---------- Events page: arrow before the title, goes back to the student list ---------- */
+  // Same look as the ATTENDANCE title: arrow + bold word, then the dimmer "| Faculty".
+  // The back address is the current address without ?events=1 (or data-back if the page sets it).
+  const evTitle = header && [...header.querySelectorAll('*')].find(el => !el.children.length && /^\s*EVENTS/i.test(el.textContent));
+  if (evTitle && !header.querySelector('.att-back')) {
+    const evNode = [...evTitle.childNodes].find(x => x.nodeType === 3 && /EVENTS/i.test(x.nodeValue));
+    if (evNode) {
+      const back = new URL(window.location.href);
+      back.searchParams.delete('events');
+
+      const word = evNode.splitText(evNode.nodeValue.search(/EVENTS/i));
+      word.splitText(6);
+
+      const link = document.createElement('a');
+      link.className = 'att-back';
+      link.href = (att && att.dataset.back) || (back.pathname + back.search);
+      link.title = 'Back to attendance list';
+      link.setAttribute('aria-label', 'Back to attendance list');
+      link.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
+      word.parentNode.insertBefore(link, word);
+      link.append(word);
+    }
+  }
+
   if (!att) return;
 
   /* ---------- 2. Back arrow moved into the header title ---------- */
@@ -235,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     link.title = backBtn.title;
     link.setAttribute('aria-label', backBtn.title);
     link.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>';
-    
+
     const node = [...title.childNodes].find(n => n.nodeType === 3 && /ATTENDANCE/i.test(n.nodeValue));
     if (node) {
       const word = node.splitText(node.nodeValue.search(/ATTENDANCE/i));
@@ -244,6 +271,58 @@ document.addEventListener('DOMContentLoaded', () => {
       link.append(word);
       backBtn.remove();
     }
+  }
+
+  /* ---------- Events page: rows open the event dialog ---------- */
+  const evDlg = document.getElementById('ev-dlg');
+  if (evDlg) {
+    const f = id => document.getElementById(id);
+    const form = f('ev-form'), fields = [...evDlg.querySelectorAll('input[type=text],input[type=date],input[type=time],select')];
+
+    // mode: 'add' | 'edit' | 'view'
+    const openDlg = (mode, d = {}) => {
+      form.noValidate = false;
+      f('ev-action').value = mode === 'edit' ? 'edit_event' : 'add_event';
+      f('ev-id').value     = d.id || '';
+      f('ev-title').textContent = mode === 'add' ? 'ADD EVENT' : (mode === 'edit' ? 'EDIT EVENT' : 'VIEW EVENT');
+      f('ev-name').value   = d.name   || '';
+      f('ev-date').value   = d.date   || '';
+      f('ev-status').value = d.status || 'ACTIVE';
+      f('ev-start').value  = d.start  || '08:00';
+      f('ev-end').value    = d.end    || '18:00';
+      f('ev-coord').value  = d.coord  || '';
+      fields.forEach(x => { x.disabled = mode === 'view'; });
+      f('ev-ok').hidden     = mode === 'view';
+      f('ev-delete').hidden = mode !== 'edit';
+      f('ev-delete').dataset.att = d.att || 0;
+      f('ev-cancel').textContent = mode === 'view' ? 'Close' : 'Cancel';
+      if (!evDlg.open) evDlg.showModal();
+      if (mode !== 'view') f('ev-name').focus();
+    };
+
+    const add = f('ev-add');
+    if (add) add.addEventListener('click', () => openDlg('add'));
+
+    const openRow = row => openDlg(row.dataset.edit === '1' ? 'edit' : 'view', {
+      id: row.dataset.id, name: row.dataset.name, date: row.dataset.date, status: row.dataset.status,
+      start: row.dataset.start, end: row.dataset.end, coord: row.dataset.coord, att: row.dataset.att
+    });
+    document.querySelectorAll('.ev-row').forEach(row => {
+      row.addEventListener('click', () => openRow(row));
+      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRow(row); } });
+    });
+
+    f('ev-cancel').addEventListener('click', () => evDlg.close());
+    evDlg.addEventListener('click', e => { if (e.target === evDlg) evDlg.close(); });   // click outside
+
+    f('ev-delete').addEventListener('click', () => {
+      const n = parseInt(f('ev-delete').dataset.att, 10) || 0;
+      const extra = n ? `\n\nThis also deletes its ${n} attendance record${n === 1 ? '' : 's'}.` : '';
+      if (!confirm('Delete this event?' + extra)) return;
+      f('ev-action').value = 'delete_event';
+      form.noValidate = true;
+      form.submit();
+    });
   }
 
   /* ---------- 3. Delete button: first click shows checkboxes, second deletes ---------- */

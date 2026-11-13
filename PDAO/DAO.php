@@ -107,7 +107,7 @@ $userDAO->prepareStatement( "getStudentInfo",
         first_name,
         middle_name,
         last_name,
-        COALESCE(NULLIF(email,''), concat(concat(year(date_created),lpad(studentID,5,0)),'@amscollege.edu.ph')) as email,
+        COALESCE(NULLIF(email,''), concat(concat(year(date_created),lpad(studentID,5,0)),'@gordoncollege.edu.ph')) as email,
         block,
         year_level,
         program,
@@ -135,7 +135,7 @@ $userDAO->prepareStatement( "getFacultyInfo",
       first_name,
       middle_name,
       last_name,
-      concat( concat('F',year(date_created),lpad(facultyID,5,0)),'@amscollege.edu.ph') as email,
+      concat( concat('F',year(date_created),lpad(facultyID,5,0)),'@gordoncollege.edu.ph') as email,
       role,
       department,
       date_created,
@@ -642,7 +642,10 @@ $userDAO->prepareStatement("updateStudentPassword",
     //faculty
 
     $clearanceDAO->prepareStatement("getOffices","SELECT 
-            *
+            O.`officeID`,
+            O.`name`,
+            O.`facultyID`,
+            O.`roomID`
         FROM `office` AS O
             inner join faculty AS F
             ON F.facultyID = O.facultyID
@@ -660,12 +663,23 @@ $userDAO->prepareStatement("updateStudentPassword",
             SS.`time_start`,
             SS.`time_end`,
             SS.`block`,
-            F.date_created
+            F.date_created,
+            S.department,
+            SY.year,
+            SY.program
         FROM `subject_schedules` AS SS
             inner join faculty AS F
             ON F.facultyID = SS.facultyID
+            inner join subjects AS S
+            ON S.subjectID = SS.`subjectID`
+            inner join syllabus AS SY
+            ON SY.subjectID = SS.`subjectID`
         WHERE 
-            CONCAT( 'F',YEAR(F.date_created), LPAD(SS.facultyID, 5, 0)) = ?;
+            (S.department = ? OR 'ALL' = ?)
+            AND (SS.`subjectID` = ? OR 'ALL' = ?)
+            AND ( SS.`block` = ? OR 'ALL' = ?)
+            AND ( SY.year = ? OR 'ALL' = ?)
+            AND CONCAT('F', YEAR(F.date_created), LPAD(SS.facultyID, 5, '0')) = ?;
     ");
 }
 

@@ -3,7 +3,7 @@ require_once __DIR__ . '/../PageLogic/login_logic.php';
 require_once __DIR__ . '/../Services/csrf.php';
 
 if (isLoggedIn()) {
-    header('Location: /dashboard');
+    header('Location: ' . BASE_PATH . '/dashboard');
     exit;
 }
 $flashError   = $_SESSION['error']   ?? '';
