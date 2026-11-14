@@ -1,32 +1,23 @@
 <?php
-/* PageLogic/account_actions.php
-   changePassword($_POST)  runs for  POST /change-password
-   updateProfile($_POST)   runs for  POST /edit-profile
-   Both end in a redirect back to /account (PRG). When something is wrong the page reopens
-   the popup with the error and what the person typed (passwords are never sent back). */
-
 require_once __DIR__ . '/../Services/session.php';
 require_once __DIR__ . '/../Services/csrf.php';
 
 const PW_MIN_LENGTH = 8;
-const PW_MAX_LENGTH = 72;      // bcrypt only reads the first 72 bytes
-const PW_MAX_FAILS  = 5;       // wrong "current password" tries ...
-const PW_LOCK_MINUTES = 15;    // ... per this many minutes
+const PW_MAX_LENGTH = 72;      
+const PW_MAX_FAILS  = 5;       
+const PW_LOCK_MINUTES = 5;   
 
 // Roles allowed to change their password from the account page.
-// Students only for now. Faculty roles (e.g. 'prof') get added here later; the registrar is never added.
 const PW_CHANGE_ROLES = ['student'];
 
 function canChangePassword(): bool {
     return in_array((string)($_SESSION['role'] ?? ''), PW_CHANGE_ROLES, true);
 }
 
-// false = only date of birth, sex and street are saved (columns that exist today).
-// Run sql/students_profile_columns.sql, add the extra columns to getStudentInfo, then set this to true.
 const PROFILE_EXTRA_COLUMNS = true;
 
 // the school email domain (same constant the login/reset files use)
-if (!defined('SCHOOL_EMAIL_DOMAIN')) define('SCHOOL_EMAIL_DOMAIN', '@gordoncollege.edu.ph');
+if (!defined('SCHOOL_EMAIL_DOMAIN')) define('SCHOOL_EMAIL_DOMAIN', '@amscollege.edu.ph');
 
 /* ---------- small helpers ---------- */
 
@@ -151,11 +142,10 @@ function changePassword($post) {
 }
 
 /* ---------- 2. edit profile ---------- */
-
-// Single source of truth: field => [label, type, max length or options, required, needs extra column]
 function profileRules(): array {
     return [
         'middle_name'        => ['Middle Name',        'text',   50,  false, false],
+        'number'             => ['Contact Number',     'phone',  20,  false, false],
         'email'              => ['Email Address',      'email',  100, false, true],
         'date_of_birth'      => ['Date of Birth',      'date',   null, true,  false],
         'sex'                => ['Sex',                'select', ['Male', 'Female'], true, false],
@@ -196,6 +186,20 @@ function validateProfileValue(string $field, array $rule, string $raw): array {
         if (substr($v, -strlen($d)) !== $d) return ['', 'Use your school email (ending in ' . SCHOOL_EMAIL_DOMAIN . ').'];
         return [$v, null];
     }
+    if ($type === 'phone') {
+        // Philippine mobile number: 09XX XXX XXXX (11 digits) or +63 9XX XXX XXXX. Spaces, dashes and brackets are ignored.
+        if (!preg_match('/^\+?[0-9][0-9 ()\-]*$/', $v)) {
+            return ['', "$label can only contain digits (spaces and dashes are fine)."];
+        }
+        $digits = preg_replace('/\D/', '', $v);
+        if (preg_match('/^639\d{9}$/', $digits) && $v[0] === '+') {
+            $digits = '0' . substr($digits, 2);              // +63 909... -> 0909...
+        }
+        if (!preg_match('/^09\d{9}$/', $digits)) {
+            return ['', "$label must be 11 digits and start with 09, e.g. 0909 123 4567."];
+        }
+        return [$digits, null];                              // saved as 09XXXXXXXXX
+    }
     if ($type === 'zip') {
         return preg_match('/^\d{4}$/', $v) ? [$v, null] : ['', 'Zip Code must be 4 digits.'];
     }
@@ -234,14 +238,14 @@ function updateProfile($post) {
 
         if (PROFILE_EXTRA_COLUMNS) {
             $userDAO->executeQuery('updateStudentProfileFull', [
-                $clean['middle_name'], $clean['email'], $clean['date_of_birth'], $clean['sex'], $clean['street'],
+                $clean['middle_name'], $clean['email'], $clean['number'], $clean['date_of_birth'], $clean['sex'], $clean['street'],
                 $clean['place_of_birth'], $clean['civil_status'], $clean['sexual_orientation'],
                 $clean['citizenship'], $clean['religion'], $clean['region'], $clean['province'],
                 $clean['municipality'], $clean['zip_code'], $num, $year,
             ]);
         } else {
             $userDAO->executeQuery('updateStudentProfile', [
-                $clean['middle_name'], $clean['date_of_birth'], $clean['sex'], $clean['street'], $num, $year,
+                $clean['middle_name'], $clean['number'], $clean['date_of_birth'], $clean['sex'], $clean['street'], $num, $year,
             ]);
         }
     } catch (Throwable $e) {

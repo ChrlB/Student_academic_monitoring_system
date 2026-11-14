@@ -979,6 +979,6 @@ textarea.form-control { min-height: 110px; resize: vertical; }
       </main>
     </div>
   </div>
-
+  <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>
