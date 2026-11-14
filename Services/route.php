@@ -75,6 +75,8 @@ $router->post('/enrollment',  fn() => require __DIR__ . '/../View/enrollment.php
 $router->get('/grades', fn() => require __DIR__ . '/../View/grades.php');
 $router->post('/grades', fn() => require __DIR__ . '/../View/grades.php');
 $router->get('/projects',  fn() => require __DIR__ . '/../View/projects.php');
+$router->get('/projects',  fn() => require __DIR__ . '/../View/projects.php');
+$router->post('/projects', fn() => require __DIR__ . '/../View/projects.php');
 $router->get('/syllabus',  fn() => require __DIR__ . '/../View/syllabus.php');
 
 $router->get('/registration',  fn() => require __DIR__ . '/../View/registration.php');
