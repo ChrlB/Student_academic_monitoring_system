@@ -52,10 +52,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!readerDiv) return;
 
-    // Show scanner view, hide static icon box[cite: 8]
+    // Show scanner view, hide static icon box
     readerDiv.style.display = 'block';
     if (staticIcon) staticIcon.style.display = 'none';
-    if (retakeBtn) retakeBtn.textContent = 'Retake'; // Change text to Retake once active[cite: 8]
+    if (retakeBtn) retakeBtn.textContent = 'Retake'; 
 
     if (!html5QrCode) {
       html5QrCode = new Html5Qrcode("qr-reader");
@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const staticIcon = document.getElementById('qrStaticIcon');
     const retakeBtn = document.getElementById('qrRetake');
 
-    if (retakeBtn) retakeBtn.textContent = 'Scan'; // Revert back to Scan when stopped[cite: 8]
+    if (retakeBtn) retakeBtn.textContent = 'Scan';
 
     const showIcon = () => {
       if (readerDiv) readerDiv.style.display = 'none';
@@ -214,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelBtn.addEventListener('click', () => {
       stopScanner().finally(() => {
         modal.style.display = 'none';
-        location.reload(); // Refresh background list so new records show up when closing modal[cite: 6]
+        location.reload(); 
       });
     });
   }
@@ -223,14 +223,14 @@ document.addEventListener('DOMContentLoaded', () => {
   if (recordBtn) {
     recordBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      if (handling) return;      // ignore double clicks while a scan is being sent[cite: 6]
+      if (handling) return;      
       handling = true;
       stopScanner();
 
       const studentInput = document.getElementById('scannerStudentId');
       const studentID = studentInput ? studentInput.value.trim() : '';
 
-      processScannedAttendance(studentID, false); // Manual record doesn't auto-restart scanner[cite: 6]
+      processScannedAttendance(studentID, false); 
     });
   }
 
@@ -286,31 +286,78 @@ document.addEventListener('DOMContentLoaded', () => {
     const f = id => document.getElementById(id);
     const form = f('ev-form'), fields = [...evDlg.querySelectorAll('input[type=text],input[type=date],input[type=time],select')];
 
+    (() => {
+      const inp = f('ev-coord'), list = f('ev-coord-list'), caret = f('ev-caret'), combo = f('ev-combo');
+      if (!inp || !list) return;
+      const items = [...list.children];
+      let hi = -1;
+      const setHi = i => {
+        const vis = items.filter(li => !li.hidden);
+        items.forEach(li => li.classList.remove('hi'));
+        if (!vis.length) { hi = -1; return; }
+        hi = (i + vis.length) % vis.length;
+        vis[hi].classList.add('hi'); vis[hi].scrollIntoView({ block: 'nearest' });
+      };
+      const close = () => { list.hidden = true; inp.setAttribute('aria-expanded', 'false'); hi = -1; items.forEach(li => li.classList.remove('hi')); };
+      const open = filter => {
+        if (inp.disabled) return;
+        const q = filter ? inp.value.trim().toLowerCase() : '';
+        let n = 0;
+        items.forEach(li => { const m = !q || li.dataset.v.toLowerCase().includes(q); li.hidden = !m; if (m) n++; });
+        if (!n) { close(); return; }
+        list.hidden = false; inp.setAttribute('aria-expanded', 'true');
+      };
+      const pick = li => { inp.value = li.dataset.v; close(); inp.focus(); };
+
+      inp.addEventListener('focus', () => open(false));
+      inp.addEventListener('click', () => { if (list.hidden) open(false); });
+      inp.addEventListener('input', () => { open(true); setHi(0); });
+      caret.addEventListener('mousedown', e => { e.preventDefault(); if (inp.disabled) return; if (list.hidden) { inp.focus(); open(false); } else close(); });
+      list.addEventListener('mousedown', e => e.preventDefault());
+      list.addEventListener('click', e => { const li = e.target.closest('li'); if (li) pick(li); });
+      inp.addEventListener('blur', close);
+      inp.addEventListener('keydown', e => {
+        const vis = items.filter(li => !li.hidden);
+        if (e.key === 'ArrowDown') { e.preventDefault(); if (list.hidden) { open(false); setHi(0); } else setHi(hi + 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); if (!list.hidden) setHi(hi - 1); }
+        else if (e.key === 'Enter' && !list.hidden && hi >= 0) { e.preventDefault(); pick(vis[hi]); }
+        else if (e.key === 'Escape' && !list.hidden) { e.preventDefault(); e.stopPropagation(); close(); }
+      });
+      evDlg.addEventListener('close', close);
+    })();
+
     // mode: 'add' | 'edit' | 'view'
+    const isDean = evDlg.dataset.dean === '1';
+    // mode: 'add' | 'edit' | 'view' | 'review' (dean looking at a pending event)
     const openDlg = (mode, d = {}) => {
       form.noValidate = false;
       f('ev-action').value = mode === 'edit' ? 'edit_event' : 'add_event';
       f('ev-id').value     = d.id || '';
-      f('ev-title').textContent = mode === 'add' ? 'ADD EVENT' : (mode === 'edit' ? 'EDIT EVENT' : 'VIEW EVENT');
+      f('ev-title').textContent = mode === 'add' ? 'ADD EVENT' : (mode === 'edit' ? 'EDIT EVENT' : (mode === 'review' ? 'REVIEW EVENT' : 'VIEW EVENT'));
       f('ev-name').value   = d.name   || '';
       f('ev-date').value   = d.date   || '';
-      f('ev-status').value = d.status || 'ACTIVE';
+      f('ev-status').value = mode === 'add' ? (isDean ? 'ACTIVE' : 'PENDING') : (d.status || 'ACTIVE');
       f('ev-start').value  = d.start  || '08:00';
       f('ev-end').value    = d.end    || '18:00';
-      f('ev-coord').value  = d.coord  || '';
-      fields.forEach(x => { x.disabled = mode === 'view'; });
-      f('ev-ok').hidden     = mode === 'view';
-      f('ev-delete').hidden = mode !== 'edit';
+      f('ev-coord').value = isDean ? (d.coord || '') : (evDlg.dataset.me || d.coord || '');
+      const locked = mode === 'view' || mode === 'review';
+      fields.forEach(x => { x.disabled = locked; });
+      if (!isDean) { f('ev-status').disabled = true; f('ev-coord').disabled = true; if (mode === 'edit') f('ev-name').disabled = true; }   // status is the dean's; non-dean events are posted under their own name
+      f('ev-note').hidden    = isDean || locked;
+      f('ev-ok').hidden      = locked;
+      f('ev-approve').hidden = mode !== 'review';
+      f('ev-reject').hidden  = mode !== 'review';
+      f('ev-delete').hidden  = mode !== 'edit';
       f('ev-delete').dataset.att = d.att || 0;
-      f('ev-cancel').textContent = mode === 'view' ? 'Close' : 'Cancel';
+      f('ev-cancel').textContent = locked ? 'Close' : 'Cancel';
       if (!evDlg.open) evDlg.showModal();
-      if (mode !== 'view') f('ev-name').focus();
+      if (!locked) (f('ev-name').disabled ? f('ev-date') : f('ev-name')).focus();
     };
 
     const add = f('ev-add');
     if (add) add.addEventListener('click', () => openDlg('add'));
 
-    const openRow = row => openDlg(row.dataset.edit === '1' ? 'edit' : 'view', {
+    const openRow = row => openDlg(row.dataset.review === '1' ? 'review' : (row.dataset.edit === '1' ? 'edit' : 'view'), {
       id: row.dataset.id, name: row.dataset.name, date: row.dataset.date, status: row.dataset.status,
       start: row.dataset.start, end: row.dataset.end, coord: row.dataset.coord, att: row.dataset.att
     });
@@ -320,7 +367,16 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     f('ev-cancel').addEventListener('click', () => evDlg.close());
-    evDlg.addEventListener('click', e => { if (e.target === evDlg) evDlg.close(); });   // click outside[cite: 6]
+    evDlg.addEventListener('click', e => { if (e.target === evDlg) evDlg.close(); });
+
+    const decide = act => {
+      f('ev-action').value = act;
+      form.noValidate = true;
+      fields.forEach(x => { x.disabled = true; }); 
+      form.submit();
+    };
+    f('ev-approve').addEventListener('click', () => decide('approve_event'));
+    f('ev-reject').addEventListener('click', () => { if (confirm('Reject this event? It will be deleted.')) decide('reject_event'); });
 
     f('ev-delete').addEventListener('click', () => {
       const n = parseInt(f('ev-delete').dataset.att, 10) || 0;

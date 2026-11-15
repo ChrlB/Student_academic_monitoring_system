@@ -72,13 +72,14 @@ if ($attGroup !== 'student' && $attFacultyID > 0) {
   $attMyDept    = $fr['department'] ?? null;
 }
 $attCanScan   = in_array($attPos, ['coordinator', 'faculty', 'dean'], true);
+$attIsDean    = ($attPos === 'dean');   // only the dean approves / rejects events
 $attScoped = false;
 $evpage    = ($attGroup !== 'student' && !empty($_GET['events']));
 if ($evpage) $_SESSION["page"] = "EVENTS | " . $attLabel;
 
 $GLOBALS['attPos'] = $attPos; $GLOBALS['attCanEdit'] = $attCanEdit; $GLOBALS['attScoped'] = $attScoped;
 $GLOBALS['attMyProgram'] = $attMyProgram; $GLOBALS['attMyDept'] = $attMyDept; $GLOBALS['evpage'] = $evpage;
-$GLOBALS['attCanScan'] = $attCanScan;
+$GLOBALS['attCanScan'] = $attCanScan; $GLOBALS['attIsDean'] = $attIsDean; $GLOBALS['attFacultyID'] = $attFacultyID;
 
 const ATT_DEBUG = true;
 const ATT_EVENT_STATUSES = ['ACTIVE', 'INACTIVE', 'FINISHED', 'RESCHEDULE', 'PENDING'];
@@ -140,7 +141,7 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
 
 # Handles Add / Edit / Delete of an event
 if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST'
-    && in_array($_POST['att_action'] ?? '', ['add_event', 'edit_event', 'delete_event'], true)) {
+    && in_array($_POST['att_action'] ?? '', ['add_event', 'edit_event', 'delete_event', 'approve_event', 'reject_event'], true)) {
   att_handle_event_action($db_connection, $_POST['att_action']);
   header('Location: ' . strtok($_SERVER['REQUEST_URI'] ?? '', '?') . '?events=1');
   exit;
@@ -160,7 +161,6 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
   $rawStudentID = trim($_POST['studentID'] ?? '');
   $eventKey     = trim($_POST['eventID'] ?? '');
 
-  # STRICT YYYYXXXXX FORMAT CHECK (No hyphen allowed)
   if (!preg_match('/^(\d{4})(\d{5})$/', $rawStudentID, $m)) {
     $respond('error', 'Enter a valid student ID (YYYYXXXXX).');
   }
@@ -221,7 +221,7 @@ if ($attScoped) {
   }
 }
 
-$eventNamesStmt = $db_connection->query("SELECT DISTINCT eventName FROM events ORDER BY eventName ASC");
+$eventNamesStmt = $db_connection->query("SELECT DISTINCT eventName FROM events WHERE status <> 'PENDING' ORDER BY eventName ASC");
 $ATT_EVENT_NAMES = $eventNamesStmt->fetchAll(PDO::FETCH_COLUMN);
 
 $openEventsStmt = $db_connection->query("
@@ -379,7 +379,7 @@ function att_norm_name(string $s): string {
 function att_faculty_names(): array {
   global $db_connection;
   $out = [];
-  foreach ($db_connection->query("SELECT facultyID, first_name, middle_name, last_name FROM faculty ORDER BY last_name, first_name")->fetchAll(PDO::FETCH_ASSOC) as $f) {
+  foreach ($db_connection->query("SELECT facultyID, first_name, middle_name, last_name FROM faculty WHERE LOWER(role) NOT LIKE '%registrar%' ORDER BY last_name, first_name")->fetchAll(PDO::FETCH_ASSOC) as $f) {
     $out[(int)$f['facultyID']] = ucwords(strtolower(preg_replace('/\s+/', ' ', trim($f['first_name'] . ' ' . $f['middle_name'] . ' ' . $f['last_name']))));
   }
   return $out;
@@ -398,16 +398,21 @@ function att_find_faculty(string $typed): ?int {
 }
 
 function att_events(): array {
-  global $db_connection, $attCanEdit, $attScoped, $attMyProgram, $attMyDept;
+  global $db_connection, $attCanEdit, $attScoped, $attMyProgram, $attMyDept, $attIsDean, $attFacultyID;
   $sql = "SELECT e.eventID, e.eventName, e.program, e.department, e.datetime_Start, e.datetime_End, e.eventCoordinator, e.status,
                  TRIM(CONCAT(f.first_name, ' ', f.middle_name, ' ', f.last_name)) AS coord_name,
                  (SELECT COUNT(*) FROM attendance a WHERE a.eventID = e.eventID) AS att_count
           FROM events e LEFT JOIN faculty f ON f.facultyID = e.eventCoordinator";
-  $args = [];
+  $args = []; $where = [];
   if ($attScoped) {
-    $sql .= " WHERE e.program = ? OR (e.program IS NULL AND (e.department IS NULL OR e.department = ?))";
-    $args = [$attMyProgram, $attMyDept];
+    $where[] = "(e.program = ? OR (e.program IS NULL AND (e.department IS NULL OR e.department = ?)))";
+    array_push($args, $attMyProgram, $attMyDept);
   }
+  if (!$attIsDean) {  
+    $where[] = "(e.status <> 'PENDING' OR e.eventCoordinator = ?)";
+    $args[] = $attFacultyID;
+  }
+  if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
   $sql .= " ORDER BY e.datetime_Start DESC, e.eventID DESC";
   $st = $db_connection->prepare($sql);
   $st->execute($args);
@@ -429,14 +434,39 @@ function att_events(): array {
       'status'  => strtoupper($r['status']),
       'coord'   => ($r['eventCoordinator'] && trim((string)$r['coord_name']) !== '') ? ucwords(strtolower(preg_replace('/\s+/', ' ', $r['coord_name']))) : '',
       'att'     => (int)$r['att_count'],
-      'canEdit' => $attCanEdit && (!$attScoped || $r['program'] === $attMyProgram),
+    
+      'canEdit' => $attCanEdit && (!$attScoped || $r['program'] === $attMyProgram) && ($attIsDean || (int)$r['eventCoordinator'] === $attFacultyID),
+      'review'  => $attIsDean && strtoupper($r['status']) === 'PENDING',  
     ];
   }
   return $out;
 }
 
 function att_handle_event_action(PDO $db, string $act): void {
-  global $attCanEdit, $attScoped, $attMyProgram, $attMyDept;
+  global $attCanEdit, $attScoped, $attMyProgram, $attMyDept, $attIsDean, $attFacultyID;
+  if (in_array($act, ['approve_event', 'reject_event'], true)) {
+    if (!$attIsDean) { $_SESSION['error'] = 'Only the dean can approve or reject events.'; return; }
+    try {
+      $id = (int)($_POST['eventID'] ?? 0);
+      $q = $db->prepare("SELECT status FROM events WHERE eventID = ?");
+      $q->execute([$id]);
+      $cur = $q->fetchColumn();
+      if ($cur === false) { $_SESSION['error'] = 'That event no longer exists.'; return; }
+      if (strtoupper((string)$cur) !== 'PENDING') { $_SESSION['error'] = 'This event is not waiting for approval.'; return; }
+      if ($act === 'approve_event') {
+        $db->prepare("UPDATE events SET status = 'ACTIVE' WHERE eventID = ? AND status = 'PENDING'")->execute([$id]);
+        $_SESSION['message'] = 'Event approved.';
+      } else {
+       
+        $db->prepare("DELETE FROM events WHERE eventID = ? AND status = 'PENDING'")->execute([$id]);
+        $_SESSION['message'] = 'Event rejected and deleted.';
+      }
+    } catch (Exception $e) {
+      error_log('Attendance approval failed: ' . $e->getMessage());
+      $_SESSION['error'] = ATT_DEBUG ? 'Database error: ' . $e->getMessage() : 'Database error. Please try again.';
+    }
+    return;
+  }
   if (!$attCanEdit) {
     $_SESSION['error'] = 'You are not allowed to add, edit or delete events.';
     return;
@@ -445,11 +475,17 @@ function att_handle_event_action(PDO $db, string $act): void {
     $id = (int)($_POST['eventID'] ?? 0);
     $existing = null;
     if ($act !== 'add_event') {
-      $q = $db->prepare("SELECT eventID, program FROM events WHERE eventID = ?");
+      $q = $db->prepare("SELECT eventID, eventName, program, status, eventCoordinator FROM events WHERE eventID = ?");
       $q->execute([$id]);
       $existing = $q->fetch(PDO::FETCH_ASSOC);
       if (!$existing) { $_SESSION['error'] = 'That event no longer exists.'; return; }
       if ($attScoped && $existing['program'] !== $attMyProgram) { $_SESSION['error'] = 'You can only change events of your own program.'; return; }
+      if (!$attIsDean && strtoupper((string)$existing['status']) === 'PENDING' && (int)$existing['eventCoordinator'] !== $attFacultyID) {
+        $_SESSION['error'] = 'That event no longer exists.'; return;
+      }
+      if (!$attIsDean && (int)$existing['eventCoordinator'] !== $attFacultyID) {
+        $_SESSION['error'] = 'Only the person who posted this event can edit or delete it.'; return;
+      }
     }
 
     if ($act === 'delete_event') {
@@ -459,10 +495,13 @@ function att_handle_event_action(PDO $db, string $act): void {
     }
 
     $name   = trim((string)($_POST['eventName'] ?? ''));
+    if (!$attIsDean && $act === 'edit_event') $name = (string)$existing['eventName'];  
     $date   = (string)($_POST['date'] ?? '');
     $start  = (string)($_POST['start'] ?? '');
     $end    = (string)($_POST['end'] ?? '');
     $status = strtoupper(trim((string)($_POST['status'] ?? '')));
+   
+    if (!$attIsDean) $status = 'PENDING';
     $coord  = trim((string)($_POST['coordinator'] ?? ''));
 
     $d = DateTime::createFromFormat('!Y-m-d', $date);
@@ -474,9 +513,11 @@ function att_handle_event_action(PDO $db, string $act): void {
     if ($end <= $start)                                    { $_SESSION['error'] = 'The end time must be after the start time.'; return; }
 
     $coordID = null;
-    if ($coord !== '') {
+    if (!$attIsDean) {
+      $coordID = $attFacultyID ?: null; 
+    } elseif ($coord !== '') {
       $coordID = att_find_faculty($coord);
-      if ($coordID === null) { $_SESSION['error'] = 'Event coordinator not found. Pick a name from the list.'; return; }
+      if ($coordID === null || !isset(att_faculty_names()[$coordID])) { $_SESSION['error'] = 'Event coordinator not found. Pick a name from the list.'; return; }
     }
     $dtStart = "$date $start:00";
     $dtEnd   = "$date $end:00";
@@ -484,11 +525,11 @@ function att_handle_event_action(PDO $db, string $act): void {
     if ($act === 'add_event') {
       $db->prepare("INSERT INTO events (eventName, program, department, datetime_Start, datetime_End, eventCoordinator, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
          ->execute([$name, $attScoped ? $attMyProgram : null, $attMyDept, $dtStart, $dtEnd, $coordID, $status]);
-      $_SESSION['message'] = 'Event added.';
+      $_SESSION['message'] = $attIsDean ? 'Event added.' : 'Event sent to the dean for approval.';
     } else {
       $db->prepare("UPDATE events SET eventName = ?, datetime_Start = ?, datetime_End = ?, eventCoordinator = ?, status = ? WHERE eventID = ?")
          ->execute([$name, $dtStart, $dtEnd, $coordID, $status, $id]);
-      $_SESSION['message'] = 'Event updated.';
+      $_SESSION['message'] = $attIsDean ? 'Event updated.' : 'Event updated and sent to the dean for approval.';
     }
   } catch (Exception $e) {
     error_log('Attendance events failed: ' . $e->getMessage());
@@ -499,6 +540,9 @@ function att_handle_event_action(PDO $db, string $act): void {
 if ($evpage) {
   $events = att_events();
   $ATT_FACULTY_NAMES = $attCanEdit ? array_values(att_faculty_names()) : [];
+  $mq = $db_connection->prepare("SELECT TRIM(CONCAT(first_name, ' ', middle_name, ' ', last_name)) FROM faculty WHERE facultyID = ?");
+  $mq->execute([$attFacultyID]);
+  $ATT_ME_NAME = ucwords(strtolower(preg_replace('/\s+/', ' ', (string)$mq->fetchColumn())));
 } elseif ($attGroup === 'student') {
   $me = $attStudentKey ? ($students[$attStudentKey] ?? null) : null;
   if (!$me) {
