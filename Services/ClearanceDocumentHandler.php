@@ -130,6 +130,10 @@ function downloadDocument(): void
                 ? 'findClearanceDocument'
                 :'findFacultyClearanceDocument';
 
+    // global $student_view;
+
+    // if(in_array($student_view , ['SUBJECT'])) $findDocQuery 'findClearanceDocument'
+
     global $clearanceDAO;
     if($docFor === "clearance"){
         if (!in_array($categ, ['S', 'F', 'O'], true) || $requestedDocumentId < 1) {
@@ -142,7 +146,20 @@ function downloadDocument(): void
             exit;
         }
         $document = $documentRows[0];
-    } else {
+    } elseif($docFor === "clearanceSigning"){
+
+        $studentID = $_GET['studentID'] ?? '';
+        if (!in_array($categ, ['S', 'F', 'O'], true) || $requestedDocumentId < 1) {
+            http_response_code(400);
+            exit;
+        }
+        $documentRows = $clearanceDAO->executeQuery('findClearanceDocument', [$categ.$requestedDocumentId,$studentID]);
+        if (empty($documentRows)) {
+            http_response_code(404);
+            exit;
+        }
+        $document = $documentRows[0];
+    }else {
         http_response_code(400);
         exit;
     }

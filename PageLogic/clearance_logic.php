@@ -104,9 +104,10 @@ function getfacultyClearance($faculty_lastname = 'ALL',$status = 'ALL'){
 }
 
 
-function getSubjectRequireMents($subjectID){
+function getSubjectRequireMents($subjectID, $studentID = 'self'){
     global $clearanceDAO;
-    $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ,$_SESSION['userID'],$_SESSION['userID']]);
+    if($studentID == 'self') $studentID = $_SESSION['userID'];
+    $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ,$studentID,$_SESSION['userID']]);
 
     return $records;
 }

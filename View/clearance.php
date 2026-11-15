@@ -1022,19 +1022,21 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 <div>
                   <hr>
                 </div>
-                <div class="row" style="gap: 20px;"><?php $uploaded_files = getFacultyUploadedRequirements($_GET['subjectID']); ?>
+                <div class="row" style="gap: 20px;"><?php $uploaded_files = getSubjectRequireMents($_GET['subjectID'],$students_for_clearance['studentID']); ?>
                     <div class="column"  style="gap: 20px;">
                       <div class="student_clearance_panel">
                         <h3>STUDENT INFO:</h3>
-                        <div class="row" style="gap: 20px;">
-                          <div class="column" style="gap: 10px;">
-                            <b>ID: <?= strtoupper($students_for_clearance['studentID']) ?>  </b>
-                            <b>NAME: <?= strtoupper($students_for_clearance['student_name']) ?>  </b>
-                                
+                        <div class="row" style="gap: 20px; ">
+                          <div class="column" style="gap: 10px; ">
+                            <span>ID:</span>
+                            <span>NAME:</span>
+                            <span>COURSE-BLOCK:</span>     
                           </div>
                           <div class="column" style="gap: 10px;">
-                            <b>COURSE-BLOCK: <?= strtoupper($students_for_clearance['program'].' - '.strtoupper($students_for_clearance['block'])) ?> </b>             
-                            <b>NAME: <?= strtoupper($students_for_clearance['student_name']) ?>  </b>             
+                            <b> <?= '&emsp;&emsp;'.strtoupper($students_for_clearance['studentID']) ?>  </b>
+                            <b> <?= '&emsp;&emsp;'.strtoupper($students_for_clearance['student_name']) ?>  </b>
+                            <b> <?= '&emsp;&emsp;'.strtoupper($students_for_clearance['program'].' - '.strtoupper($students_for_clearance['block'])) ?> </b>             
+                                     
                           </div>
                         </div>
                       </div>
@@ -1055,19 +1057,24 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                               </div> -->
                               <div class="row" style="align-items:center;">
                                 <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
-                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S" target="_blank">
+                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearanceSigning&amp;categ=S&amp;studentID=<?= $students_for_clearance['studentID'] ?>" target="_blank">
                                     <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
                                   </a>
                                 <?php endif ?>
                                 
-                                
+                                <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearanceSigning&amp;categ=S&amp;download=1&amp;studentID=<?= $students_for_clearance['studentID']?>">
+                                  <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
+                                </a>
                                 
                               </div>
                             </div>
 
                           <?php endforeach ?>
                         </div>                    
-                      </div>                   
+                      </div>  
+                      <div class="student_clearance_panel">
+                        <h3>PROJECTS:</h3>
+                      </div>                 
                     </div>  
                     
                     <div class="column"  style="gap: 20px;">
@@ -1080,16 +1087,16 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                           
                         </div>                    
                       </div>
-                      <div class="column student_clearance_panel" style="gap: 20px;">
+                      <div class="column student_clearance_panel" style="gap: 20px; ">
                         REMARKS:
-                        <textarea name="" id="" style="min-width:400px; max-width:650px; height:150px">
+                        <textarea name="" id="" style="min-width:500px; max-width:650px; height:150px;" class="filter">
 
                         </textarea>
                         STATUS:
-                        <select>
-                          <option value="CLEARED">CLEARED</option>
-                          <option value="PENDING">NOT YET CLEARED</option>
-                          <option value="REJECT">REJECT</option>
+                        <select class="filter" onchange="this.style.color = this.options[this.selectedIndex].style.color">
+                          <option value="CLEARED" style="color:green">CLEARED</option>
+                          <option value="PENDING" style="color:blue">NOT YET CLEARED</option>
+                          <option value="REJECT" style="color:red">REJECT</option>
                         </select>
                       </div>   
                     </div>
@@ -1100,7 +1107,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             <?php endif ?>
 
           <?php elseif($student_view == "FACULTY"): ?>
-
+                
           <?php endif ?>
 
 
