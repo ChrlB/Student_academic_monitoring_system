@@ -7,6 +7,7 @@
   var endpoint = wrap.dataset.endpoint;
   var csrf     = wrap.dataset.csrf;
   var sched    = wrap.dataset.sched;
+  var canEdit  = !!wrap.dataset.edit;
 
   /* ---------- toast ---------- */
   var toastTimer = null;
@@ -20,7 +21,7 @@
     el.className = 'syl-toast' + (isError ? ' error' : '');
     el.textContent = msg;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.remove(); }, 4000);
+    toastTimer = setTimeout(function () { el.remove(); }, 6000);
   }
 
   /* ---------- class dropdown ---------- */
@@ -30,8 +31,8 @@
   }
 
   /* ---------- search + status filter ---------- */
-  var searchInput = wrap.querySelector('.search-bar');
-  var filterItems = wrap.querySelectorAll('.filter-item');
+  var searchInput  = wrap.querySelector('.search-bar');
+  var filterItems  = wrap.querySelectorAll('.filter-item');
   var activeFilter = '';
 
   function applyFilters() {
@@ -39,17 +40,17 @@
     var filtering = q !== '' || activeFilter !== '';
 
     wrap.querySelectorAll('.syl-module').forEach(function (mod) {
-      var rows = mod.querySelectorAll('.week-item');
+      var topics = mod.querySelectorAll('.topic');
       var visible = 0;
-      rows.forEach(function (row) {
-        var okText   = q === '' || (row.dataset.text || '').indexOf(q) !== -1;
-        var okStatus = activeFilter === '' || row.dataset.status === activeFilter;
+      topics.forEach(function (t) {
+        var okText   = q === '' || (t.dataset.text || '').indexOf(q) !== -1;
+        var okStatus = activeFilter === '' || t.dataset.status === activeFilter;
         var show = okText && okStatus;
-        row.classList.toggle('is-hidden', !show);
+        t.classList.toggle('is-hidden', !show);
         if (show) visible++;
       });
-      // keep empty modules visible when nothing is being filtered (faculty need them to add tasks)
-      mod.classList.toggle('is-hidden', filtering && rows.length > 0 && visible === 0);
+      // keep empty modules visible when nothing is being filtered (faculty need them to add topics)
+      mod.classList.toggle('is-hidden', filtering && topics.length > 0 && visible === 0);
     });
   }
 
@@ -59,7 +60,7 @@
     function toggle() {
       var f = item.dataset.filter || '';
       activeFilter = (activeFilter === f) ? '' : f;
-      filterItems.forEach(function (i) { i.classList.toggle('active', i.dataset.filter === activeFilter && activeFilter !== ''); });
+      filterItems.forEach(function (i) { i.classList.toggle('active', activeFilter !== '' && i.dataset.filter === activeFilter); });
       applyFilters();
     }
     item.addEventListener('click', toggle);
@@ -68,7 +69,18 @@
     });
   });
 
-  /* ---------- server actions (faculty only) ---------- */
+  /* ---------- a topic row opens its topic page (students + faculty) ---------- */
+  wrap.addEventListener('click', function (e) {
+    var row = e.target.closest('.week-item[data-href]');
+    if (!row) return;
+    if (e.target.closest('a, button, select, input, textarea, label')) return;   // links navigate on their own
+    if (row.classList.contains('editing')) return;
+    window.location.href = row.dataset.href;
+  });
+
+  if (!canEdit) return;   // read-only view: nothing more to wire
+
+  /* ---------- server actions (faculty) ---------- */
   function send(action, data) {
     var fd = new FormData();
     fd.append('csrf_token', csrf);
@@ -94,9 +106,6 @@
     });
   }
 
-  if (!wrap.dataset.edit) return;   // read-only view: nothing more to wire
-
-  // add module
   var moduleForm = wrap.querySelector('.module-form');
   if (moduleForm) {
     moduleForm.addEventListener('submit', function (e) {
@@ -107,12 +116,11 @@
     });
   }
 
-  // add task (one form per module)
   wrap.querySelectorAll('.task-form').forEach(function (form) {
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var title = form.elements.title.value.trim();
-      if (!title) { toast('Enter a task title first.', true); return; }
+      if (!title) { toast('Enter a topic title first.', true); return; }
       run('add_task', {
         moduleID: form.dataset.module,
         title: title,
@@ -122,14 +130,12 @@
     });
   });
 
-  // status dropdown on each task
   wrap.querySelectorAll('.status-select').forEach(function (sel) {
     sel.addEventListener('change', function () {
       run('set_status', { taskID: sel.dataset.task, status: sel.value });
     });
   });
 
-  // buttons (event delegation)
   wrap.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-action]');
     if (!btn) return;
@@ -145,7 +151,7 @@
       if (next !== current) run('rename_module', { moduleID: btn.dataset.module, title: next });
 
     } else if (action === 'delete-module') {
-      if (window.confirm('Delete this module and ALL of its tasks? This cannot be undone.')) {
+      if (window.confirm('Delete this module, ALL of its topics, lesson pages and uploaded files? This cannot be undone.')) {
         run('delete_module', { moduleID: btn.dataset.module });
       }
 
@@ -157,7 +163,7 @@
 
     } else if (action === 'save-task' && row) {
       var title = row.querySelector('[name="title"]').value.trim();
-      if (!title) { toast('Task title cannot be empty.', true); return; }
+      if (!title) { toast('Topic title cannot be empty.', true); return; }
       run('edit_task', {
         taskID: btn.dataset.task,
         title: title,
@@ -166,7 +172,9 @@
       });
 
     } else if (action === 'delete-task') {
-      if (window.confirm('Delete this task?')) run('delete_task', { taskID: btn.dataset.task });
+      if (window.confirm('Delete this topic, its lesson page and all of its materials? This cannot be undone.')) {
+        run('delete_task', { taskID: btn.dataset.task });
+      }
 
     } else if (action === 'mark-done') {
       run('set_status', { taskID: btn.dataset.task, status: 'completed' });
