@@ -28,6 +28,21 @@ $box = function (array $c) {
     $auto     = ['date_of_birth' => 'bday', 'number' => 'tel', 'address' => 'street-address'][$c['key']] ?? 'off';
     $dateAttr = $c['type'] === 'date' ? 'data-kind="date" min="1900-01-01" max="' . date('Y-m-d') . '"' : '';
     ?>
+    <!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AMS | Faculty Account</title>
+  <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
+  <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/general.css">
+  <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/account.css">
+  <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/account_dialogs.css">
+  
+  <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/faculty_account.css">
+  
+</head>
+<body>
     <label class="<?= e($cls) ?>" for="<?= e($id) ?>">
       <span><?= e($c['label']) ?></span>
       <?php if ($c['type'] === 'select'): ?>
@@ -136,3 +151,6 @@ $box = function (array $c) {
 </article>
 
 <div class="fa-toast" id="fa-toast" role="status" aria-live="polite" hidden></div>
+
+  </body>
+  </html>  
