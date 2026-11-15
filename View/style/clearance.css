@@ -330,6 +330,38 @@
 
 }
 
+*{
+  .student_clearance_panel{
+    padding: 20px;
+    border-radius: 30px;
+     background: rgba(40, 40, 40, 0.3);
+  }
+
+
+  .subject_uploaded_file_container{
+    .uploaded_file_container {
+      font-size: 16px;
+      justify-content: space-between;
+      width:400px; 
+      align-items: center;
+      background-color: #7D6186;
+      padding: 10px 15px;
+      border-radius: 50px;
+      gap: 10px;
+
+      .file_icons {
+        height: 30px;
+      }
+
+      b {
+        font-size: 12px;
+        overflow: hidden;
+      }
+    }
+  }
+}
+
+
 .uploads_container {
   padding: 40px;
   border-radius: 30px;

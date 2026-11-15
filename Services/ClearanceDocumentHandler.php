@@ -126,13 +126,17 @@ function downloadDocument(): void
     $documentRows = [];
     $document = [];
 
+    $findDocQuery = ($_SESSION['role'] == 'student')
+                ? 'findClearanceDocument'
+                :'findFacultyClearanceDocument';
+
     global $clearanceDAO;
     if($docFor === "clearance"){
         if (!in_array($categ, ['S', 'F', 'O'], true) || $requestedDocumentId < 1) {
             http_response_code(400);
             exit;
         }
-        $documentRows = $clearanceDAO->executeQuery('findClearanceDocument', [$categ.$requestedDocumentId, $_SESSION['userID']]);
+        $documentRows = $clearanceDAO->executeQuery($findDocQuery, [$categ.$requestedDocumentId, $_SESSION['userID']]);
         if (empty($documentRows)) {
             http_response_code(404);
             exit;
@@ -202,6 +206,10 @@ function deleteDocument($request): void
         'O' => 'deleteOfficeClearanceDocument',
     ];
 
+    $findDocQuery = ($_SESSION['role'] == 'student')
+                ? 'findClearanceDocument'
+                :'findFacultyClearanceDocument';
+
     if (!isset($deleteQueries[$categ]) || $documentId < 1) {
         http_response_code(400);
         exit;
@@ -210,7 +218,7 @@ function deleteDocument($request): void
     try {
         // 1. Get the Drive file ID before the row disappears
         $rows = $clearanceDAO->executeQuery(
-            'findClearanceDocument',
+            $findDocQuery,
             [$categ . $documentId, $_SESSION['userID']]
         );
         if (empty($rows)) {

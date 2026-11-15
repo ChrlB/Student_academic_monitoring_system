@@ -197,3 +197,24 @@ function getStudentsForSubjectClearance($department = 'ALL', $subjectID = 'ALL',
 
     return $records;
 }
+function editStudentsForSubjectClearance($department = 'ALL', $subjectID = 'ALL',$block = 'ALL',$year = 'ALL',$acad_year = 'ALL',$studentID = '0'){
+    global $clearanceDAO;
+
+    $records = $clearanceDAO->executeQuery("editStudentsForSubjectClearance",[
+        $department,$department,
+        $subjectID,$subjectID,
+        $block,$block, 
+        $year,$year,
+        $acad_year,$acad_year,
+        $studentID,
+        $_SESSION['userID']]);
+
+    return $records;
+}
+
+function getFacultyUploadedRequirements($subjectID){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getFacultyUploadedRequirements",[ $subjectID ,$_SESSION['userID']]);
+
+    return $records;
+}
