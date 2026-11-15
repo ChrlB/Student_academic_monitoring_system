@@ -756,7 +756,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
             <?php $subjects_handling = getSubjects(); if(count($subjects_handling) > 0): $filtered_subjects_handling = getSubjects($department,$search,$block,$year,$acadyear); ?>
               
-              
+              <?php var_dump($department.$search.$block.$year.$acadyear) ?>
               <form class="column" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
                 <input type="hidden" name="view" value="MAIN">
                 <div class="row" style="justify-content:space-between; align-items:center; gap:20px" >
@@ -871,6 +871,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           <?php elseif($student_view == "OFFICE"): ?>
           <?php elseif($student_view == "SUBJECT"): $students_for_clearance = getStudentsForSubjectClearance($department,$_GET['subjectID'],$block,$year,$acadyear)?>
             
+            <?php //var_dump($department." ".$_GET['subjectID']." ".$block." ".$year." ".$acadyear) ?>
             <?php if(!isset($_GET['edit'])): ?>
               <div class="row" style="justify-content: space-between; align-items:center">
                 <b class="view_title"><?= $_GET['subjectID'].' - '.$_GET['name'] ?>  </b>
@@ -1013,7 +1014,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
               </div>
             <?php elseif(isset($_GET['edit']) && ($_GET['edit'] == 1)): $students_for_clearance = (editStudentsForSubjectClearance($department,$_GET['subjectID'],$block,$year,$acadyear, $_GET['studentID']))[0]?>
-                <?php // var_dump($students_for_clearance) ?>     
+                   
                 
                 <div class="row" style="justify-content: space-between; align-items:center">
                   <b class="view_title"><?= $_GET['subjectID'].' - '.$_GET['name'] ?>  </b>
@@ -1087,18 +1088,28 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                           
                         </div>                    
                       </div>
-                      <div class="column student_clearance_panel" style="gap: 20px; ">
+                      <form method="post" action="<?= BASE_PATH ?>/update_clearance"   class="column student_clearance_panel" style="gap: 20px; ">
                         REMARKS:
-                        <textarea name="" id="" style="min-width:500px; max-width:650px; height:150px;" class="filter">
-
+                        <textarea name="remarks" id="" style="min-width:500px; max-width:650px; height:150px; padding:20px" class="filter" ><?= htmlspecialchars($students_for_clearance['remarks'] ?? '')?>
                         </textarea>
-                        STATUS:
-                        <select class="filter" onchange="this.style.color = this.options[this.selectedIndex].style.color">
-                          <option value="CLEARED" style="color:green">CLEARED</option>
-                          <option value="PENDING" style="color:blue">NOT YET CLEARED</option>
-                          <option value="REJECT" style="color:red">REJECT</option>
+                        STATUS:<?php $clearance_status = $students_for_clearance['status'] ?? 'NOT YET CLEARED'; ?>
+                        <select name="clearance_status_filter" class="filter" onchange="this.style.color = this.options[this.selectedIndex].style.color"  style="color: <?php 
+                              {echo (strtoupper($clearance_status) === 'CLEARED') ? 'green' : 
+                                  ((strtoupper($clearance_status) === 'NOT YET CLEARED') ? 'yellow' : 
+                                  ((strtoupper($clearance_status) === 'REJECT') ? 'red' : 'white')); }
+                            ?>;">
+
+                          <option value="CLEARED" style="color:green" <?php if(strtoupper($clearance_status) === 'CLEARED') echo 'selected'  ?>>CLEARED</option>
+                          <option value="NOT YET CLEARED" style="color:yellow" <?php if(strtoupper($clearance_status) === 'NOT YET CLEARED') echo 'selected'  ?>>NOT YET CLEARED</option>
+                          <option value="REJECT" style="color:red" <?php if(strtoupper($clearance_status) === 'REJECT') echo 'selected'  ?> >REJECT</option>
                         </select>
-                      </div>   
+
+                        <input type="hidden" name="clearance_categ" value="<?= $student_view ?>">
+                        <input type="hidden" name="clearanceID" value="<?= $students_for_clearance['subject_clearanceID'] ?? '' ?>">
+                        <input type="hidden" name="enrolled_subID" value="<?= $students_for_clearance['enrolled_subjectID'] ?>">
+                        <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">          
+                        <button type="submit">SAVE</button>
+                      </form>   
                     </div>
                 </div>
                 

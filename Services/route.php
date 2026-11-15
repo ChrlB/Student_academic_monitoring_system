@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__.'/../PageLogic/login_logic.php';
+// require_once __DIR__.'/../PageLogic/clearance_logic.php';
 require_once __DIR__.'/../PageLogic/account_actions.php';   // changePassword(), updateProfile()
 require_once __DIR__.'/../PageLogic/faculty_account_actions.php';   // saveFacultyInfo(), saveFacultyContact()
 require_once __DIR__."/../Services/session.php";
@@ -67,6 +68,11 @@ $router->post('/attendance', fn() => require __DIR__.'/../View/attendance.php');
 $router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
 $router->post('/class-sched', fn() => require __DIR__ . '/../View/class_sched.php');
 $router->get('/clearance',  fn() => require __DIR__ . '/../View/clearance.php');
+// $router->post('/update_clearance',  fn($request) => updateClearance($request));
+$router->post('/update_clearance', function ($request) {
+    require_once __DIR__ . '/../PageLogic/clearance_logic.php';
+    return updateClearance($request);
+});
 
 // $router->post('/clearance',  fn($request) => require __DIR__ . '/../View/clearance.php');
 

@@ -67,7 +67,11 @@ if($_SESSION["role"] == "student"){
 // }    
 
 function statusClass(string $status): string{
-    return strtoupper($status) === 'CLEARED' ? 'status_cleared' : 'status_rejected';
+    $class = '';
+    if(strtoupper($status) === 'CLEARED')$class = 'status_cleared';
+    elseif(in_array(strtoupper($status),[ 'PENDING','NOT YET CLEARED']))$class = 'status_pending';
+    elseif(strtoupper($status) === 'REJECT')$class = 'status_rejected';
+    return  $class;
 }
 
 function getSubjectsClearance($subjectID = 'ALL',$status = 'ALL'){
@@ -218,4 +222,47 @@ function getFacultyUploadedRequirements($subjectID){
     $records = $clearanceDAO->executeQuery("getFacultyUploadedRequirements",[ $subjectID ,$_SESSION['userID']]);
 
     return $records;
+}
+
+function updateClearance($request){
+    global $clearanceDAO;
+    $records = -1;
+    if(!isset($request['clearance_categ']) || !isset($request['clearanceID'])){
+        $_SESSION["error"] = "CANT SAVE RECORD";
+        return;
+    } 
+
+    
+    $remarks = $request['remarks'] ?? '';
+    $status = $request['clearance_status_filter'] ?? '';
+
+    if($request['clearance_categ'] === "SUBJECT"){
+        if($request['clearanceID'] === ''){
+           $records = $clearanceDAO->executeQuery("addSubjectClearance",[$request['enrolled_subID'],$remarks,$status]);
+        }else{
+           $records = $clearanceDAO->executeQuery("updateSubjectClearance",[$remarks,$status,$request['clearanceID']]);
+        }
+        
+
+    }elseif($request['clearance_categ'] === "OFFICE"){
+        if($request['clearanceID'] == ''){
+            
+        }elseif($request['enrolled_subID']){
+
+        }
+
+    }elseif($request['clearance_categ'] === "FACULTY"){
+        if($request['clearanceID'] == ''){
+            
+        }elseif($request['enrolled_subID']){
+
+        }
+
+    }
+
+    ($records > 0)? $_SESSION["message"] = "RECORD SAVED"
+    : $_SESSION["error"] = "CANT SAVE RECORD".($request['clearanceID'] === '');
+
+    header('Location: ' .$request['page_uploader']);
+    exit;
 }

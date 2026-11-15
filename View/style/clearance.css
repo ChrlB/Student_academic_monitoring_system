@@ -331,6 +331,18 @@
 }
 
 *{
+
+
+  button {
+      padding: 10px 25px;
+      font-size: 20px;
+      border-radius: 50px;
+      background-color: #A45DBB;
+    }
+
+    button:hover {
+      background-color: #cc87e3;
+    }
   .student_clearance_panel{
     padding: 20px;
     border-radius: 30px;
@@ -498,6 +510,10 @@ button {
 
 .status_cleared {
   background: #1fa012;
+}
+
+.status_pending {
+  background: #0aa7b9;
 }
 
 main {

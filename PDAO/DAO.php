@@ -184,6 +184,8 @@ $userDAO->prepareStatement("updateStudentPassword",
 
 
 
+$userDAO->prepareStatement("updateStudentProfileFull",
+        "UPDATE students SET middle_name = ?, email = ?, number = ?, date_of_birth = ?, gender = ?, address = ?, place_of_birth = ?, civil_status = ?, sexual_orientation = ?, citizenship = ?, religion = ?, region = ?, province = ?, municipality = ?, zip_code = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
 
 
 
@@ -241,17 +243,15 @@ $userDAO->prepareStatement("updateStudentPassword",
     $clearanceDAO->prepareStatement("getClearanceUpdates",
     " SELECT category, item_name, name, studentID, date_cleared, remarks, status
         FROM ($cleranceUpdate) AS updates
-        WHERE upper(`status`) in ('CLEARED','REJECTED')
+        
         ORDER BY date_cleared DESC LIMIT 50
     "
     );
-        $userDAO->prepareStatement("updateStudentProfileFull",
-        "UPDATE students SET middle_name = ?, email = ?, number = ?, date_of_birth = ?, gender = ?, address = ?, place_of_birth = ?, civil_status = ?, sexual_orientation = ?, citizenship = ?, religion = ?, region = ?, province = ?, municipality = ?, zip_code = ? WHERE studentID = ? AND YEAR(date_created) = ?;");
-
+        
     $clearanceDAO->prepareStatement("getPieChartData",
     " SELECT
         COALESCE(SUM(UPPER(status) = 'CLEARED'), 0)  AS cleared,
-        COALESCE(SUM(UPPER(status) = 'REJECTED'), 0) AS rejected,
+        COALESCE(SUM(UPPER(status) = 'REJECT'), 0) AS rejected,
         COALESCE(SUM(UPPER(status) in ( 'PENDING','NOT YET CLEARED')), 0) AS not_yet_cleared
         FROM ($cleranceUpdate) AS updates
     "
@@ -289,6 +289,7 @@ $userDAO->prepareStatement("updateStudentPassword",
     );
 
     $clearanceDAO->prepareStatement("getSubjectRequirements","SELECT
+            SC.subject_clearanceID,
             S.subjectID AS subjectID,
             S.name AS name,
             SC.date_cleared AS date_cleared,
@@ -741,7 +742,7 @@ $userDAO->prepareStatement("updateStudentPassword",
             AND (SS.`subjectID` = ? OR 'ALL' = ?)
             AND ( SS.`block` = ? OR 'ALL' = ?)
             AND ( SY.year = ? OR 'ALL' = ?)
-            AND ( concat(EP.acad_year,' - ',EP.sem) = ? OR 'ALL' = ?)
+            AND ( concat(EP.acad_year,' - ',EP.sem,' sem') = ? OR 'ALL' = ?)
             AND CONCAT('F', YEAR(F.date_created), LPAD(SS.facultyID, 5, '0')) = ?;
            
     ");
@@ -762,6 +763,7 @@ $userDAO->prepareStatement("updateStudentPassword",
             SY.program,
             EP.acad_year,
             EP.sem,
+            SC.subject_clearanceID,
             IFNULL(SC.date_cleared, 'Not Yet Cleared') AS date_cleared,
             concat(EP.acad_year,' - ',EP.sem,' sem') as acad_year_sem
         FROM `enrolled_subjects` AS ES
@@ -786,7 +788,7 @@ $userDAO->prepareStatement("updateStudentPassword",
             AND (ES.`subjectID` = ? OR 'ALL' = ?)
             AND ( SS.`block` = ? OR 'ALL' = ?)
             AND ( SY.year = ? OR 'ALL' = ?)
-            AND ( concat(EP.acad_year,' - ',EP.sem) = ? OR 'ALL' = ?)
+            AND ( concat(EP.acad_year,' - ',EP.sem,' sem') = ? OR 'ALL' = ?)
             AND CONCAT('F', YEAR(F.date_created), LPAD(SS.facultyID, 5, '0')) = ?;
 
 
@@ -808,6 +810,8 @@ $userDAO->prepareStatement("updateStudentPassword",
             SY.program,
             EP.acad_year,
             EP.sem,
+            SC.remarks,
+            SC.subject_clearanceID,
             IFNULL(SC.date_cleared, 'Not Yet Cleared') AS date_cleared,
             concat(EP.acad_year,' - ',EP.sem,' sem') as acad_year_sem
         FROM `enrolled_subjects` AS ES
@@ -881,6 +885,87 @@ $userDAO->prepareStatement("updateStudentPassword",
         WHERE
             S.subjectID = ? 
             ANd SCR.uploaded_by = ?;
+
+    ");
+
+    $clearanceDAO->prepareStatement("getAllClearance","SELECT
+            `faculty_clearanceID` AS id,
+            'faculty' AS category,
+            f.role AS item_name,
+            CONCAT(f.last_name, ', ', f.first_name) AS name,
+            fc.studentID AS studentID,
+            DATE(fc.date_cleared) AS date_cleared,
+            fc.remarks AS remarks,
+            fc.status AS status
+        FROM faculty_clearance AS fc
+        JOIN faculty AS f ON f.facultyID = fc.facultyID
+        JOIN students AS S ON S.studentID = fc.studentID
+        WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
+
+        UNION ALL
+
+        SELECT
+            `office_clearanceID`,
+            'office' AS category,
+            o.name,
+            CONCAT(f.last_name, ', ', f.first_name),
+            oc.studentID,
+            DATE(oc.date_cleared),
+            oc.remarks,
+            oc.status
+        FROM office_clearance AS oc
+        JOIN office AS o ON o.officeID = oc.officeID
+        JOIN faculty AS f ON f.facultyID = o.facultyID
+        JOIN students AS S ON S.studentID = oc.studentID
+        WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
+
+        UNION ALL
+
+        SELECT
+            `subject_clearanceID`,
+            'subjects' AS category,
+            su.name,
+            es.subjectID,
+            es.studentID,
+            DATE(sc.date_cleared),
+            sc.remarks,
+            sc.status
+        FROM subject_clearance AS sc
+        JOIN enrolled_subjects AS es ON es.enrolled_subjectID = sc.enrolled_subjectID
+        JOIN subjects AS su ON su.subjectID = es.subjectID
+        JOIN students AS S ON S.studentID = es.studentID
+        WHERE concat(year(S.date_created),lpad(S.studentID,5,0)) = ?
+    ");
+
+    $clearanceDAO->prepareStatement("updateSubjectClearance","UPDATE `subject_clearance` 
+        SET 
+            `remarks` = ?,
+            `status` = ?
+        WHERE `subject_clearanceID` = ?;
+
+    ");
+
+    $clearanceDAO->prepareStatement("updateOfficeClearance","
+
+    ");
+
+    $clearanceDAO->prepareStatement("updateFacultyClearance","
+
+    ");
+
+    $clearanceDAO->prepareStatement("addSubjectClearance"," INSERT 
+        INTO `subject_clearance` (
+            `enrolled_subjectID`,
+            `remarks`,
+            `status`
+        ) VALUES (?,?,? )
+    ");
+
+    $clearanceDAO->prepareStatement("addOfficeClearance","
+
+    ");
+
+    $clearanceDAO->prepareStatement("addFacultyClearance","
 
     ");
 }
