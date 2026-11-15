@@ -43,7 +43,7 @@
              title="<?= $ev['canEdit'] ? 'Click to edit' : 'Click to view' ?>"
              data-id="<?= (int)$ev['id'] ?>" data-name="<?= e($ev['name']) ?>" data-date="<?= e($ev['ymd']) ?>"
              data-start="<?= e($ev['start24']) ?>" data-end="<?= e($ev['end24']) ?>" data-status="<?= e($ev['status']) ?>"
-             data-coord="<?= e($ev['coord']) ?>" data-att="<?= (int)$ev['att'] ?>" data-edit="<?= $ev['canEdit'] ? '1' : '0' ?>" data-review="<?= !empty($ev['review']) ? '1' : '0' ?>">
+             data-program="<?= e($ev['program']) ?>" data-coord="<?= e($ev['coord']) ?>" data-att="<?= (int)$ev['att'] ?>" data-edit="<?= $ev['canEdit'] ? '1' : '0' ?>" data-review="<?= !empty($ev['review']) ? '1' : '0' ?>">
           <span class="ev-name"><?= e($ev['name']) ?></span>
           <span><?= e($ev['scope']) ?></span>
           <span><?= e($ev['date']) ?></span>
@@ -56,7 +56,7 @@
   </section>
 
   <!-- Add / Edit / View event -->
-  <dialog class="ev-dlg" id="ev-dlg" data-dean="<?= !empty($attIsDean) ? '1' : '0' ?>" data-me="<?= e($ATT_ME_NAME ?? '') ?>">
+  <dialog class="ev-dlg" id="ev-dlg" data-dean="<?= !empty($attIsDean) ? '1' : '0' ?>" data-me="<?= e($ATT_ME_NAME ?? '') ?>" data-my-program="<?= e(in_array($attMyProgram, $ATT_PROGRAMS, true) ? $attMyProgram : '') ?>">
     <form method="post" action="<?= e(att_url()) ?>" id="ev-form" autocomplete="off">
       <input type="hidden" name="att_action" id="ev-action" value="add_event">
       <input type="hidden" name="eventID" id="ev-id" value="">
@@ -74,11 +74,16 @@
           </select></label>
       </div>
 
-      <div class="ev-two">
+      <div class="ev-three">
         <label class="ev-field"><span>START</span>
           <input type="time" name="start" id="ev-start" value="08:00" required></label>
         <label class="ev-field"><span>END</span>
           <input type="time" name="end" id="ev-end" value="18:00" required></label>
+        <label class="ev-field"><span>PROGRAM / COLLEGE</span>
+          <select name="program" id="ev-program">
+            <option value=""><?= e($ATT_ALL_LABEL) ?></option>
+            <?php foreach ($ATT_PROGRAMS as $pg): ?><option value="<?= e($pg) ?>"><?= e($pg) ?></option><?php endforeach; ?>
+          </select></label>
       </div>
 
       <div class="ev-field"><span>EVENT COORDINATOR</span>
