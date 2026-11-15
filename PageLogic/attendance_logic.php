@@ -1,14 +1,39 @@
 <?php
+# Start session first before touching $_SESSION
+if (session_status() === PHP_SESSION_NONE) session_start();
+
+# --- Handles Serving Stored QR Image Blob ---
+if (isset($_GET['att_qr']) && $_GET['att_qr'] === '1') {
+    require_once __DIR__.'/../Services/auth.php';
+    require_once __DIR__.'/../PDAO/DAO.php';
+    global $db_connection;
+    
+    $attUserRaw = (string)($_SESSION['userID'] ?? '');
+    if (preg_match('/^(\d{4})(\d{5})$/', $attUserRaw, $m)) {
+        $studentDBID = (int)$m[2];
+        $st = $db_connection->prepare("SELECT qr_image_data FROM students WHERE studentID = ?");
+        $st->execute([$studentDBID]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        
+        if ($row && !empty($row['qr_image_data'])) {
+            if (ob_get_level()) ob_end_clean();
+            header('Content-Type: image/png');
+            header('Content-Length: ' . strlen($row['qr_image_data']));
+            echo $row['qr_image_data'];
+            exit;
+        }
+    }
+    header("HTTP/1.0 404 Not Found");
+    exit;
+}
+
 require_once __DIR__.'/../Services/auth.php';
 require_once __DIR__.'/../PDAO/DAO.php';
 global $db_connection;
 
 $_SESSION["page"] = "ATTENDANCE | Faculty";
 
-#Starts session
-if (session_status() === PHP_SESSION_NONE) session_start();
-
-#Checks role
+# Checks role
 function att_role_group(string $role): string {
   $r = strtolower(trim($role));
   if (preg_match('/coordinator|dean|registrar|admin/', $r)) return 'manager';
@@ -17,18 +42,15 @@ function att_role_group(string $role): string {
 }
 
 $attRole   = strtolower(trim($_SESSION['role'] ?? 'student'));
-$attUserRaw    = (string)($_SESSION['userID'] ?? '');
+$attUserRaw    = trim((string)($_SESSION['userID'] ?? ''));
 $attGroup  = att_role_group($attRole);          
 $attFacultyID  = ($attGroup !== 'student') ? (int)($_SESSION['real_userID'] ?? substr($attUserRaw, 5)) : 0;
-$attStudentKey = ($attGroup === 'student' && preg_match('/^(\d{4})(\d{5})$/', $attUserRaw, $attM)) ? $attM[1] . '-' . $attM[2] : null;  // "2026-00001"
+
+# CONSISTENT FORMAT: YYYYXXXXX (No hyphen)
+$attStudentKey = ($attGroup === 'student' && preg_match('/^(\d{4})(\d{5})$/', $attUserRaw, $attM)) ? $attUserRaw : null;  
 
 $_SESSION["page"] = ($attGroup === 'student') ? "ATTENDANCE | Student" : "ATTENDANCE | Faculty";
 
-#Position inside the faculty:
-#  program coordinator -> access to everything
-#  dean    -> view everything and scan, but cannot add, edit or delete
-#  registrar -> view only
-#  any other faculty   -> view only and scan
 $attPos = 'student';
 if ($attGroup !== 'student') {
   if     (strpos($attRole, 'coordinator') !== false) $attPos = 'coordinator';
@@ -40,7 +62,7 @@ if ($attGroup !== 'student') {
 $attLabels = ['coordinator' => 'Coordinator', 'dean' => 'Dean', 'registrar' => 'Registrar', 'admin' => 'Admin'];
 $attLabel  = strtoupper(($attGroup === 'student') ? 'Student' : ($attLabels[$attPos] ?? (ucwords($attRole) ?: 'Faculty')));
 $_SESSION["page"] = "ATTENDANCE | " . $attLabel;
-$attCanEdit   = in_array($attPos, ['coordinator', 'admin', 'dean', 'faculty'], true);   // add / edit / delete
+$attCanEdit   = in_array($attPos, ['coordinator', 'admin', 'dean', 'faculty'], true);
 $attMyProgram = null; $attMyDept = null;
 if ($attGroup !== 'student' && $attFacultyID > 0) {
   $fq = $db_connection->prepare("SELECT program, department FROM faculty WHERE facultyID = ?");
@@ -54,18 +76,38 @@ $attScoped = false;
 $evpage    = ($attGroup !== 'student' && !empty($_GET['events']));
 if ($evpage) $_SESSION["page"] = "EVENTS | " . $attLabel;
 
-#The functions below read these through $GLOBALS
 $GLOBALS['attPos'] = $attPos; $GLOBALS['attCanEdit'] = $attCanEdit; $GLOBALS['attScoped'] = $attScoped;
 $GLOBALS['attMyProgram'] = $attMyProgram; $GLOBALS['attMyDept'] = $attMyDept; $GLOBALS['evpage'] = $evpage;
 $GLOBALS['attCanScan'] = $attCanScan;
 
-#While testing: true shows the real database error in the scan popup. Set to false before going live.
 const ATT_DEBUG = true;
-
-#Status choices for an event (the events.status column must have the same values)
 const ATT_EVENT_STATUSES = ['ACTIVE', 'INACTIVE', 'FINISHED', 'RESCHEDULE', 'PENDING'];
 
-#Handles record deletion (program coordinator only, and only students of their own program)
+# --- Handles Saving Student QR Code (Blob) ---
+if ($attGroup === 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['att_action'] ?? '') === 'save_qr') {
+  $rawQr = $_POST['qr'] ?? '';
+  
+  if ($attStudentKey && preg_match('/^(\d{4})(\d{5})$/', $attStudentKey, $m) && strpos($rawQr, 'data:image/png;base64,') === 0) {
+    $studentDBID = (int)$m[2];
+    list(, $data) = explode(',', $rawQr);
+    $binaryData = base64_decode($data);
+    
+    if ($binaryData !== false) {
+      try {
+        $stmt = $db_connection->prepare("UPDATE students SET qr_image_data = ? WHERE studentID = ?");
+        $stmt->execute([$binaryData, $studentDBID]);
+        echo json_encode(['status' => 'success']);
+        exit;
+      } catch (Exception $e) {
+        error_log('Failed to save student QR blob: ' . $e->getMessage());
+      }
+    }
+  }
+  echo json_encode(['status' => 'error']);
+  exit;
+}
+
+# Handles record deletion
 if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['att_action'] ?? '') === 'delete') {
   if (session_status() !== PHP_SESSION_ACTIVE) session_start();
   if (!$attCanEdit) {
@@ -96,7 +138,7 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
   exit;
 }
 
-#Handles Add / Edit / Delete of an event (program coordinator only)
+# Handles Add / Edit / Delete of an event
 if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST'
     && in_array($_POST['att_action'] ?? '', ['add_event', 'edit_event', 'delete_event'], true)) {
   att_handle_event_action($db_connection, $_POST['att_action']);
@@ -105,7 +147,6 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST'
 }
 
 # --- Handles QR Code Scanning & Attendance Logging ---
-# The QR modal POSTs here (the attendance page URL, NOT attendance_logic.php) with att_action=scan.
 if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['att_action'] ?? '') === 'scan') {
   header('Content-Type: application/json');
 
@@ -117,11 +158,11 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
   if (!$attCanScan) $respond('error', 'You are not allowed to record attendance.');
 
   $rawStudentID = trim($_POST['studentID'] ?? '');
-  $eventKey     = trim($_POST['eventID'] ?? '');       // an eventID or an event name
+  $eventKey     = trim($_POST['eventID'] ?? '');
 
-  // "2026-00001" or "202600001" -> year 2026, studentID 1
-  if (!preg_match('/^(\d{4})\D?(\d{5})$/', $rawStudentID, $m)) {
-    $respond('error', 'Enter a valid student ID (xxxx-xxxxx).');
+  # STRICT YYYYXXXXX FORMAT CHECK (No hyphen allowed)
+  if (!preg_match('/^(\d{4})(\d{5})$/', $rawStudentID, $m)) {
+    $respond('error', 'Enter a valid student ID (YYYYXXXXX).');
   }
   if ($eventKey === '') $respond('error', 'Select an event first.');
 
@@ -145,13 +186,11 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
     $row = $chk->fetch(PDO::FETCH_ASSOC);
 
     if (!$row) {
-      // attendance.facultyID is the faculty/manager who scanned
       $db_connection->prepare("INSERT INTO attendance (eventID, facultyID, studentID, timein) VALUES (?, ?, ?, NOW())")
                     ->execute([$eventID, $attFacultyID, $studentID]);
       $respond('success', "Time-in logged for $who.", ['type' => 'timein']);
     }
     if (empty($row['timeout'])) {
-      // a second scan within a minute of the time-in is almost always an accidental double scan
       if ((int)$row['secs'] < 60) $respond('info', "$who just timed in. Scan again later to time out.");
       $db_connection->prepare("UPDATE attendance SET timeout = NOW() WHERE attendanceID = ?")->execute([(int)$row['attendanceID']]);
       $respond('success', "Time-out recorded for $who.", ['type' => 'timeout']);
@@ -163,15 +202,12 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
   }
 }
 
-#Minutes after the event start before a time-in counts as late
 const ATT_GRACE_MIN = 15;
 
-#Escapes output text
 if (!function_exists('e')) {
   function e($v): string { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 }
 
-#Loads departments and programs from database
 $progStmt = $db_connection->query("SELECT program, department FROM programs");
 $allProgs = $progStmt->fetchAll();
 $ATT_DEPT_COURSES = [];
@@ -179,29 +215,26 @@ foreach ($allProgs as $p) {
   $ATT_DEPT_COURSES[$p['department']][] = $p['program'];
 }
 
-#A coordinator only works with their own program
 if ($attScoped) {
   foreach ($ATT_DEPT_COURSES as $d => $cs) {
     if (in_array($attMyProgram, $cs, true)) { $ATT_DEPT_COURSES = [$d => [$attMyProgram]]; break; }
   }
 }
 
-#Loads event names from database
 $eventNamesStmt = $db_connection->query("SELECT DISTINCT eventName FROM events ORDER BY eventName ASC");
 $ATT_EVENT_NAMES = $eventNamesStmt->fetchAll(PDO::FETCH_COLUMN);
 
-#Finds the active event based strictly on status = 'ACTIVE'
-$activeEventStmt = $db_connection->query("
-  SELECT eventName FROM events 
+$openEventsStmt = $db_connection->query("
+  SELECT eventID, eventName, DATE_FORMAT(datetime_Start, '%m/%d/%Y') as d 
+  FROM events 
   WHERE status = 'ACTIVE' 
-  ORDER BY datetime_Start DESC LIMIT 1
+  ORDER BY datetime_Start DESC
 ");
-$currentActiveEvent = $activeEventStmt->fetchColumn();
+$ATT_OPEN_EVENTS = $openEventsStmt->fetchAll(PDO::FETCH_ASSOC);
+$currentActiveEvent = !empty($ATT_OPEN_EVENTS) ? $ATT_OPEN_EVENTS[0]['eventName'] : null;
 
-#Fetches student list and profiles
 function att_students(): array {
   global $db_connection;
-  
   $stmt = $db_connection->query("
     SELECT s.studentID, s.first_name, s.last_name, s.program, s.date_created, p.department 
     FROM students s
@@ -215,7 +248,10 @@ function att_students(): array {
   foreach ($rows as $s) {
     if ($attScoped && $s['program'] !== $attMyProgram) continue;
     $year = date('Y', strtotime($s['date_created']));
-    $id = $year . '-' . str_pad($s['studentID'], 5, '0', STR_PAD_LEFT);
+    
+    # CONSISTENT FORMAT: YYYYXXXXX (No hyphen)
+    $id = $year . str_pad($s['studentID'], 5, '0', STR_PAD_LEFT);
+    
     $f = $s['first_name'];
     $l = $s['last_name'];
     
@@ -231,10 +267,8 @@ function att_students(): array {
   return $out;
 }
 
-#Fetches attendance records for a specific student (Fixed to use facultyID join)
 function att_records(array $stu): array {
   global $db_connection;
-  
   $stmt = $db_connection->prepare("
     SELECT 
       a.attendanceID as record_id,
@@ -251,7 +285,6 @@ function att_records(array $stu): array {
     WHERE a.studentID = ? 
     ORDER BY e.datetime_Start DESC
   ");
-  
   $stmt->execute([$stu['db_id']]);
   $rows = $stmt->fetchAll();
   
@@ -259,7 +292,6 @@ function att_records(array $stu): array {
   foreach ($rows as $r) {
     $timeInObj = new DateTime($r['timein']);
     $timeOutObj = $r['timeout'] ? new DateTime($r['timeout']) : null;
-    
     $tinStr = $timeInObj->format('h:i A');
     $toutStr = $timeOutObj ? $timeOutObj->format('h:i A') : '--';
     
@@ -269,7 +301,6 @@ function att_records(array $stu): array {
       $hours = round(($diff->h * 60 + $diff->i) / 60, 1);
     }
     
-    // LATE when the student timed in more than ATT_GRACE_MIN minutes after the event started
     $graceEnd = (new DateTime($r['datetime_Start']))->modify('+' . ATT_GRACE_MIN . ' minutes');
     $status   = ($timeInObj > $graceEnd) ? 'LATE' : 'ON-TIME';
     
@@ -289,7 +320,6 @@ function att_records(array $stu): array {
   return $out;
 }
 
-#Sets up request state and filters
 $students = $students ?? att_students();
 $q      = trim($_GET['q'] ?? '');
 $dept   = isset($ATT_DEPT_COURSES[$_GET['dept'] ?? '']) ? $_GET['dept'] : null;
@@ -304,7 +334,6 @@ $event  = in_array($_GET['event'] ?? '', $ATT_EVENT_NAMES, true) ? $_GET['event'
 $yr     = (int)($_GET['year'] ?? 0);
 $year   = ($yr >= 2000 && $yr <= 2100) ? $yr : null;
 
-#Builds query URL parameters
 function att_url(array $over = []): string {
   global $q, $dept, $course, $view, $stu, $event, $year, $evpage;
   $p = ['dept' => $dept, 'course' => $course, 'q' => $q ?: null, 'view' => $view === 'list' ? 'list' : null,
@@ -313,7 +342,6 @@ function att_url(array $over = []): string {
   return '?' . http_build_query(array_filter($p, fn($v) => $v !== null && $v !== ''));
 }
 
-#Renders filter dropdown component
 function att_dropdown(string $label, string $allText, array $items, $current, string $param, array $extra = []): void {
   echo '<details class="dd"><summary class="dd-btn' . ($current !== null ? ' has-value' : '') . '"><span>' . e($current ?? $label) . '</span>'
      . '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 9v6l-4 2v-8z"/></svg></summary><ul class="dd-menu">';
@@ -324,7 +352,6 @@ function att_dropdown(string $label, string $allText, array $items, $current, st
   echo '</ul></details>';
 }
 
-#Builds student view URL parameters
 function sa_url(array $over = []): string {
   global $sa_event, $sa_year;
   $p = ['event' => $sa_event, 'year' => $sa_year];
@@ -332,7 +359,6 @@ function sa_url(array $over = []): string {
   return '?' . http_build_query(array_filter($p, fn($v) => $v !== null && $v !== ''));
 }
 
-#Renders student view dropdown component
 function sa_dropdown(string $label, string $allText, array $items, $current, string $param): void {
   echo '<details class="dd"><summary class="dd-btn' . ($current !== null ? ' has-value' : '') . '"><span>' . e($current ?? $label) . '</span>'
      . '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 4h18l-7 9v6l-4 2v-8z"/></svg></summary><ul class="dd-menu">';
@@ -343,9 +369,6 @@ function sa_dropdown(string $label, string $allText, array $items, $current, str
   echo '</ul></details>';
 }
 
-#---------------- Events (list page + add / edit / delete) ----------------
-
-#"Mr. Johniel Zar Mendoza" / "Mendoza, Johniel" -> "johniel zar mendoza" (for matching a typed name to a faculty)
 function att_norm_name(string $s): string {
   $s = strtolower(trim($s));
   $s = preg_replace('/\b(mr|ms|mrs|miss|dr|prof|engr|atty)\b\.?/', ' ', $s);
@@ -353,7 +376,6 @@ function att_norm_name(string $s): string {
   return trim(preg_replace('/\s+/', ' ', $s));
 }
 
-#All faculty as [facultyID => "First Middle Last"]
 function att_faculty_names(): array {
   global $db_connection;
   $out = [];
@@ -363,7 +385,6 @@ function att_faculty_names(): array {
   return $out;
 }
 
-#Typed coordinator name -> facultyID (null when it does not match anybody)
 function att_find_faculty(string $typed): ?int {
   global $db_connection;
   $want = att_norm_name($typed);
@@ -376,7 +397,6 @@ function att_find_faculty(string $typed): ?int {
   return null;
 }
 
-#Events the logged-in faculty may see (a coordinator: own program + their department-wide events)
 function att_events(): array {
   global $db_connection, $attCanEdit, $attScoped, $attMyProgram, $attMyDept;
   $sql = "SELECT e.eventID, e.eventName, e.program, e.department, e.datetime_Start, e.datetime_End, e.eventCoordinator, e.status,
@@ -409,14 +429,12 @@ function att_events(): array {
       'status'  => strtoupper($r['status']),
       'coord'   => ($r['eventCoordinator'] && trim((string)$r['coord_name']) !== '') ? ucwords(strtolower(preg_replace('/\s+/', ' ', $r['coord_name']))) : '',
       'att'     => (int)$r['att_count'],
-      // only a coordinator can edit / delete, and only events of their own program
       'canEdit' => $attCanEdit && (!$attScoped || $r['program'] === $attMyProgram),
     ];
   }
   return $out;
 }
 
-#Add / edit / delete an event. Always ends with a message in the session (shown by popup_message.php).
 function att_handle_event_action(PDO $db, string $act): void {
   global $attCanEdit, $attScoped, $attMyProgram, $attMyDept;
   if (!$attCanEdit) {
@@ -435,7 +453,6 @@ function att_handle_event_action(PDO $db, string $act): void {
     }
 
     if ($act === 'delete_event') {
-      // attendance rows of the event are removed with it (ON DELETE CASCADE)
       $db->prepare("DELETE FROM events WHERE eventID = ?")->execute([$id]);
       $_SESSION['message'] = 'Event deleted.';
       return;
@@ -465,12 +482,10 @@ function att_handle_event_action(PDO $db, string $act): void {
     $dtEnd   = "$date $end:00";
 
     if ($act === 'add_event') {
-      // a coordinator's events belong to their program; (admin: department-wide)
       $db->prepare("INSERT INTO events (eventName, program, department, datetime_Start, datetime_End, eventCoordinator, status) VALUES (?, ?, ?, ?, ?, ?, ?)")
          ->execute([$name, $attScoped ? $attMyProgram : null, $attMyDept, $dtStart, $dtEnd, $coordID, $status]);
       $_SESSION['message'] = 'Event added.';
     } else {
-      // datetime_Start is always written here, so nothing can reset it by accident
       $db->prepare("UPDATE events SET eventName = ?, datetime_Start = ?, datetime_End = ?, eventCoordinator = ?, status = ? WHERE eventID = ?")
          ->execute([$name, $dtStart, $dtEnd, $coordID, $status, $id]);
       $_SESSION['message'] = 'Event updated.';
@@ -481,18 +496,22 @@ function att_handle_event_action(PDO $db, string $act): void {
   }
 }
 
-#Processes view branch logic and data
 if ($evpage) {
   $events = att_events();
   $ATT_FACULTY_NAMES = $attCanEdit ? array_values(att_faculty_names()) : [];
 } elseif ($attGroup === 'student') {
-  // the logged-in student (key like "2026-00001", built at the top of this file)
   $me = $attStudentKey ? ($students[$attStudentKey] ?? null) : null;
   if (!$me) {
     $_SESSION['error'] = 'Student record not found.';
     header('Location: ' . BASE_PATH . '/dashboard');
     exit;
   }
+  
+  $qrCheckStmt = $db_connection->prepare("SELECT (qr_image_data IS NOT NULL AND LENGTH(qr_image_data) > 0) FROM students WHERE studentID = ?");
+  $qrCheckStmt->execute([$me['db_id']]);
+  $attHasQr = (bool)$qrCheckStmt->fetchColumn();
+  $GLOBALS['attHasQr'] = $attHasQr;
+
   $sa_all   = att_records($me);
   $sa_years = array_values(array_unique(array_column($sa_all, 'year'))); rsort($sa_years);
   $sa_event = in_array($_GET['event'] ?? '', $ATT_EVENT_NAMES, true) ? $_GET['event'] : null;
@@ -514,11 +533,12 @@ if ($evpage) {
   $recs = array_values(array_filter($all, fn($r) => (!$event || $r['eventName'] === $event) && (!$year || $r['year'] === $year)));
   $cnt  = fn($st) => count(array_filter($recs, fn($r) => $r['status'] === $st));
   $ontime = $cnt('ON-TIME'); $late = $cnt('LATE'); $absent = $cnt('ABSENT');
-  $hrs = round(array_sum(array_column($recs, 'hours')), 1);
+  $hrs = round(array_sum(array_column($all, 'hours')), 1);
   $years = array_values(array_unique(array_column($all, 'year'))); rsort($years);
 }
 
 $GLOBALS['q'] = $q; $GLOBALS['dept'] = $dept; $GLOBALS['course'] = $course; $GLOBALS['view'] = $view;
 $GLOBALS['stu'] = $stu; $GLOBALS['event'] = $event; $GLOBALS['year'] = $year;
 $GLOBALS['currentActiveEvent'] = $currentActiveEvent ?? null;
+$GLOBALS['ATT_OPEN_EVENTS'] = $ATT_OPEN_EVENTS ?? [];
 $GLOBALS['evpage'] = $evpage;
