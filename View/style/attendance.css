@@ -734,3 +734,9 @@ header a.att-back svg { display: block; width: 22px; height: 22px; min-width: 0;
 }
 .att .tbl thead th:first-child { border-radius: calc(1.4 * var(--u)) 0 0 calc(1.4 * var(--u)); }
 .att .tbl thead th:last-child  { border-radius: 0 calc(1.4 * var(--u)) calc(1.4 * var(--u)) 0; }
+
+.popup {
+  position: fixed; top: 24px; left: 0; right: 0; bottom: auto;
+  width: max-content; max-width: 90vw; margin-left: auto; margin-right: auto;
+  text-align: center; z-index: 10000;
+}
