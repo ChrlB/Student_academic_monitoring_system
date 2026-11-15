@@ -8,7 +8,7 @@ const PW_MAX_FAILS  = 5;
 const PW_LOCK_MINUTES = 5;   
 
 // Roles allowed to change their password from the account page.
-const PW_CHANGE_ROLES = ['student'];
+const PW_CHANGE_ROLES = ['student', 'dean', 'program coordinator', 'prof', 'registrar'];
 
 function canChangePassword(): bool {
     return in_array((string)($_SESSION['role'] ?? ''), PW_CHANGE_ROLES, true);

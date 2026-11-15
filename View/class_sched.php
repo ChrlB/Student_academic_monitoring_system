@@ -193,7 +193,8 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AMS-Schedule</title>
+  <title>AMS | Schedule</title>
+  <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/schedule.css">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/general.css">
 </head>
@@ -294,14 +295,14 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             <?php endif; ?>
           </div>
 
-          <header class="class-head">
+          <div class="class-head">
             <div class="class-head__icon"><?= str_replace('width="16" height="16"', 'width="40" height="40"', sched_icon('laptop')) ?></div>
             <div>
               <h2 class="sched-title"><?= sched_e($sched['subject_code']) ?> &nbsp;-&nbsp; <?= sched_e($sched['block_label']) ?></h2>
               <p class="class-head__sub"><?= sched_e($sched['subject_name']) ?></p>
               <span class="sp-pill"><?= sched_e(ScheduleLogic::typeLabel($sched['type'])) ?></span>
             </div>
-          </header>
+          </div>
 
           <dl class="class-meta">
             <div><dt>Instructor</dt><dd><?= sched_e($sched['faculty_name']) ?></dd></div>
@@ -375,13 +376,13 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
           <div class="sched-bar">
             <a class="sp-btn" href="<?= sched_e(sched_url(['view' => 'class', 'id' => $sched['schedID']])) ?>"><?= sched_icon('left') ?> Back to Class</a>
           </div>
-          <header class="class-head class-head--compact">
+          <div class="class-head class-head--compact">
             <div class="class-head__icon"><?= sched_icon('laptop') ?></div>
             <div>
               <h2 class="sched-title">Edit Class</h2>
               <p class="class-head__sub">Update the details for <?= sched_e($sched['subject_code']) ?> - <?= sched_e($sched['block_label']) ?></p>
             </div>
-          </header>
+          </div>
 
           <form method="post" action="<?= sched_e(sched_url(['view' => 'edit', 'id' => $sched['schedID']])) ?>" class="sp-form" data-sched-form>
             <input type="hidden" name="csrf" value="<?= sched_e($csrf) ?>">
@@ -498,14 +499,14 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
         $addVals = $old ?: ['semester' => $semKey, 'class_type' => 'LEC']; ?>
       <dialog class="sched-modal" id="add-schedule" aria-labelledby="add-title" <?= isset($_GET['add']) ? 'data-autoopen' : '' ?>>
         <form method="post" action="<?= sched_e(sched_url(['sem' => $semKey])) ?>" class="sp-form" data-sched-form>
-          <header class="sched-modal__head">
+          <div class="sched-modal__head">
             <?= str_replace('width="16" height="16"', 'width="26" height="26"', sched_icon('calendar')) ?>
             <div>
               <h2 id="add-title">Add Schedule</h2>
               <p>Create a new class schedule for <?= sched_e($semLabel ?: 'the selected semester') ?>.</p>
             </div>
             <button type="button" class="sp-btn sp-btn--icon" data-close-add aria-label="Close"><?= sched_icon('close') ?></button>
-          </header>
+          </div>
           <?php if ($flash && $flash['type'] !== 'conflict' && isset($_GET['add'])): ?>
             <div class="sched-flash sched-flash--error" role="alert">
               <?php foreach ($flash['msgs'] as $m): ?><p><?= sched_e($m) ?></p><?php endforeach; ?>
@@ -611,7 +612,8 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
   if (dlg.hasAttribute('data-autoopen')) dlg.showModal();
   showConflict();
 })();
-</script>
 <?php endif; ?>
+</script>
+<?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>

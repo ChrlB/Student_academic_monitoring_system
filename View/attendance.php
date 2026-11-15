@@ -43,7 +43,7 @@
              title="<?= $ev['canEdit'] ? 'Click to edit' : 'Click to view' ?>"
              data-id="<?= (int)$ev['id'] ?>" data-name="<?= e($ev['name']) ?>" data-date="<?= e($ev['ymd']) ?>"
              data-start="<?= e($ev['start24']) ?>" data-end="<?= e($ev['end24']) ?>" data-status="<?= e($ev['status']) ?>"
-             data-coord="<?= e($ev['coord']) ?>" data-att="<?= (int)$ev['att'] ?>" data-edit="<?= $ev['canEdit'] ? '1' : '0' ?>">
+             data-coord="<?= e($ev['coord']) ?>" data-att="<?= (int)$ev['att'] ?>" data-edit="<?= $ev['canEdit'] ? '1' : '0' ?>" data-review="<?= !empty($ev['review']) ? '1' : '0' ?>">
           <span class="ev-name"><?= e($ev['name']) ?></span>
           <span><?= e($ev['scope']) ?></span>
           <span><?= e($ev['date']) ?></span>
@@ -56,7 +56,7 @@
   </section>
 
   <!-- Add / Edit / View event -->
-  <dialog class="ev-dlg" id="ev-dlg">
+  <dialog class="ev-dlg" id="ev-dlg" data-dean="<?= !empty($attIsDean) ? '1' : '0' ?>" data-me="<?= e($ATT_ME_NAME ?? '') ?>">
     <form method="post" action="<?= e(att_url()) ?>" id="ev-form" autocomplete="off">
       <input type="hidden" name="att_action" id="ev-action" value="add_event">
       <input type="hidden" name="eventID" id="ev-id" value="">
@@ -81,15 +81,23 @@
           <input type="time" name="end" id="ev-end" value="18:00" required></label>
       </div>
 
-      <label class="ev-field"><span>EVENT COORDINATOR</span>
-        <input type="text" name="coordinator" id="ev-coord" list="ev-faculty" placeholder="ex. Mr. Johniel Zar Mendoza" maxlength="200"></label>
-      <datalist id="ev-faculty">
-        <?php foreach ($ATT_FACULTY_NAMES as $fn): ?><option value="<?= e($fn) ?>"></option><?php endforeach; ?>
-      </datalist>
+      <div class="ev-field"><span>EVENT COORDINATOR</span>
+        <div class="ev-combo" id="ev-combo">
+          <input type="text" name="coordinator" id="ev-coord" placeholder="ex. Mr. Johniel Zar Mendoza" autocomplete="off"
+                 role="combobox" aria-expanded="false" aria-controls="ev-coord-list" aria-autocomplete="list" aria-label="Event coordinator">
+          <button type="button" class="ev-caret" id="ev-caret" tabindex="-1" aria-label="Show coordinators"></button>
+          <ul class="ev-list" id="ev-coord-list" role="listbox" hidden>
+            <?php foreach ($ATT_FACULTY_NAMES as $fn): ?><li role="option" data-v="<?= e($fn) ?>"><?= e($fn) ?></li><?php endforeach; ?>
+          </ul>
+        </div></div>
+
+      <p class="ev-note" id="ev-note" hidden>This event will be sent to the dean for approval.</p>
 
       <div class="ev-btns">
         <button type="button" class="ev-b del" id="ev-delete" hidden>Delete</button>
         <button type="button" class="ev-b cancel" id="ev-cancel">Cancel</button>
+        <button type="button" class="ev-b rej" id="ev-reject" hidden>Reject</button>
+        <button type="button" class="ev-b ok" id="ev-approve" hidden>Approve</button>
         <button type="submit" class="ev-b ok" id="ev-ok">Confirm</button>
       </div>
     </form>

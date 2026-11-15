@@ -9,10 +9,7 @@ $options = [
   // This line forces the connection collation to match your tables perfectly
   PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"
 ];
-
 $db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root", "", $options);
-
-
 $userDAO = new PHPDAO($db_connection);
 $clearanceDAO = new PHPDAO($db_connection);
 
@@ -148,7 +145,22 @@ $userDAO->prepareStatement( "getFacultyInfo",
   WHERE  concat('F',year(date_created),lpad(facultyID,5,0)) = ?"
 );
 
-$userDAO->prepareStatement("saveStudentFolderID","UPDATE 
+/* ---- faculty account page (dean / program coordinator / professor): faculty table columns only ---- */
+$userDAO->prepareStatement("getFacultyAccount",
+  "SELECT F.facultyID, F.first_name, F.middle_name, F.last_name, F.role, F.department, F.program,
+          F.address, F.number, F.date_of_birth, F.gender, F.status, F.date_created,
+          (F.image_data IS NOT NULL AND LENGTH(F.image_data) > 0) AS has_photo
+   FROM faculty AS F
+   WHERE F.facultyID = ? AND YEAR(F.date_created) = ?;"
+);
+$userDAO->prepareStatement("updateFacultyBasic",
+  "UPDATE faculty SET middle_name = ?, date_of_birth = ?, gender = ?, address = ?, number = ? WHERE facultyID = ? AND YEAR(date_created) = ?;");
+$userDAO->prepareStatement("updateFacultyNumber",
+  "UPDATE faculty SET number = ? WHERE facultyID = ? AND YEAR(date_created) = ?;");
+$userDAO->prepareStatement("updateFacultyPassword",
+  "UPDATE faculty SET password = ? WHERE facultyID = ? AND YEAR(date_created) = ?;");
+
+$userDAO->prepareStatement("saveStudentFolderID","UPDATE
     students
     SET folderID = ?
     where concat(year(students.date_created),lpad(students.studentID,5,0)) = ?;
@@ -872,5 +884,3 @@ $userDAO->prepareStatement("updateStudentPassword",
 
     ");
 }
-
-
