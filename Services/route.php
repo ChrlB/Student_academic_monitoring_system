@@ -2,7 +2,6 @@
 require_once __DIR__.'/../PageLogic/login_logic.php';
 // require_once __DIR__.'/../PageLogic/clearance_logic.php';
 require_once __DIR__.'/../PageLogic/account_actions.php';   // changePassword(), updateProfile()
-require_once __DIR__.'/../PageLogic/faculty_account_actions.php';   // saveFacultyInfo(), saveFacultyContact()
 require_once __DIR__."/../Services/session.php";
 require_once __DIR__."/../Services/imageHandler.php";
 require_once __DIR__ . '/../Services/ClearanceDocumentHandler.php';
@@ -63,8 +62,7 @@ $router->get('/index.php', function(){
 $router->get('/login',  fn() => require __DIR__ . '/../View/login.php');
 
 $router->get('/account',  fn() => require __DIR__ . '/../View/account.php');
-$router->get('/attendance', fn() => require __DIR__.'/../View/attendance.php');
-$router->post('/attendance', fn() => require __DIR__.'/../View/attendance.php');
+$router->get('/attendance', fn() => require __DIR__ . '/../View/attendance.php');
 $router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.php');
 $router->post('/class-sched', fn() => require __DIR__ . '/../View/class_sched.php');
 $router->get('/clearance',  fn() => require __DIR__ . '/../View/clearance.php');
@@ -83,10 +81,10 @@ $router->post('/enrollment',  fn() => require __DIR__ . '/../View/enrollment.php
 $router->get('/grades', fn() => require __DIR__ . '/../View/grades.php');
 $router->post('/grades', fn() => require __DIR__ . '/../View/grades.php');
 $router->get('/projects',  fn() => require __DIR__ . '/../View/projects.php');
-$router->get('/projects',  fn() => require __DIR__ . '/../View/projects.php');
-$router->post('/projects', fn() => require __DIR__ . '/../View/projects.php');
 $router->get('/syllabus',  fn() => require __DIR__ . '/../View/syllabus.php');
 $router->post('/syllabus', fn() => require __DIR__ . '/../PageLogic/syllabus_logic.php');
+$router->get('/syllabus-file', fn() => require __DIR__ . '/../PageLogic/syllabus_file.php');
+$router->get('/syllabus-topic', fn() => require __DIR__ . '/../View/syllabus_topic.php');
 
 $router->get('/registration',  fn() => require __DIR__ . '/../View/registration.php');
 $router->post('/registration',  fn($request) => require __DIR__ . '/../View/registration.php');
@@ -97,9 +95,6 @@ $router->post('/logout', fn() => logout());
 // account popups (Change Password / Edit Profile). $_POST on purpose, not $_REQUEST.
 $router->post('/change-password', fn() => changePassword($_POST));
 $router->post('/edit-profile',    fn() => updateProfile($_POST));
-// faculty account page (JSON, saved in place)
-$router->post('/faculty-info',    fn() => saveFacultyInfo($_POST));
-$router->post('/faculty-contact', fn() => saveFacultyContact($_POST));
  
 $router->post('/upload-profile', fn() => uploadProfile());
 $router->get('/get-profile', fn() => getProfilePic());

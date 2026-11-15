@@ -1,0 +1,4 @@
+# never commit uploaded PDFs / videos
+*
+!.gitignore
+!.htaccess
