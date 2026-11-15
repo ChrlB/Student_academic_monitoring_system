@@ -1,0 +1,310 @@
+.faculty-account {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  --ok: #7ed957; /* green used for "editing" and Save */
+  --ok-ink: #12300b;
+}
+
+.faculty-account .avatar {
+  background: #fff;
+}
+.avatar-badge {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #2a1160;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.fa-warning {
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(224, 166, 58, 0.18);
+  border: 1px solid rgba(224, 166, 58, 0.7);
+  color: #ffe7b0;
+  font-size: 0.9rem;
+}
+.fa-warning code {
+  font-weight: 700;
+}
+
+.faculty-account .info-head h2 {
+  flex: 1;
+}
+.info-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.info-actions [hidden] {
+  display: none;
+}
+.fa-toggle .ic-save {
+  display: none;
+}
+.fa-toggle.is-editing {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: var(--ok-ink);
+  font-weight: 700;
+}
+.fa-toggle.is-editing:hover {
+  background: #93e771;
+}
+.fa-toggle.is-editing .ic-save {
+  display: inline;
+}
+.fa-toggle.is-editing .ic-edit {
+  display: none;
+}
+.fa-toggle:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+/* ---------- fields ---------- */
+.faculty-account .f.w12 {
+  grid-column: span 12;
+}
+.faculty-account .f input,
+.faculty-account .f select {
+  width: 100%;
+  box-sizing: border-box;
+  height: 34px;
+  padding: 0 12px;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  background: var(--field);
+  color: #2a1160;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+/* a disabled <select> must look exactly like a read-only box */
+.faculty-account .f select {
+  appearance: none;
+  -webkit-appearance: none;
+  opacity: 1;
+  cursor: default;
+}
+.faculty-account .f select:disabled {
+  opacity: 1;
+  color: #2a1160;
+  -webkit-text-fill-color: #2a1160;
+}
+
+/* editing: white box with a green outline (the "unlocked" look in the design) */
+.faculty-account .f.is-editing input,
+.faculty-account .f.is-editing select {
+  background: #fff;
+  border-color: #5fae52;
+  box-shadow: 0 0 0 1px rgba(126, 217, 87, 0.45);
+  cursor: text;
+}
+.faculty-account .f.is-editing select {
+  cursor: pointer;
+  padding-right: 30px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%232a1160' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 11px;
+}
+.faculty-account .f.is-editing input:focus,
+.faculty-account .f.is-editing select:focus {
+  outline: none;
+  border-color: var(--ok);
+  box-shadow: 0 0 0 3px rgba(126, 217, 87, 0.35);
+}
+/* fields the registrar owns (names, program) look flat while the rest are being edited */
+.faculty-account.is-editing-info .f.is-locked input,
+.faculty-account.is-editing-info .f.is-locked select {
+  background: #b9aedb;
+  color: #3d3260;
+  -webkit-text-fill-color: #3d3260;
+  cursor: not-allowed;
+}
+
+.faculty-account .f.has-error input,
+.faculty-account .f.has-error select {
+  border-color: #ff7b93;
+  box-shadow: 0 0 0 3px rgba(255, 123, 147, 0.3);
+}
+.f-err {
+  font-style: normal;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: #ffb3c1;
+}
+.f-err[hidden] {
+  display: none;
+}
+
+/* ---------- Edit Profile popup ---------- */
+.dlg-faculty {
+  width: min(92vw, 440px);
+  border-radius: 22px;
+  border: 1px solid rgba(170, 140, 245, 0.7);
+  background: linear-gradient(180deg, #432885 0%, #35206e 100%);
+}
+.dlg-faculty .dlg-scroll {
+  padding: 22px 24px 8px;
+}
+.dlg-faculty h2 {
+  gap: 10px;
+  padding-bottom: 12px;
+  font-size: 1.05rem;
+  font-weight: 800;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+}
+.dlg-faculty h2 > svg {
+  color: #7ed957;
+}
+.dlg-faculty h2 > span {
+  flex: 1;
+}
+.dlg-x {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+.dlg-x:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.dlg-x svg {
+  width: 18px;
+  height: 18px;
+}
+.dlg-faculty .df-row {
+  margin-top: 12px;
+}
+.dlg-faculty .df > span {
+  margin-left: 2px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.dlg-faculty .df input {
+  height: 40px;
+  border: 2px solid #5b4a8c;
+  border-radius: 12px;
+  background: #ddd5f0;
+  color: #2a1160;
+  font-weight: 600;
+}
+.dlg-faculty .df input:focus {
+  border-color: var(--ok, #7ed957);
+}
+.dlg-faculty .df input:disabled {
+  background: #b9aedb;
+  border-color: transparent;
+  color: #3d3260;
+  -webkit-text-fill-color: #3d3260;
+}
+.dlg-faculty .df.w4 {
+  flex: 0 0 calc(50% - 7px);
+}
+.dlg-faculty .dlg-actions-dark {
+  padding: 14px 24px 22px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+.dlg-faculty .dlg-actions-dark .pill {
+  min-width: 88px;
+  height: 36px;
+  border-radius: 10px;
+  background: #5b3f9a;
+  color: #fff;
+  font-size: 0.88rem;
+}
+.dlg-faculty .dlg-actions-dark .pill:hover {
+  background: #6d4fb2;
+}
+.dlg-faculty .dlg-actions-dark .pill-save {
+  background: #7ed957;
+  color: #12300b;
+}
+.dlg-faculty .dlg-actions-dark .pill-save:hover {
+  background: #93e771;
+}
+
+/* ---------- toast (bottom right) ---------- */
+.fa-toast {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(380px, calc(100vw - 44px));
+  padding: 12px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(170, 140, 245, 0.55);
+  background: #1f1245;
+  color: #fff;
+  font:
+    700 0.92rem/1.35 'Inter',
+    system-ui,
+    sans-serif;
+  box-shadow: 0 12px 32px rgba(8, 2, 24, 0.55);
+  animation: fa-toast-in 0.18s ease-out;
+}
+.fa-toast[hidden] {
+  display: none;
+}
+.fa-toast::before {
+  content: '';
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #7ed957;
+}
+.fa-toast.is-error::before {
+  background: #ff7b93;
+}
+@keyframes fa-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+/* Responsiveness */
+@media (max-width: 700px) {
+  .faculty-account .f.w12 {
+    grid-column: span 12;
+  }
+  .info-head {
+    flex-wrap: wrap;
+  }
+  .info-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fa-toast {
+    animation: none;
+  }
+}
