@@ -1,19 +1,7 @@
 <?php
-/**
- * Faculty account page (dean, program coordinator, professor, registrar).
- * Uses ONLY columns of the `faculty` table: first/middle/last name, role, department, program,
- * address, number, date_of_birth, gender, status, date_created. No extra tables.
- *
- * One field list + one layout per role lives here. View/faculty/faculty_account.php draws from it
- * and PageLogic/faculty_account_actions.php validates saves against it.
- */
+
 require_once __DIR__ . '/account_actions.php';   // accountRowKey(), validateProfileValue()
 
-/**
- * account_logic.php pulls in Services/auth.php, which redirects to /login when nobody is logged in.
- * route.php loads this file on EVERY request (including /login), so it must NOT be required at the
- * top of the file, or /login would redirect to itself forever. Load it only when a logged-in page needs it.
- */
 function facultyLoadAccountHelpers(): void {
     require_once __DIR__ . '/account_logic.php';   // properName(), buildFullName(), schoolEmailFor()
 }
@@ -23,10 +11,7 @@ const FACULTY_DEPARTMENTS = [
     'CCS' => 'College of Computer Studies',
 ];
 
-/**
- * Every field the page can show.
- *   locked true = shown but not editable here (names, role, department, program, status... are set by the registrar)
- */
+
 function facultyFieldSpec(): array {
     $f = fn(string $label, string $type, $limit = 100, bool $locked = false, bool $required = false) =>
         ['label' => $label, 'type' => $type, 'limit' => $limit, 'locked' => $locked, 'required' => $required];

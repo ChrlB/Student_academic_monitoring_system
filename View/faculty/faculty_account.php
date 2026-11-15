@@ -48,14 +48,14 @@ $box = function (array $c) {
 ?>
 <article class="faculty-account" data-faculty aria-labelledby="fa-page-title"
      data-save-url="<?= e(accountUrl('/faculty-info')) ?>"
-     data-contact-url="<?= e(accountUrl('/faculty-contact')) ?>"
      data-csrf="<?= e(csrfToken()) ?>">
 
-  <header class="acc-banner">
+  <?php /* a <div>, not <header>: general.css styles every <header> as the site top bar */ ?>
+  <div class="acc-banner">
     <?= $svg($cfg['banner']) ?>
     <span class="bar" aria-hidden="true"></span>
     <h1 id="fa-page-title"><?= e($name) ?> Account</h1>
-  </header>
+  </div>
 
   <div class="acc-top">
 
@@ -73,9 +73,6 @@ $box = function (array $c) {
       <div class="profile-body">
         <div class="profile-head">
           <h2 id="fa-profile-title"><?= e($name) ?> Profile</h2>
-          <button type="button" class="edit-btn" data-action="edit-faculty-profile">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13 7l4 4"/></svg>Edit
-          </button>
         </div>
         <dl class="profile-info">
           <div><dt>Full Name:</dt><dd data-bind="fullName"><?= e($fa['fullName'] ?: '—') ?></dd></div>
@@ -137,42 +134,5 @@ $box = function (array $c) {
     <?php endforeach; ?>
   </section>
 </article>
-
-<!-- Edit Profile popup (the Edit button on the profile card) -->
-<dialog id="faculty-profile-dialog" class="dlg dlg-dark dlg-faculty" aria-labelledby="fp-title" aria-describedby="fp-note">
-  <form method="post" action="<?= e(accountUrl('/faculty-contact')) ?>" novalidate autocomplete="off" data-contact-form>
-    <input type="hidden" name="csrf_token" value="<?= e(csrfToken()) ?>">
-    <div class="dlg-scroll">
-      <h2 id="fp-title">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13 7l4 4"/></svg>
-        <span>Edit <?= e($name) ?> Profile</span>
-        <button type="button" class="dlg-x" data-close aria-label="Close">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
-        </button>
-      </h2>
-      <p class="dlg-msg dlg-msg-dark" id="fp-msg" role="alert" hidden></p>
-
-      <div class="df-row">
-        <label class="df w6"><span>Full Name</span>
-          <input type="text" value="<?= e($fa['fullName']) ?>" data-bind-input="fullName" disabled></label>
-      </div>
-      <div class="df-row">
-        <label class="df w4"><span>ID Number</span>
-          <input type="text" value="<?= e($fa['schoolId']) ?>" disabled></label>
-        <label class="df w4"><span>Contact Num</span>
-          <input type="tel" name="number" value="<?= e($fa['phone']) ?>" maxlength="20" inputmode="tel" placeholder="09XX XXX XXXX"></label>
-      </div>
-      <div class="df-row">
-        <label class="df w6"><span>Office / Program / Department</span>
-          <input type="text" value="<?= e($fa['office']) ?>" disabled></label>
-      </div>
-      <p class="dlg-note" id="fp-note">Name, ID and department are managed by the Registrar. You can update your contact number here.</p>
-    </div>
-    <div class="dlg-actions dlg-actions-dark">
-      <button type="button" class="pill" data-close>Cancel</button>
-      <button type="submit" class="pill pill-save">Save Profile</button>
-    </div>
-  </form>
-</dialog>
 
 <div class="fa-toast" id="fa-toast" role="status" aria-live="polite" hidden></div>

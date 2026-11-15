@@ -5,7 +5,7 @@ require_once __DIR__.'/../PageLogic/account_actions.php';   // changePassword(),
 require_once __DIR__."/../Services/session.php";
 require_once __DIR__."/../Services/imageHandler.php";
 require_once __DIR__ . '/../Services/ClearanceDocumentHandler.php';
-
+require_once __DIR__.'/../PageLogic/faculty_account_actions.php';
 class Router {
     private array $routes = [];
 
@@ -95,6 +95,9 @@ $router->post('/logout', fn() => logout());
 // account popups (Change Password / Edit Profile). $_POST on purpose, not $_REQUEST.
 $router->post('/change-password', fn() => changePassword($_POST));
 $router->post('/edit-profile',    fn() => updateProfile($_POST));
+
+$router->post('/faculty-info',    fn() => saveFacultyInfo($_POST));
+$router->post('/faculty-contact', fn() => saveFacultyContact($_POST));
  
 $router->post('/upload-profile', fn() => uploadProfile());
 $router->get('/get-profile', fn() => getProfilePic());
