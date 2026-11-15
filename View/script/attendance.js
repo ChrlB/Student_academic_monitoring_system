@@ -36,6 +36,15 @@ document.addEventListener('DOMContentLoaded', () => {
   let handling = false;   // true while one scan is being sent, so one QR is never counted twice
 
   const startScanner = () => {
+    const eventSelect = document.getElementById('eventSelect');
+    const currentEventID = eventSelect ? eventSelect.value.trim() : '';
+
+    // Block scanning entirely if there is no active event
+    if (!currentEventID) {
+      showScannerAlert("No active event available. Cannot start scanning.", "error");
+      return;
+    }
+
     const readerDiv = document.getElementById('qr-reader');
     const staticIcon = document.getElementById('qrStaticIcon');
     const studentInput = document.getElementById('scannerStudentId');
@@ -43,10 +52,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!readerDiv) return;
 
-    // Show scanner view, hide static icon box
+    // Show scanner view, hide static icon box[cite: 8]
     readerDiv.style.display = 'block';
     if (staticIcon) staticIcon.style.display = 'none';
-    if (retakeBtn) retakeBtn.textContent = 'Retake'; // Change text to Retake once active
+    if (retakeBtn) retakeBtn.textContent = 'Retake'; // Change text to Retake once active[cite: 8]
 
     if (!html5QrCode) {
       html5QrCode = new Html5Qrcode("qr-reader");
@@ -84,7 +93,7 @@ document.addEventListener('DOMContentLoaded', () => {
    */
   const processScannedAttendance = (studentID, autoRestart = false) => {
     const eventSelect = document.getElementById('eventSelect');
-    const currentEventID = eventSelect ? eventSelect.value : null;
+    const currentEventID = eventSelect ? eventSelect.value.trim() : '';
 
     if (!currentEventID) {
       showScannerAlert("Please select an active event first.", "error");
@@ -133,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const studentInput = document.getElementById('scannerStudentId');
         if (studentInput) studentInput.value = '';
 
-        // Automatically reopen/restart scanner for the next scan after a short delay
+        // Automatically reopen/restart scanner for the next scan after a short delay (Cooldown window)
         if (autoRestart) {
           setTimeout(() => {
             startScanner();
@@ -179,7 +188,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const staticIcon = document.getElementById('qrStaticIcon');
     const retakeBtn = document.getElementById('qrRetake');
 
-    if (retakeBtn) retakeBtn.textContent = 'Scan'; // Revert back to Scan when stopped
+    if (retakeBtn) retakeBtn.textContent = 'Scan'; // Revert back to Scan when stopped[cite: 8]
 
     const showIcon = () => {
       if (readerDiv) readerDiv.style.display = 'none';
@@ -205,7 +214,7 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelBtn.addEventListener('click', () => {
       stopScanner().finally(() => {
         modal.style.display = 'none';
-        location.reload(); // Refresh background list so new records show up when closing modal
+        location.reload(); // Refresh background list so new records show up when closing modal[cite: 6]
       });
     });
   }
@@ -214,20 +223,18 @@ document.addEventListener('DOMContentLoaded', () => {
   if (recordBtn) {
     recordBtn.addEventListener('click', (e) => {
       e.preventDefault();
-      if (handling) return;      // ignore double clicks while a scan is being sent
+      if (handling) return;      // ignore double clicks while a scan is being sent[cite: 6]
       handling = true;
       stopScanner();
 
       const studentInput = document.getElementById('scannerStudentId');
       const studentID = studentInput ? studentInput.value.trim() : '';
 
-      processScannedAttendance(studentID, false); // Manual record doesn't auto-restart scanner
+      processScannedAttendance(studentID, false); // Manual record doesn't auto-restart scanner[cite: 6]
     });
   }
 
   /* ---------- Events page: arrow before the title, goes back to the student list ---------- */
-  // Same look as the ATTENDANCE title: arrow + bold word, then the dimmer "| Faculty".
-  // The back address is the current address without ?events=1 (or data-back if the page sets it).
   const evTitle = header && [...header.querySelectorAll('*')].find(el => !el.children.length && /^\s*EVENTS/i.test(el.textContent));
   if (evTitle && !header.querySelector('.att-back')) {
     const evNode = [...evTitle.childNodes].find(x => x.nodeType === 3 && /EVENTS/i.test(x.nodeValue));
@@ -313,7 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     f('ev-cancel').addEventListener('click', () => evDlg.close());
-    evDlg.addEventListener('click', e => { if (e.target === evDlg) evDlg.close(); });   // click outside
+    evDlg.addEventListener('click', e => { if (e.target === evDlg) evDlg.close(); });   // click outside[cite: 6]
 
     f('ev-delete').addEventListener('click', () => {
       const n = parseInt(f('ev-delete').dataset.att, 10) || 0;
