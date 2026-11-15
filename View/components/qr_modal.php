@@ -92,7 +92,7 @@
             </div>
 
             <h3>Enter Student ID</h3>
-            <input type="text" id="scannerStudentId" name="studentID" placeholder="eg. xxxx-xxxxx" autocomplete="off" required>
+            <input type="text" id="scannerStudentId" name="studentID" placeholder="eg. YYYYXXXXX" autocomplete="off" required>
 
             <div id="scannerAlert" style="display: none; width: 100%; max-width: 280px; margin-bottom: 12px; padding: 8px; font-size: 12px; border-radius: 6px; text-align: center;"></div>
 
