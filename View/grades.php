@@ -36,6 +36,18 @@ if ($isStudentAccount) {
 
 $view = ($_GET['view'] ?? 'preview') === 'gradebook' ? 'gradebook' : 'preview';
 $scheduleID = (int)($_GET['class'] ?? $_POST['class'] ?? 0);
+$assignedClasses = $isFacultyAccount && $view === 'gradebook'
+    ? $gradesLogic->assignedClasses()
+    : [];
+if ($isFacultyAccount && $view === 'gradebook' && $_SERVER['REQUEST_METHOD'] === 'GET') {
+    foreach ($assignedClasses as $assignedClass) {
+        if ($assignedClass['schedID'] === $scheduleID) {
+            $semesterKey = $assignedClass['semester_key'];
+            $semesterLabel = $assignedClass['semester_label'];
+            break;
+        }
+    }
+}
 
 if ($isFacultyAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_grades') {
     $semesterKey = $gradesLogic->selectedSemester($_POST['sem'] ?? '', $semesters);
@@ -1005,33 +1017,49 @@ $csrf = $gradesLogic->csrfToken();
                     ? BASE_PATH . '/grades?' . http_build_query(['sem' => $semesterKey])
                     : BASE_PATH . '/dashboard' ?>">Back</a>
 
-                <form class="term-group" method="get" action="<?= BASE_PATH ?>/grades">
-                  <?php if ($view === 'gradebook'): ?>
+                <?php if ($view === 'preview'): ?>
+                  <form class="term-group" method="get" action="<?= BASE_PATH ?>/grades">
+                    <div class="term-picker">
+                      <select id="grade-semester" name="sem" aria-label="Select Term" onchange="this.form.submit()" <?= empty($semesters) ? 'disabled' : '' ?>>
+                        <?php if (empty($semesters)): ?>
+                          <option value="" selected>Select Term</option>
+                        <?php endif; ?>
+                        <?php foreach ($semesters as $semester): ?>
+                          <option value="<?= grades_e($semester['key']) ?>" <?= $semester['key'] === $semesterKey ? 'selected' : '' ?>>
+                            <?= grades_e($semester['label']) ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                    <noscript><button class="term-btn" type="submit">Show Term</button></noscript>
+                  </form>
+                <?php else: ?>
+                  <form class="term-group" method="get" action="<?= BASE_PATH ?>/grades">
                     <input type="hidden" name="view" value="gradebook">
-                  <?php endif; ?>
-                  <?php if ($view === 'gradebook' && $class): ?>
-                    <input type="hidden" name="class" value="<?= (int)$class['schedID'] ?>">
-                  <?php endif; ?>
-                  <div class="term-picker">
-                    <select id="grade-semester" name="sem" aria-label="Select Term" onchange="this.form.submit()" <?= empty($semesters) ? 'disabled' : '' ?>>
-                      <?php if (empty($semesters)): ?>
-                        <option value="" selected>Select Term</option>
-                      <?php endif; ?>
-                      <?php foreach ($semesters as $semester): ?>
-                        <option value="<?= grades_e($semester['key']) ?>" <?= $semester['key'] === $semesterKey ? 'selected' : '' ?>>
-                          <?= grades_e($semester['label']) ?>
-                        </option>
-                      <?php endforeach; ?>
-                    </select>
-                  </div>
-                  <noscript><button class="term-btn" type="submit">Show Term</button></noscript>
-                </form>
+                    <div class="term-picker">
+                      <select id="grade-class" name="class" aria-label="Select Class"
+                              onchange="this.form.submit()" <?= empty($assignedClasses) ? 'disabled' : '' ?>>
+                        <?php if (!$class): ?>
+                          <option value="" selected <?= $assignedClasses ? '' : 'disabled' ?>>
+                            Select Class
+                          </option>
+                        <?php endif; ?>
+                        <?php foreach ($assignedClasses as $assignedClass): ?>
+                          <option value="<?= (int)$assignedClass['schedID'] ?>"
+                                  <?= $assignedClass['schedID'] === $scheduleID ? 'selected' : '' ?>>
+                            <?= grades_e($assignedClass['subject_code'] . ' - '
+                                . $assignedClass['subject_name'] . ' (' . $assignedClass['program']
+                                . $assignedClass['block'] . ') - ' . $assignedClass['semester_label']) ?>
+                          </option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                    <noscript><button class="term-btn" type="submit">Show Class</button></noscript>
+                  </form>
+                <?php endif; ?>
                 <?php if ($view === 'preview'): ?>
                   <?php
                     $gradebookParams = ['view' => 'gradebook', 'sem' => $semesterKey];
-                    if (!empty($classPreview)) {
-                        $gradebookParams['class'] = (int)$classPreview[0]['schedID'];
-                    }
                   ?>
                   <div class="preview-toolbar">
                     <a class="class-scope-btn grades-action-link" href="<?= BASE_PATH ?>/grades?<?= http_build_query(['sem' => $semesterKey]) ?>">Class Preview</a>
@@ -1047,9 +1075,11 @@ $csrf = $gradesLogic->csrfToken();
 
               <section class="grade-content">
                 <?php if ($view === 'gradebook'): ?>
-                  <div class="grade-head">
-                    <div class="semester-pill"><?= grades_e($semesterLabel ?: 'No assigned semester') ?></div>
-                  </div>
+                  <?php if ($class): ?>
+                    <div class="grade-head">
+                      <div class="semester-pill"><?= grades_e($semesterLabel ?: 'No assigned semester') ?></div>
+                    </div>
+                  <?php endif; ?>
                 <?php endif; ?>
                 <?php if ($view === 'gradebook' && $class && $roster): ?>
                   <section class="gradebook-panel" aria-labelledby="gradebook-class-title">
@@ -1145,7 +1175,9 @@ $csrf = $gradesLogic->csrfToken();
                   <section class="gradebook-panel" aria-labelledby="gradebook-class-title">
                     <h2 class="gradebook-heading" id="gradebook-class-title">Grade Book</h2>
                     <div class="gradebook-empty">
-                      No assigned class schedule or student grades are available to display.
+                      <?= $assignedClasses
+                          ? 'Select a class to view its gradebook.'
+                          : 'No assigned class schedule or student grades are available to display.' ?>
                     </div>
                   </section>
                 <?php elseif (empty($classPreview)): ?>
