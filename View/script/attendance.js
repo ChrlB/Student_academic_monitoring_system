@@ -177,7 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(window.alertTimeout);
       window.alertTimeout = setTimeout(() => {
         alertBox.style.display = 'none';
-      }, 4000);
+      }, 5000);
     }
   };
 
