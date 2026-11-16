@@ -1,4 +1,5 @@
 <?php
+# Include attendance page logic and QR modal component
   require_once __DIR__."/../PageLogic/attendance_logic.php";
   require_once __DIR__."/components/qr_modal.php";
 ?>
@@ -6,6 +7,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <!-- Page meta tags, favicon, and stylesheet links -->
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS - Attendance</title>
@@ -20,6 +22,7 @@
 
 <body>
   <?php require_once __DIR__."/components/popup_message.php"; ?>
+  <!-- Main layout container with sidebar navigation and header -->
   <div class="row main_box">
     
     <?php require_once __DIR__."/components/navigation.php"; ?>
@@ -28,6 +31,7 @@
       <main class="column scrollbar att-main">
 <div class="att<?= $attGroup === 'student' ? ' student' : '' ?>" id="att" data-qr="<?= e(BASE_PATH) ?>/attendance-qr" data-qr-icon="<?= BASE_PATH ?>/View/resources/qr.png" data-can-qr="<?= ($attGroup === 'student' || $attCanScan) ? '1' : '0' ?>">
 <?php if ($evpage): /* =============== EVENTS PAGE =============== */ ?>
+  <!-- Events management toolbar and list view -->
   <section class="view">
     <div class="toolbar">
       <?php if ($attCanEdit): ?>
@@ -55,11 +59,12 @@
     </div></div>
   </section>
 
-  <!-- Add / Edit / View event -->
+  <!-- Add / Edit / View event modal dialog -->
   <dialog class="ev-dlg" id="ev-dlg" data-dean="<?= !empty($attIsDean) ? '1' : '0' ?>" data-me="<?= e($ATT_ME_NAME ?? '') ?>" data-my-program="<?= e(in_array($attMyProgram, $ATT_PROGRAMS, true) ? $attMyProgram : '') ?>">
     <form method="post" action="<?= e(att_url()) ?>" id="ev-form" autocomplete="off">
       <input type="hidden" name="att_action" id="ev-action" value="add_event">
       <input type="hidden" name="eventID" id="ev-id" value="">
+      <input type="hidden" name="events" value="1">
       <h2 id="ev-title">ADD EVENT</h2>
 
       <label class="ev-field"><span>EVENT NAME</span>
@@ -109,6 +114,7 @@
   </dialog>
 
 <?php elseif ($attGroup === 'student'): /* =============== STUDENT VIEW (read-only) =============== */ ?>
+  <!-- Student personal attendance summary and record table view -->
   <section class="view">
     <div class="detail-head">
       <div class="detail-title"><?= e("{$me['id']}, {$me['name']}, {$me['dept']}, {$me['course']}") ?></div>
@@ -152,6 +158,7 @@
   </section>
 
 <?php elseif (!$stu): /* =============== LIST VIEW =============== */ ?>
+  <!-- Faculty student directory list/grid view with filters and search -->
   <section class="view">
     <div class="toolbar">
       <?php att_dropdown('Department', 'All departments', array_keys($ATT_DEPT_COURSES), $dept, 'dept'); ?>
@@ -202,6 +209,7 @@
   </section>
 
 <?php else: /* =============== DETAIL VIEW =============== */ ?>
+  <!-- Faculty detailed student attendance view and record management -->
   <section class="view">
     <div class="detail-head">
       <a class="back-btn" href="<?= e(att_url(['student' => null, 'event' => null, 'year' => null])) ?>" title="Back to attendance list">
@@ -222,7 +230,7 @@
       <?php att_dropdown('Year', 'All years', $years, $year, 'year'); ?>
     </div>
 
-    <form class="rec-box" method="post" action="<?= e(att_url()) ?>">
+    <form class="rec-box" method="post" action="">
       <input type="hidden" name="att_action" value="delete">
       <div class="rec-scroll">
         <table class="rec">
