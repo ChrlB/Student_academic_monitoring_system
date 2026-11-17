@@ -51,7 +51,7 @@ $page = $_SESSION["page"] ?? "";
 
     <?php if($_SESSION["role"] == "registrar"): ?>
       <a class="nav_buttons row REGISTRATION" href="<?= BASE_PATH?>/registration">
-        <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/User.png" alt="" class="nav_button_icons"> </div>
+        <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Document.png" alt="" class="nav_button_icons"> </div>
         <input type="button" value="REGISTRATION"></a>
     <?php endif ?>
 

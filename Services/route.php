@@ -93,6 +93,8 @@ $router->get('/registration',  fn() => require __DIR__ . '/../View/registration.
 $router->post('/registration',  fn($request) => require __DIR__ . '/../View/registration.php');
 $router->post('/registration-add',      fn() => registrationAdd($_POST));
 $router->post('/registration-restrict', fn() => registrationRestrict($_POST));
+$router->post('/registration-update',   fn() => registrationUpdate($_POST));
+$router->post('/registration-delete',   fn() => registrationDelete($_POST));
 
 $router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    

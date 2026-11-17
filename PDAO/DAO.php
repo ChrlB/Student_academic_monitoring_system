@@ -26,7 +26,8 @@ $users = "SELECT
       F.`program` AS `program`,
       F.`password` AS `password`,
       F.`folderID` AS `folderID`,
-      F.`role` AS `role`
+      F.`role` AS `role`,
+      F.`status` AS `status`
   FROM
       `faculty` as F
   UNION
@@ -42,7 +43,8 @@ $users = "SELECT
       S.`program` AS `program`,
       S.`password` AS `password`,
       S.`folderID` AS `folderID`,
-      'student' AS `role`
+      'student' AS `role`,
+      S.`status` AS `status`
   FROM
       `students` as S";
 
