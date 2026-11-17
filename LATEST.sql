@@ -1308,3 +1308,18 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+
+/* Registration */
+
+CREATE TABLE IF NOT EXISTS `account_restrictions` (
+  `restriction_id` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `account_id`     varchar(11)  NOT NULL,                       
+  `reason`         varchar(250) NOT NULL,
+  `restricted_by`  varchar(11)  NOT NULL,
+  `restricted_at`  timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `lifted_at`      timestamp    NULL DEFAULT NULL,
+  `lifted_by`      varchar(11)  DEFAULT NULL,
+  PRIMARY KEY (`restriction_id`),
+  KEY `account_id` (`account_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
