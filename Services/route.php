@@ -95,6 +95,8 @@ $router->post('/registration-add',      fn() => registrationAdd($_POST));
 $router->post('/registration-restrict', fn() => registrationRestrict($_POST));
 $router->post('/registration-update',   fn() => registrationUpdate($_POST));
 $router->post('/registration-delete',   fn() => registrationDelete($_POST));
+$router->post('/registration-assign',   fn() => registrationAssign($_POST));
+$router->post('/registration-unassign', fn() => registrationUnassign($_POST));
 
 $router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    
