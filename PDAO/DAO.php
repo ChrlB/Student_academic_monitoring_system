@@ -23,6 +23,7 @@ $users = "SELECT
       F.`first_name` AS `first_name`,
       F.`middle_name` AS `middle_name`,
       F.`last_name` AS `last_name`,
+      F.`program` AS `program`,
       F.`password` AS `password`,
       F.`folderID` AS `folderID`,
       F.`role` AS `role`
@@ -38,6 +39,7 @@ $users = "SELECT
       S.`first_name` AS `first_name`,
       S.`middle_name` AS `middle_name`,
       S.`last_name` AS `last_name`,
+      S.`program` AS `program`,
       S.`password` AS `password`,
       S.`folderID` AS `folderID`,
       'student' AS `role`
@@ -839,6 +841,32 @@ $userDAO->prepareStatement("updateStudentProfileFull",
             AND ( concat(EP.acad_year,' - ',EP.sem) = ? OR 'ALL' = ?)
             AND CONCAT( YEAR(ST.date_created), LPAD( ES.`studentID`, 5, '0')) = ?
             AND CONCAT('F', YEAR(F.date_created), LPAD(SS.facultyID, 5, '0')) = ?;
+
+
+    ");
+
+    $clearanceDAO->prepareStatement("getStudentsForFacultyClearance","SELECT
+            CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) AS studentID,
+            CONCAT(ST.last_name, ', ', ST.first_name, ' ', IFNULL(ST.middle_name, '')) AS student_name,
+            ST.program,
+            ST.block,
+            CONCAT(EP.acad_year,' ',EP.sem,'sem') as acad_year_sem,
+            COUNT(ES.enrolled_subjectID) AS total_subjects,
+            SUM(SC.subject_clearanceID IS NULL) AS not_yet_cleared
+        FROM enrolled_subjects AS ES
+            INNER JOIN students AS ST
+                ON ST.studentID = ES.studentID
+            INNER JOIN enrollment_period AS EP
+                ON EP.enrollmentID = ES.enrollmentID
+            LEFT JOIN subject_clearance AS SC
+                ON SC.enrolled_subjectID = ES.enrolled_subjectID
+        WHERE 	(CONCAT(EP.acad_year,' ',EP.sem,'sem') = ? OR 'ALL' = ?)
+                AND (ST.block = ? OR 'ALL' = ?)
+                AND (CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ? OR 'ALL' = ?)
+                AND (ST.program = ?)
+        GROUP BY ST.studentID, ST.date_created, ST.last_name, ST.first_name,
+                ST.middle_name, ST.program, EP.acad_year, EP.sem
+        ORDER BY student_name;
 
 
     ");
