@@ -105,6 +105,8 @@ function login($login_info) {
     $_SESSION['folderID'] = $user['folderID'] ?? null;
     $_SESSION['real_userID'] = $user['real_userID'] ?? null;
 
+    $_SESSION['program'] = $user['program'] ?? null;
+
     $_SESSION['message'] = 'Account verification successful';
 
     unset($_SESSION['csrf_token'], $_SESSION['error'], $_SESSION['login_errors'], $_SESSION['login_old'], $_SESSION['login_fails']);

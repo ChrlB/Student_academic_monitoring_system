@@ -17,6 +17,14 @@ $year = 'ALL';
 $program = 'ALL';
 $acadyear = 'ALL';
 
+$Fblock  = 'ALL';
+$Facadyear  = $clearanceDAO->executeQuery('getCurrentAcadYear')[0]['acad_year_sem'] ?? 'ALL';
+$FstudentID  = 'ALL';
+$FstudentID  = 'ALL';
+
+// $currentAY = 
+
+
 $allowedViews = ($_SESSION["role"] == 'student')
     ? ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE', 'UPDATES', 'SUBJECT-REQUIREMENTS','FACULTY-REQUIREMENTS','OFFICE-REQUIREMENTS']
     : ['MAIN', 'SUBJECT', 'FACULTY', 'OFFICE'];
@@ -217,6 +225,18 @@ function editStudentsForSubjectClearance($department = 'ALL', $subjectID = 'ALL'
     return $records;
 }
 
+function getStudentsForFacultyClearance($block = 'ALL',$acad_year = 'ALL', $studentID = 'ALL'){
+    global $clearanceDAO;
+
+    $records = $clearanceDAO->executeQuery("getStudentsForFacultyClearance",[
+        $_SESSION['real_userID'],
+        $acad_year,$acad_year,
+        $block,$block, 
+        $studentID,$studentID,
+        $_SESSION['program']]);
+
+    return $records;
+}
 function getFacultyUploadedRequirements($subjectID){
     global $clearanceDAO;
     $records = $clearanceDAO->executeQuery("getFacultyUploadedRequirements",[ $subjectID ,$_SESSION['userID']]);
