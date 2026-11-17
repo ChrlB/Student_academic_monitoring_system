@@ -18,9 +18,11 @@ $program = 'ALL';
 $acadyear = 'ALL';
 
 $Fblock  = 'ALL';
-$Facadyear  = 'ALL';
+$Facadyear  = $clearanceDAO->executeQuery('getCurrentAcadYear')[0]['acad_year_sem'] ?? 'ALL';
 $FstudentID  = 'ALL';
 $FstudentID  = 'ALL';
+
+// $currentAY = 
 
 
 $allowedViews = ($_SESSION["role"] == 'student')
@@ -227,6 +229,7 @@ function getStudentsForFacultyClearance($block = 'ALL',$acad_year = 'ALL', $stud
     global $clearanceDAO;
 
     $records = $clearanceDAO->executeQuery("getStudentsForFacultyClearance",[
+        $_SESSION['real_userID'],
         $acad_year,$acad_year,
         $block,$block, 
         $studentID,$studentID,

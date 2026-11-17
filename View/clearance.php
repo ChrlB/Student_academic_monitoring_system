@@ -1134,13 +1134,15 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
           <?php elseif($student_view == "FACULTY"): 
 
+
                 $students_for_faculty_clearance = getStudentsForFacultyClearance(); 
-                $Facadyear = $students_for_faculty_clearance[0]['acad_year_sem'] ?? 'ALL';
                 $students_for_clearance = getStudentsForFacultyClearance($Fblock,$Facadyear,$FstudentID)
                 ?>
 
+                <?php //var_dump($students_for_clearance) ?>
+
               <div class="row" style="justify-content: space-between; align-items:center">
-                <b class="view_title"><?= strtoupper($_SESSION['role']) ?>  </b>
+                <b class="view_title"><?= strtoupper($_SESSION['role']).' - '.$_SESSION['program']?>  </b>
                 <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
               </div>
                <div class="row" style="gap: 20px; align-items:center; border-bottom: 2px solid white; padding-bottom: 20px;" >
@@ -1160,17 +1162,10 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                       <option  value="<?= $subject["acad_year_sem"] ?>" <?php if($acadyear == $subject["acad_year_sem"]) echo 'selected'?>><?= $subject["acad_year_sem"] ?></option>
                     <?php endif; endforeach ?>
                   </select>
-
-                  <b>PROGRAM:</b>
-                  <select name="programfilter" class="filter" onchange="this.form.submit()">
-                    <?php $options = []; foreach( $students_for_faculty_clearance as $subject): if(!in_array($subject["program"],$options)): $options[] = $subject["program"];?>
-                      <option  value="<?= $subject["program"] ?>" <?php if($program == $subject["program"]) echo 'selected'?>><?= $subject["program"] ?></option>
-                    <?php endif; endforeach ?>
-                  </select>
                 </div >
-              <div>
+              <!-- <div>
                 <hr>
-              </div>
+              </div> -->
               <div class="updates_frame2  ">
                 <table class="updates_table">
                   <thead style="position: relative;z-index: 1;">
@@ -1191,20 +1186,16 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                         <td title="<?= htmlspecialchars($row['student_name']) ?>">
                           <?= htmlspecialchars($row['student_name']) ?>
                         </td>
-                        <td><?= htmlspecialchars($row['date_cleared']) ?></td>
+                        <td><?php htmlspecialchars($row['date_cleared']) ?></td>
                         <td>
-                          <span class="status_badge <?= statusClass($row['status']) ?>">
-                            <?= htmlspecialchars(strtoupper($row['status'])) ?>
+                          <span class="status_badge <?php statusClass($row['status']) ?>">
+                            <?php htmlspecialchars(strtoupper($row['status'])) ?>
                           </span>
-                          <div class="remark" >
-                            <b>REMARKS</b>
-                            <p><?=  $row['remarks'] ?> </p>
-                          </div>
                         </td>
                         <td>
                           
                           <div>
-                            <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>&edit=1&studentID=<?= $row['studentID'] ?>"><button type="submit">EDIT</button></a>
+                            <a href="<?= BASE_PATH ?>/clearance?view=FACULTY&studentID=<?= $row['studentID']?>&edit=1"><button type="submit">EDIT</button></a>
                           </div>
                         </td>
                         

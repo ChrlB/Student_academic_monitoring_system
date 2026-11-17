@@ -847,28 +847,36 @@ $userDAO->prepareStatement("updateStudentProfileFull",
 
     $clearanceDAO->prepareStatement("getStudentsForFacultyClearance","SELECT
             CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) AS studentID,
-            CONCAT(ST.last_name, ', ', ST.first_name, ' ', IFNULL(ST.middle_name, '')) AS student_name,
+            CONCAT(ST.last_name, ', ', ST.first_name,
+                IFNULL(CONCAT(' ', ST.middle_name), '')) AS student_name,
             ST.program,
             ST.block,
-            CONCAT(EP.acad_year,' ',EP.sem,'sem') as acad_year_sem,
-            COUNT(ES.enrolled_subjectID) AS total_subjects,
-            SUM(SC.subject_clearanceID IS NULL) AS not_yet_cleared
-        FROM enrolled_subjects AS ES
-            INNER JOIN students AS ST
-                ON ST.studentID = ES.studentID
+            CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem,
+            IFNULL(CAST(FC.date_cleared AS CHAR), 'not yet cleared') AS date_cleared,
+            IFNULL(FC.`status`, 'not yet cleared') AS status
+        FROM students AS ST
+            INNER JOIN enrolled_subjects AS ES
+                ON ES.studentID = ST.studentID
             INNER JOIN enrollment_period AS EP
                 ON EP.enrollmentID = ES.enrollmentID
-            LEFT JOIN subject_clearance AS SC
-                ON SC.enrolled_subjectID = ES.enrolled_subjectID
-        WHERE 	(CONCAT(EP.acad_year,' ',EP.sem,'sem') = ? OR 'ALL' = ?)
+            LEFT JOIN faculty_clearance AS FC
+                        ON FC.studentID = ST.`studentID`
+                        and FC.facultyID = ?
+        WHERE (CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ? OR 'ALL' = ?)
                 AND (ST.block = ? OR 'ALL' = ?)
                 AND (CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ? OR 'ALL' = ?)
                 AND (ST.program = ?)
         GROUP BY ST.studentID, ST.date_created, ST.last_name, ST.first_name,
-                ST.middle_name, ST.program, EP.acad_year, EP.sem
-        ORDER BY student_name;
+                ST.middle_name, ST.program, ST.block, EP.acad_year, EP.sem,
+                FC.date_cleared, FC.`status`
+        ORDER BY EP.acad_year DESC, EP.sem DESC, student_name, ST.studentID,
+                FC.date_cleared;
+    ");
 
-
+    $clearanceDAO->prepareStatement("getCurrentAcadYear","SELECT 
+        CONCAT(acad_year, ' ', sem, 'sem') AS acad_year_sem
+        FROM enrollment_period
+        ORDER BY acad_year DESC
     ");
 
     $clearanceDAO->prepareStatement("getFacultyUploadedRequirements","SELECT
