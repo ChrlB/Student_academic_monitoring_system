@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const header = document.querySelector('header');
   const modal  = document.getElementById('qrModal');
 
-  /* ---------- 1. QR button, to the left of the profile ---------- */
+  /* Create and insert QR Code button next to user profile header icon */
   // data-can-qr is "0" when the role may not scan (dean, registrar); students and scanners get "1"
   const profile = header && header.querySelector('.profile_icon')?.closest('.column');
   const canQr   = !att || att.dataset.canQr !== '0';
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     group.append(qr, profile);
   }
 
-  /* ---------- Scanner (only exists in the page for roles that may scan) ---------- */
+  /* Initialize and manage QR Code scanner functionality */
   let html5QrCode = null;
   let handling = false;   // true while one scan is being sent, so one QR is never counted twice
 
@@ -87,7 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   /**
-   * Sends scanned/typed student ID asynchronously to PHP backend handler
+   * Send scanned or typed student ID asynchronously to PHP backend handler
    * @param {string} studentID
    * @param {boolean} autoRestart - Whether to restart the scanner automatically after success
    */
@@ -165,9 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .finally(() => { handling = false; });
   };
 
-  /**
-   * Helper function to show alerts inside the scanner modal banner
-   */
+  /* Helper function to display alerts inside the scanner modal banner */
   const showScannerAlert = (message, type = 'success') => {
     const alertBox = document.getElementById('scannerAlert');
     if (alertBox) {
@@ -179,10 +177,11 @@ document.addEventListener('DOMContentLoaded', () => {
       clearTimeout(window.alertTimeout);
       window.alertTimeout = setTimeout(() => {
         alertBox.style.display = 'none';
-      }, 4000);
+      }, 5000);
     }
   };
 
+  /* Stop active QR scanner camera instance */
   const stopScanner = () => {
     const readerDiv = document.getElementById('qr-reader');
     const staticIcon = document.getElementById('qrStaticIcon');
@@ -201,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return html5QrCode.stop().then(showIcon).catch(err => console.error("Failed to stop scanner.", err));
   };
 
-  // Button Event Handlers for Modal
+  /* Button event listeners for scanner modal actions */
   const retakeBtn = document.getElementById('qrRetake');
   if (retakeBtn) {
     retakeBtn.addEventListener('click', () => {
@@ -234,7 +233,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  /* ---------- Events page: arrow before the title, goes back to the student list ---------- */
+  /* Inject back arrow into header on events page to return to student list */
   const evTitle = header && [...header.querySelectorAll('*')].find(el => !el.children.length && /^\s*EVENTS/i.test(el.textContent));
   if (evTitle && !header.querySelector('.att-back')) {
     const evNode = [...evTitle.childNodes].find(x => x.nodeType === 3 && /EVENTS/i.test(x.nodeValue));
@@ -258,7 +257,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (!att) return;
 
-  /* ---------- 2. Back arrow moved into the header title ---------- */
+  /* Relocate back arrow into header title on attendance detail view */
   const backBtn = att.querySelector('.back-btn');
   const title = header && [...header.querySelectorAll('*')].find(el => !el.children.length && /^\s*ATTENDANCE/i.test(el.textContent));
 
@@ -280,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  /* ---------- Events page: rows open the event dialog ---------- */
+  /* Events management dialog and combobox autocomplete behavior */
   const evDlg = document.getElementById('ev-dlg');
   if (evDlg) {
     const f = id => document.getElementById(id);
@@ -326,9 +325,8 @@ document.addEventListener('DOMContentLoaded', () => {
       evDlg.addEventListener('close', close);
     })();
 
-    // mode: 'add' | 'edit' | 'view'
+    /* Open event dialog in appropriate mode (add, edit, view, review) */
     const isDean = evDlg.dataset.dean === '1';
-    // mode: 'add' | 'edit' | 'view' | 'review' (dean looking at a pending event)
     const openDlg = (mode, d = {}) => {
       form.noValidate = false;
       f('ev-action').value = mode === 'edit' ? 'edit_event' : 'add_event';
@@ -339,11 +337,14 @@ document.addEventListener('DOMContentLoaded', () => {
       f('ev-status').value = mode === 'add' ? (isDean ? 'ACTIVE' : 'PENDING') : (d.status || 'ACTIVE');
       f('ev-start').value  = d.start  || '08:00';
       f('ev-end').value    = d.end    || '18:00';
-      f('ev-coord').value = isDean ? (d.coord || '') : (evDlg.dataset.me || d.coord || '');
+      
+      /* Pull and show the assigned coordinator from table data (d.coord) */
+      f('ev-coord').value = d.coord || (mode === 'add' && !isDean ? (evDlg.dataset.me || '') : '');
+      
       f('ev-program').value = mode === 'add' ? (evDlg.dataset.myProgram || '') : (d.program || '');
       const locked = mode === 'view' || mode === 'review';
       fields.forEach(x => { x.disabled = locked; });
-      if (!isDean) { f('ev-status').disabled = true; f('ev-coord').disabled = true; if (mode === 'edit') { f('ev-name').disabled = true; f('ev-program').disabled = true; } }   // status is the dean's; non-dean events are posted under their own name
+      if (!isDean) { f('ev-status').disabled = true; f('ev-coord').disabled = true; if (mode === 'edit') { f('ev-name').disabled = true; f('ev-program').disabled = true; } }
       f('ev-note').hidden    = isDean || locked;
       f('ev-ok').hidden      = locked;
       f('ev-approve').hidden = mode !== 'review';
@@ -389,7 +390,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  /* ---------- 3. Delete button: first click shows checkboxes, second deletes ---------- */
+  /* Attendance record selection and bulk deletion toggle behavior */
   const del = att.querySelector('.icon-btn.del');
   if (del) {
     att.classList.add('sel-hidden');

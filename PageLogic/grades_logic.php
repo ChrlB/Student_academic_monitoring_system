@@ -279,6 +279,36 @@ class GradesLogic
         return $rows;
     }
 
+    public function assignedClasses(): array
+    {
+        $facultyID = $this->currentUserID();
+        if ($facultyID <= 0) {
+            return [];
+        }
+
+        $rows = $this->all(
+            "SELECT ss.schedID, TRIM(ss.subjectID) AS subject_code,
+                    TRIM(s.name) AS subject_name, ss.block, ep.program,
+                    ep.acad_year, ep.sem
+             FROM subject_schedules ss
+             JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
+             JOIN subjects s ON TRIM(s.subjectID) = TRIM(ss.subjectID)
+             WHERE ss.facultyID = :facultyID
+             ORDER BY ep.acad_year DESC, ep.sem DESC, ss.subjectID, ep.program, ss.block",
+            [':facultyID' => $facultyID]
+        );
+
+        foreach ($rows as &$row) {
+            $row['schedID'] = (int)$row['schedID'];
+            $row['sem'] = (int)$row['sem'];
+            $row['semester_key'] = $row['acad_year'] . '|' . $row['sem'];
+            $row['semester_label'] = self::semesterLabel($row['acad_year'], $row['sem']);
+        }
+        unset($row);
+
+        return $rows;
+    }
+
     public static function semesterLabel($acadYear, $sem)
     {
         $labels = [1 => '1st Semester', 2 => '2nd Semester', 3 => 'Summer'];

@@ -146,6 +146,10 @@ textarea.form-control { min-height: 110px; resize: vertical; }
     z-index: 10;
 }
 .file-clear-btn:hover { background: rgba(255, 60, 60, 1); }
+.submission-status { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 0 16px; color: #7ce5b5; }
+.submission-check { width: 58px; height: 58px; border: 1px solid #3da879; border-radius: 50%; background: #277b58; color: #fff; font-size: 30px; font-weight: 700; }
+.submission-check:disabled { opacity: 1; cursor: default; }
+.submission-edit { width: 100%; margin-top: 8px; }
 
 @media (max-width: 1100px) { .proj-detail { grid-template-columns: 1fr; } }
 @media (max-width: 700px) { .projects-page { padding: 16px !important; } .proj-card { padding: 17px !important; border-radius: 13px !important; } .proj-stats { grid-template-columns: 1fr; gap: 12px; } }
@@ -261,7 +265,7 @@ textarea.form-control { min-height: 110px; resize: vertical; }
             <?php else: ?>
             <?php /* ---------- DETAIL PAGE ---------- */
                 $submitted = $logic->submission !== null;
-                $locked    = $submitted || !$logic->isLead;
+                $locked    = !$logic->isLead;
             ?>
 
             <a href="<?= proj_e(ProjectsLogic::url()) ?>" class="btn-proj" style="margin-bottom: 20px; width: fit-content;">← Back to projects</a>
@@ -346,11 +350,22 @@ textarea.form-control { min-height: 110px; resize: vertical; }
 
                 <!-- SUBMIT PANEL -->
                 <aside class="proj-card">
-                    <h3 class="proj-section-title" style="font-size: 17px;">Pass / Submit Project</h3>
+                    <?php if ($submitted): ?>
+                        <div id="submission-complete" class="submission-status">
+                            <button type="button" class="submission-check" aria-label="Submission completed" disabled>✓</button>
+                            <strong>Completed</strong>
+                            <?php if ($logic->isLead): ?>
+                                <button type="button" class="btn-proj submission-edit" id="edit-submission">Edit</button>
+                            <?php endif; ?>
+                        </div>
+                        <h3 id="submission-edit-title" class="proj-section-title" style="font-size: 17px; display: none;">Edit Submission</h3>
+                    <?php else: ?>
+                        <h3 class="proj-section-title" style="font-size: 17px;">Pass / Submit Project</h3>
+                    <?php endif; ?>
                     <hr class="proj-divider" style="margin-top: 0;">
 
                     <!-- ADDED enctype FOR FILE UPLOAD -->
-                    <form method="POST" action="<?= $formAction ?>" enctype="multipart/form-data">
+                    <form id="project-submission-form" method="POST" action="<?= $formAction ?>" enctype="multipart/form-data" <?= $submitted ? 'style="display: none;"' : '' ?>>
                         <input type="hidden" name="csrf" value="<?= proj_e($csrf) ?>">
                         <input type="hidden" name="project_action" value="submit_project">
                         <input type="hidden" name="project_id" value="<?= (int)$selected['id'] ?>">
@@ -383,7 +398,7 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                         </div>
 
                         <button type="submit" class="btn-proj primary" style="width: 100%;" <?= $locked ? 'disabled' : '' ?>>
-                            <?= $submitted ? '✔ Submitted to Professor' : '✔ Pass Project to Professor' ?>
+                            <?= $submitted ? 'Save Changes' : '✔ Pass Project to Professor' ?>
                         </button>
 
                         <?php if (!$submitted && !$logic->isLead): ?>
@@ -930,6 +945,24 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                 clearBtn.addEventListener('click', function() {
                     fileInput.value = ''; 
                     clearBtn.style.display = 'none'; 
+                });
+            }
+        });
+        </script>
+
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const editButton = document.getElementById('edit-submission');
+            const completeStatus = document.getElementById('submission-complete');
+            const editTitle = document.getElementById('submission-edit-title');
+            const submissionForm = document.getElementById('project-submission-form');
+
+            if (editButton && completeStatus && editTitle && submissionForm) {
+                editButton.addEventListener('click', function() {
+                    completeStatus.style.display = 'none';
+                    editTitle.style.display = 'flex';
+                    submissionForm.style.display = 'block';
+                    submissionForm.querySelector('[name="file_url"]').focus();
                 });
             }
         });

@@ -5,7 +5,6 @@
   if (!root) return;
 
   var saveUrl = root.dataset.saveUrl;
-  var contactUrl = root.dataset.contactUrl;
   var csrf = root.dataset.csrf;
 
   var toggleBtn = root.querySelector('[data-action="toggle-info"]');
@@ -215,64 +214,4 @@
       e.returnValue = '';
     }
   });
-
-  /* ---------- Edit Profile popup (contact number) ---------- */
-  var dlg = document.getElementById('faculty-profile-dialog');
-  if (dlg) {
-    var form = dlg.querySelector('[data-contact-form]');
-    var msg = document.getElementById('fp-msg');
-    var numInput = form.querySelector('input[name="number"]');
-    var submit = form.querySelector('button[type="submit"]');
-
-    function dlgError(text) {
-      msg.textContent = text;
-      msg.hidden = !text;
-    }
-
-    document.addEventListener('click', function (e) {
-      var t = e.target.closest('[data-action="edit-faculty-profile"]');
-      if (!t) return;
-      dlgError('');
-      if (typeof dlg.showModal === 'function' && !dlg.open) dlg.showModal();
-      numInput.focus();
-    });
-
-    form.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var v = numInput.value.trim();
-      var d = v.replace(/\D/g, '');
-      if (/^639\d{9}$/.test(d) && v.charAt(0) === '+') d = '0' + d.slice(2);
-      if (!/^\+?[0-9][0-9 ()\-]*$/.test(v) || !/^09\d{9}$/.test(d)) {
-        dlgError('Contact Number must be 11 digits and start with 09, e.g. 0909 123 4567.');
-        numInput.focus();
-        return;
-      }
-      dlgError('');
-      var params = new URLSearchParams();
-      params.set('csrf_token', csrf);
-      params.set('number', v);
-      submit.disabled = true;
-      post(contactUrl, params)
-        .then(function (data) {
-          if (!data.ok) {
-            dlgError(data.message || 'Could not save your profile.');
-            return;
-          }
-          var saved = (data.values && data.values.number) || v;
-          numInput.value = saved;
-          numInput.defaultValue = saved; // so Cancel/reset keeps the saved number
-          root.querySelectorAll('[data-bind="number"]').forEach(function (n) {
-            n.textContent = saved;
-          });
-          dlg.close();
-          toast(data.message || 'Profile saved.');
-        })
-        .catch(function () {
-          dlgError('Could not reach the server. Please try again.');
-        })
-        .then(function () {
-          submit.disabled = false;
-        });
-    });
-  }
 })();

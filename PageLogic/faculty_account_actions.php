@@ -1,10 +1,5 @@
 <?php
-/**
- * Saves from the faculty account page. Both endpoints answer with JSON because the page updates
- * in place (no reload):
- *   POST /faculty-info     "Save Changes"  (the Edit Information button)  -> saveFacultyInfo()
- *   POST /faculty-contact  "Save Profile"  (the Edit Profile popup)       -> saveFacultyContact()
- */
+
 require_once __DIR__ . '/faculty_account_logic.php';
 require_once __DIR__ . '/../Services/csrf.php';
 
