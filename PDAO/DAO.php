@@ -729,7 +729,7 @@ $userDAO->prepareStatement("updateStudentProfileFull",
             SY.program,
             EP.acad_year,
             EP.sem,
-            concat(EP.acad_year,' - ',EP.sem,' sem') as acad_year_sem
+            concat(EP.acad_year,' ',EP.sem,'sem') as acad_year_sem
         FROM `subject_schedules` AS SS
             inner join faculty AS F
             ON F.facultyID = SS.facultyID
@@ -744,7 +744,7 @@ $userDAO->prepareStatement("updateStudentProfileFull",
             AND (SS.`subjectID` = ? OR 'ALL' = ?)
             AND ( SS.`block` = ? OR 'ALL' = ?)
             AND ( SY.year = ? OR 'ALL' = ?)
-            AND ( concat(EP.acad_year,' - ',EP.sem,' sem') = ? OR 'ALL' = ?)
+            AND ( concat(EP.acad_year,' ',EP.sem,'sem') = ? OR 'ALL' = ?)
             AND CONCAT('F', YEAR(F.date_created), LPAD(SS.facultyID, 5, '0')) = ?;
            
     ");
