@@ -6,6 +6,7 @@ require_once __DIR__."/../Services/session.php";
 require_once __DIR__."/../Services/imageHandler.php";
 require_once __DIR__ . '/../Services/ClearanceDocumentHandler.php';
 require_once __DIR__.'/../PageLogic/faculty_account_actions.php';
+require_once __DIR__.'/../PageLogic/registration_actions.php';
 class Router {
     private array $routes = [];
 
@@ -89,6 +90,8 @@ $router->get('/syllabus-topic', fn() => require __DIR__ . '/../View/syllabus_top
 
 $router->get('/registration',  fn() => require __DIR__ . '/../View/registration.php');
 $router->post('/registration',  fn($request) => require __DIR__ . '/../View/registration.php');
+$router->post('/registration-add',      fn() => registrationAdd($_POST));
+$router->post('/registration-restrict', fn() => registrationRestrict($_POST));
 
 $router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    
