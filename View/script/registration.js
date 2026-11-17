@@ -11,6 +11,8 @@
   var searchInput = document.getElementById('reg-search');
   var chips = [].slice.call(root.querySelectorAll('.reg-chip'));
   var filter = 'all';
+
+  /* ---------- toast ---------- */
   var toastEl = document.getElementById('reg-toast');
   var toastTimer = null;
   function toast(text, isError) {
@@ -26,6 +28,7 @@
     );
   }
 
+  /* ---------- table: filter + search ---------- */
   function rows() {
     return [].slice.call(body.querySelectorAll('tr'));
   }
@@ -86,7 +89,13 @@
       ' ' +
       a.programBlock +
       ' ' +
-      a.roleLabel
+      a.roleLabel +
+      ' ' +
+      (a.assignments || [])
+        .map(function (x) {
+          return x.name + ' ' + x.label;
+        })
+        .join(' ')
     ).toLowerCase();
     tr.textContent = '';
     var th = el('th', '', a.name);
@@ -102,6 +111,7 @@
       role.appendChild(el('span', 'tag', 'Faculty'));
     }
     tr.appendChild(role);
+    tr.appendChild(assignedCell(a));
     var st = el('td');
     st.appendChild(
       el(
@@ -115,6 +125,84 @@
     act.appendChild(rowButton('edit', 'Edit', a));
     act.appendChild(rowButton('delete', 'Delete', a));
     tr.appendChild(act);
+  }
+  var NS = 'http://www.w3.org/2000/svg';
+  function icon(paths, cls) {
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    if (cls) svg.setAttribute('class', cls);
+    paths.forEach(function (d) {
+      var p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', d);
+      svg.appendChild(p);
+    });
+    return svg;
+  }
+  var PERSON_CHECK = [
+    'M9.5 4.4a3.6 3.6 0 100 7.2 3.6 3.6 0 000-7.2z',
+    'M3 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6',
+    'M16.5 11.5l2 2 3.5-4',
+  ];
+
+  /* the "Assigned Professors" cell: a student shows one chip per professor (+ Add Prof), a faculty shows a count */
+  function assignedCell(a) {
+    var td = el('td', 'reg-asg');
+    if (a.kind === 'faculty') {
+      if (a.role === 'registrar') {
+        td.appendChild(el('span', 'asg-none', '—'));
+        return td;
+      }
+      var n = a.assignedCount || 0;
+      var pill = el('span', 'asg-pill');
+      pill.appendChild(
+        icon([
+          'M8.5 6a3 3 0 100 6 3 3 0 000-6z',
+          'M3 19c0-3 2.4-5 5.5-5s5.5 2 5.5 5',
+          'M17 6.6a2.4 2.4 0 100 4.8 2.4 2.4 0 000-4.8z',
+          'M16 14.2c2.7-.3 5 1.3 5 4.3',
+        ]),
+      );
+      pill.appendChild(
+        document.createTextNode(n + ' assigned student' + (n === 1 ? '' : 's')),
+      );
+      td.appendChild(pill);
+      return td;
+    }
+    var list = a.assignments || [];
+    list.forEach(function (x) {
+      var chip = el(
+        'div',
+        'asg-chip' + (x.type === 'adviser' ? ' is-adviser' : ''),
+      );
+      chip.appendChild(icon(PERSON_CHECK, 'asg-chip-ic'));
+      var txt = el('span', 'asg-chip-txt');
+      txt.appendChild(el('b', '', x.name));
+      txt.appendChild(el('small', '', x.label));
+      chip.appendChild(txt);
+      var rm = el('button', 'asg-x', '\u00d7');
+      rm.type = 'button';
+      rm.dataset.asgRemove = x.id;
+      rm.setAttribute(
+        'aria-label',
+        'Remove ' + x.name + ' (' + x.label + ') from ' + a.name,
+      );
+      chip.appendChild(rm);
+      td.appendChild(chip);
+    });
+    var add = el('button', 'asg-add');
+    add.type = 'button';
+    add.dataset.asgAdd = a.id;
+    add.setAttribute(
+      'aria-label',
+      (list.length ? 'Add a professor to ' : 'Assign a professor to ') + a.name,
+    );
+    add.appendChild(icon(list.length ? ['M12 5v14M5 12h14'] : PERSON_CHECK));
+    add.appendChild(
+      document.createTextNode(list.length ? 'Add Prof' : 'Assign Prof'),
+    );
+    td.appendChild(add);
+    return td;
   }
   var ROW_ICONS = {
     edit: ['M4 20h4l10-10-4-4L4 16z', 'M13 7l4 4'],
@@ -461,6 +549,16 @@
   body.addEventListener('click', function (e) {
     var tr = e.target.closest('tr');
     if (!tr) return;
+    var asgAdd = e.target.closest('[data-asg-add]');
+    if (asgAdd) {
+      openAssign(asgAdd.dataset.asgAdd);
+      return;
+    }
+    var asgRm = e.target.closest('[data-asg-remove]');
+    if (asgRm) {
+      unassign(accountOf(tr).id, asgRm.dataset.asgRemove, asgRm);
+      return;
+    }
     var btn = e.target.closest('[data-row-action]');
     if (btn) {
       // Edit / Delete buttons: do not also open the Restrict dialog
@@ -633,5 +731,232 @@
       });
   });
 
+  /* ---------- Assign professors ---------- */
+  var asgDlg = document.getElementById('assign-dialog');
+  var asgForm = document.getElementById('assign-form');
+  var asgStudent = asgForm.elements.school_id;
+  var asgFaculty = asgForm.elements.faculty_id;
+  var asgType = asgForm.elements.type;
+  var asgLabel = asgForm.elements.assignment;
+  var asgList = document.getElementById('assign-list');
+  var asgInfo = document.getElementById('assign-info');
+  var asgCount = document.getElementById('assign-count');
+  var asgHint = document.getElementById('assign-hint');
+  var asgFormErr = document.getElementById('assign-formerr');
+  var asgSubmit = document.getElementById('assign-submit');
+
+  function option(value, text) {
+    var o = el('option', '', text);
+    o.value = value;
+    return o;
+  }
+
+  /* redraw the table rows the server sent back (the student and the professor) */
+  function applyAccounts(accounts) {
+    (accounts || []).forEach(function (a) {
+      var tr = findRow(a.id);
+      if (tr) fillRow(tr, a);
+    });
+    applyFilter();
+  }
+
+  function selectedStudent() {
+    var tr = findRow(asgStudent.value);
+    return tr ? accountOf(tr) : null;
+  }
+
+  /* the info strip + the "Currently Assigned Professors" list for the chosen student */
+  function renderAssigned() {
+    var a = selectedStudent();
+    asgInfo.textContent = '';
+    asgList.textContent = '';
+    if (!a) {
+      asgCount.textContent = '';
+      return;
+    }
+    var pb = el('span');
+    pb.appendChild(document.createTextNode('Program / Block: '));
+    pb.appendChild(el('b', '', a.programBlock));
+    var dp = el('span');
+    dp.appendChild(document.createTextNode('Dept: '));
+    dp.appendChild(el('b', '', a.dept || '—'));
+    asgInfo.appendChild(pb);
+    asgInfo.appendChild(dp);
+
+    var list = a.assignments || [];
+    asgCount.textContent = list.length + ' assigned';
+    if (!list.length) {
+      asgList.appendChild(el('li', 'asg-empty', 'No professors assigned yet.'));
+      return;
+    }
+    list.forEach(function (x) {
+      var li = el('li', 'asg-item');
+      var txt = el('div', 'asg-item-txt');
+      txt.appendChild(el('b', '', x.name + ' (' + x.roleLabel + ')'));
+      txt.appendChild(
+        el(
+          'small',
+          '',
+          x.label + (x.type === 'adviser' ? ' • reviews enrollment' : ''),
+        ),
+      );
+      li.appendChild(txt);
+      var rm = el('button', 'asg-remove', 'Remove');
+      rm.type = 'button';
+      rm.dataset.asgRemove = x.id;
+      rm.setAttribute('aria-label', 'Remove ' + x.name + ' (' + x.label + ')');
+      li.appendChild(rm);
+      asgList.appendChild(li);
+    });
+  }
+
+  function syncAsgType() {
+    if (asgType.value === 'adviser') {
+      asgLabel.placeholder = 'Academic Adviser (optional)';
+      asgHint.textContent =
+        'An academic adviser can review this student’s enrollment requests. Use this for one adviser per student.';
+    } else {
+      asgLabel.placeholder = 'e.g. CS 202 — Object-Oriented Programming';
+      asgHint.textContent =
+        'Add one assignment per subject. The same professor can be added again for another subject.';
+    }
+  }
+  asgType.addEventListener('change', syncAsgType);
+  asgStudent.addEventListener('change', function () {
+    clearErrors(asgForm);
+    asgFormErr.hidden = true;
+    renderAssigned();
+  });
+
+  function openAssign(studentId) {
+    var studentRows = rows()
+      .map(accountOf)
+      .filter(function (a) {
+        return a && a.kind === 'student';
+      });
+    if (!studentRows.length) {
+      toast('Register a student first.', true);
+      return;
+    }
+    var profs = rows()
+      .map(accountOf)
+      .filter(function (a) {
+        return a && a.kind === 'faculty' && a.role !== 'registrar';
+      });
+    if (!profs.length) {
+      toast('Register a professor first.', true);
+      return;
+    }
+
+    asgStudent.textContent = '';
+    studentRows.forEach(function (a) {
+      asgStudent.appendChild(option(a.id, a.name + ' (' + a.id + ')'));
+    });
+    asgFaculty.textContent = '';
+    asgFaculty.appendChild(option('', 'Select a professor…'));
+    profs.forEach(function (a) {
+      asgFaculty.appendChild(
+        option(
+          a.id,
+          a.name + ' — ' + a.roleLabel + (a.dept ? ' (' + a.dept + ')' : ''),
+        ),
+      );
+    });
+
+    asgStudent.value = studentId || studentRows[0].id;
+    if (asgStudent.value !== (studentId || studentRows[0].id))
+      asgStudent.value = studentRows[0].id;
+    asgType.value = 'subject';
+    asgLabel.value = '';
+    clearErrors(asgForm);
+    asgFormErr.hidden = true;
+    syncAsgType();
+    renderAssigned();
+    openDialog(asgDlg);
+    asgFaculty.focus();
+  }
+  document
+    .querySelector('[data-action="open-assign"]')
+    .addEventListener('click', function () {
+      openAssign(null);
+    });
+
+  var asgBusy = false;
+  asgForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (asgBusy) return;
+    clearErrors(asgForm);
+    asgFormErr.hidden = true;
+    var params = new URLSearchParams();
+    params.set('school_id', asgStudent.value);
+    params.set('faculty_id', asgFaculty.value);
+    params.set('type', asgType.value);
+    params.set('assignment', asgLabel.value);
+    asgBusy = true;
+    asgSubmit.disabled = true;
+    post(cfg.assignUrl, params)
+      .then(function (data) {
+        if (!data.ok) {
+          if (data.errors) showErrors(asgForm, data);
+          else {
+            asgFormErr.textContent = data.message || 'Something went wrong.';
+            asgFormErr.hidden = false;
+          }
+          return;
+        }
+        applyAccounts(data.accounts);
+        renderAssigned();
+        asgFaculty.value = '';
+        asgLabel.value = ''; // ready for the next subject
+        toast(data.message);
+        asgFaculty.focus();
+      })
+      .catch(function () {
+        asgFormErr.textContent =
+          'Could not reach the server. Check your connection and try again.';
+        asgFormErr.hidden = false;
+      })
+      .then(function () {
+        asgBusy = false;
+        asgSubmit.disabled = false;
+      });
+  });
+
+  /* remove one assignment (from the dialog list or the x on a chip) */
+  function unassign(studentId, assignmentId, btn) {
+    if (btn.disabled) return;
+    btn.disabled = true;
+    var params = new URLSearchParams();
+    params.set('school_id', studentId);
+    params.set('assignment_id', assignmentId);
+    post(cfg.unassignUrl, params)
+      .then(function (data) {
+        if (!data.ok) {
+          toast(data.message || 'Could not remove the assignment.', true);
+          btn.disabled = false;
+          return;
+        }
+        applyAccounts(data.accounts);
+        if (asgDlg.open) renderAssigned();
+        toast(data.message);
+      })
+      .catch(function () {
+        toast(
+          'Could not reach the server. Check your connection and try again.',
+          true,
+        );
+        btn.disabled = false;
+      });
+  }
+  asgList.addEventListener('click', function (e) {
+    var rm = e.target.closest('[data-asg-remove]');
+    if (rm) unassign(asgStudent.value, rm.dataset.asgRemove, rm);
+  });
+
+  // first paint: every row is drawn by fillRow so the page and later updates look identical
+  rows().forEach(function (tr) {
+    var a = accountOf(tr);
+    if (a) fillRow(tr, a);
+  });
   applyFilter();
 })();

@@ -30,3 +30,5 @@ try {
 } catch (Throwable $err) {
     error_log('registration departments failed: ' . $err->getMessage());
 }
+
+$regAsgReady = regAssignmentsReady();   
