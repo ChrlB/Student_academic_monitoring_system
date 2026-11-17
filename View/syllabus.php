@@ -4,14 +4,6 @@ require_once __DIR__ . "/../PageLogic/syllabus_logic.php";
 $sl  = new SyllabusLogic();
 $e   = fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 $fmt = fn($d) => $d ? date('M j, Y', strtotime($d)) : '';
-$fmtSize = function ($b) {
-    $b = (float) $b;
-    if ($b >= 1073741824) return round($b / 1073741824, 2) . ' GB';
-    if ($b >= 1048576)    return round($b / 1048576, 1) . ' MB';
-    if ($b >= 1024)       return round($b / 1024) . ' KB';
-    return (int) $b . ' B';
-};
-$fileUrl = fn($id, $dl = false) => BASE_PATH . '/syllabus-file?id=' . (int) $id . ($dl ? '&download=1' : '');
 
 $setupError = false;
 $classes    = [];
@@ -20,6 +12,7 @@ $tracker    = null;
 $canManage  = false;
 $preview    = false;
 $canEdit    = false;
+$mode       = 'observer';
 
 try {
     $classes   = $sl->classes();
@@ -27,8 +20,10 @@ try {
     $canManage = ($current && $sl->canEdit($current));
     $preview   = ($canManage && ($_GET['preview'] ?? '') === '1');
     $canEdit   = ($canManage && !$preview);
+    // staff = faculty editing | student = own progress | preview = faculty looking as a student | observer = anyone else
+    $mode      = $canEdit ? 'staff' : ($preview ? 'preview' : ($sl->isStudent ? 'student' : 'observer'));
     if ($current) {
-        $tracker = $sl->tracker((int) $current['schedID'], $canEdit);
+        $tracker = $sl->tracker((int) $current['schedID'], $mode);
     }
 } catch (PDOException $ex) {
     error_log('Syllabus page: ' . $ex->getMessage());
@@ -36,15 +31,20 @@ try {
 }
 
 $topicUrl = fn($id) => BASE_PATH . '/syllabus-topic?id=' . (int) $id . ($preview ? '&preview=1' : '');
+$sum = $tracker['summary'] ?? [
+    'mode' => $mode, 'total' => 0, 'done' => 0, 'progress' => 0, 'upcoming' => 0, 'remaining' => 0, 'pct' => 0,
+    'overdue' => 0, 'materials' => 0, 'students' => 0, 'current' => null, 'next' => null, 'next_open' => null, 'people' => [],
+];
 
-$sum = $tracker['summary'] ?? ['total' => 0, 'done' => 0, 'progress' => 0, 'remaining' => 0, 'pct' => 0, 'overdue' => 0, 'materials' => 0, 'current' => null, 'next' => null];
+$badgeLabels = ['completed' => 'COMPLETED', 'progress' => 'IN PROGRESS', 'not-started' => 'NOT STARTED', 'upcoming' => 'UPCOMING', 'open' => 'OPEN', 'closed' => 'PAST DEADLINE'];
+$badgeClass  = ['completed' => 'status-completed', 'progress' => 'status-progress', 'not-started' => 'status-not-started', 'upcoming' => 'status-upcoming', 'open' => 'status-open', 'closed' => 'status-closed'];
+$quizLabel   = ['quiz' => '&#129514; Mini quiz', 'exam' => '&#128221; Mock exam'];
 
-$badgeLabels = ['completed' => 'COMPLETED', 'progress' => 'IN PROGRESS', 'not-started' => 'NOT STARTED', 'upcoming' => 'UPCOMING'];
-$badgeClass  = ['completed' => 'status-completed', 'progress' => 'status-progress', 'not-started' => 'status-not-started', 'upcoming' => 'status-upcoming'];
-$dbStatuses  = ['not_started' => 'Not started', 'in_progress' => 'In progress', 'completed' => 'Completed'];
-$kindIcon    = ['pdf' => '&#128196;', 'video' => '&#127916;', 'note' => '&#128221;'];
-$kindLabel   = ['pdf' => 'PDF document', 'video' => 'Video', 'note' => 'Text note'];
+$filters = ($mode === 'staff')
+    ? [['open', 'dot-green', 'Open'], ['upcoming', 'dot-purple', 'Upcoming'], ['closed', 'dot-gray', 'Past deadline']]
+    : [['completed', 'dot-green', 'Completed'], ['progress', 'dot-yellow', 'In Progress'], ['not-started', 'dot-gray', 'Not Started'], ['upcoming', 'dot-purple', 'Upcoming']];
 
+$completionLabel = ($mode === 'student') ? 'Your Completion' : (($mode === 'staff') ? 'Class Average' : 'Overall Completion');
 $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'] : BASE_PATH . '/syllabus';
 ?>
 
@@ -117,7 +117,7 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                     <?php endif; ?>
                 </div>
                 <div class="completion-bar-container">
-                    <span class="completion-text">Overall Completion <?= (int) $sum['pct'] ?>%</span>
+                    <span class="completion-text"><?= $e($completionLabel) ?> <?= (int) $sum['pct'] ?>%<?= $mode === 'staff' ? ' (' . (int) $sum['students'] . ' student' . ($sum['students'] === 1 ? '' : 's') . ')' : '' ?></span>
                     <div class="progress-bg">
                         <div class="progress-fill" style="width: <?= (int) $sum['pct'] ?>%;"></div>
                     </div>
@@ -146,10 +146,9 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                     <div class="search-filter">
                         <input type="text" class="search-bar" placeholder="Search topics or materials..." aria-label="Search topics">
                         <div class="filters">
-                            <div class="filter-item" data-filter="completed" role="button" tabindex="0"><div class="dot dot-green"></div> Completed</div>
-                            <div class="filter-item" data-filter="progress" role="button" tabindex="0"><div class="dot dot-yellow"></div> In Progress</div>
-                            <div class="filter-item" data-filter="not-started" role="button" tabindex="0"><div class="dot dot-gray"></div> Not Started</div>
-                            <div class="filter-item" data-filter="upcoming" role="button" tabindex="0"><div class="dot dot-purple"></div> Upcoming</div>
+                            <?php foreach ($filters as $f): ?>
+                            <div class="filter-item" data-filter="<?= $e($f[0]) ?>" role="button" tabindex="0"><div class="dot <?= $e($f[1]) ?>"></div> <?= $e($f[2]) ?></div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
 
@@ -164,7 +163,11 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                     <div class="syl-module">
                         <h2>
                             <span class="mod-title">&#128230; <?= $e($m['title']) ?></span>
-                            <span class="mod-pct"><?= (int) $m['done'] ?>/<?= (int) $m['total'] ?> topics &middot; <?= (int) $m['pct'] ?>%</span>
+                            <span class="mod-pct">
+                                <?php if ($mode === 'student'): ?><?= (int) $m['done'] ?>/<?= (int) $m['total'] ?> topics &middot; <?= (int) $m['pct'] ?>%
+                                <?php elseif ($mode === 'staff'): ?><?= (int) $m['total'] ?> topic<?= $m['total'] === 1 ? '' : 's' ?> &middot; class avg <?= (int) $m['pct'] ?>%
+                                <?php else: ?><?= (int) $m['total'] ?> topic<?= $m['total'] === 1 ? '' : 's' ?><?php endif; ?>
+                            </span>
                             <?php if ($canEdit): ?>
                             <span class="mod-actions">
                                 <button type="button" class="icon-btn" data-action="rename-module" data-module="<?= (int) $m['moduleID'] ?>" data-title="<?= $e($m['title']) ?>" title="Rename module">&#9998;</button>
@@ -175,31 +178,49 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                         <div class="mod-bar"><div style="width: <?= (int) $m['pct'] ?>%;"></div></div>
 
                         <?php foreach ($m['tasks'] as $t):
-                            $nMat = count($t['contents']);
-                            $searchText = mb_strtolower($t['title'] . ' ' . $t['week_label'] . ' ' . implode(' ', array_column($t['contents'], 'title')));
+                            $locked   = ($t['locked'] && $mode !== 'staff');   // students cannot open it yet
+                            $nMat     = count($t['contents']);
+                            $search   = mb_strtolower($t['title'] . ' ' . $t['week_label'] . ' ' . implode(' ', array_column($t['contents'], 'title')));
                         ?>
-                        <div class="topic" id="topic-<?= (int) $t['taskID'] ?>" data-status="<?= $e($t['view']) ?>" data-text="<?= $e($searchText) ?>">
+                        <div class="topic" id="topic-<?= (int) $t['taskID'] ?>" data-status="<?= $e($t['view']) ?>" data-text="<?= $e($search) ?>">
 
-                            <div class="week-item<?= $canEdit ? ' editable' : '' ?>" data-href="<?= $e($topicUrl($t['taskID'])) ?>">
+                            <div class="week-item<?= $canEdit ? ' editable' : '' ?><?= $locked ? ' is-locked' : '' ?>"<?= $locked ? '' : ' data-href="' . $e($topicUrl($t['taskID'])) . '"' ?>>
                                 <div class="week-label"><?= $e($t['week_label']) ?></div>
 
                                 <div class="topic-cell">
                                     <div class="view-fields">
-                                        <a class="topic-name topic-link" href="<?= $e($topicUrl($t['taskID'])) ?>"><?= $e($t['title']) ?></a>
-                                        <?php if ($t['due_date']): ?>
-                                        <small class="due<?= $t['overdue'] ? ' overdue' : '' ?>">Due <?= $e($fmt($t['due_date'])) ?><?= $t['overdue'] ? ' (overdue)' : '' ?></small>
+                                        <?php if ($locked): ?>
+                                            <span class="topic-name">&#128274; <?= $e($t['title']) ?></span>
+                                        <?php else: ?>
+                                            <a class="topic-name topic-link" href="<?= $e($topicUrl($t['taskID'])) ?>"><?= $e($t['title']) ?></a>
                                         <?php endif; ?>
-                                        <small class="mat-meta">
-                                            <?php if (!empty($t['has_page'])): ?>&#128196; Lesson page<?php endif; ?>
-                                            <?php if ($nMat > 0): ?><?= !empty($t['has_page']) ? ' &middot; ' : '' ?>&#128206; <?= $nMat ?> material<?= $nMat === 1 ? '' : 's' ?><?php endif; ?>
-                                            <?php if (empty($t['has_page']) && $nMat === 0): ?><?= $canEdit ? 'Click to add a lesson &amp; materials' : 'Open topic' ?><?php endif; ?>
+
+                                        <?php if ($t['available_from'] || $t['due_date']): ?>
+                                        <small class="due<?= $t['overdue'] ? ' overdue' : '' ?>">
+                                            <?php if ($t['available_from'] && $t['locked']): ?>Opens <?= $e($fmt($t['available_from'])) ?><?php elseif ($t['available_from']): ?>Opened <?= $e($fmt($t['available_from'])) ?><?php endif; ?>
+                                            <?= ($t['available_from'] && $t['due_date']) ? ' &middot; ' : '' ?>
+                                            <?php if ($t['due_date']): ?>Due <?= $e($fmt($t['due_date'])) ?><?= $t['overdue'] ? ' (overdue)' : '' ?><?php endif; ?>
                                         </small>
+                                        <?php endif; ?>
+
+                                        <?php if (!$locked): ?>
+                                        <span class="mat-meta">
+                                            <?php if ($t['has_page']): ?><span class="chip">&#128196; Lesson</span><?php endif; ?>
+                                            <?php if ($nMat > 0): ?><span class="chip">&#128206; <?= $nMat ?> material<?= $nMat === 1 ? '' : 's' ?></span><?php endif; ?>
+                                            <?php foreach ($t['quizzes'] as $kind => $z): ?>
+                                                <span class="chip"><?= $quizLabel[$kind] ?><?= ($mode === 'staff' && (int) $z['is_published'] !== 1) ? ' (draft)' : '' ?></span>
+                                            <?php endforeach; ?>
+                                            <?php if ($t['restudy']): ?><span class="chip warn">Study again to retake</span><?php endif; ?>
+                                            <?php if (!$t['has_page'] && $nMat === 0 && !$t['quizzes'] && $canEdit): ?><span class="chip">Click to add a lesson &amp; materials</span><?php endif; ?>
+                                        </span>
+                                        <?php endif; ?>
                                     </div>
                                     <?php if ($canEdit): ?>
                                     <div class="edit-fields">
                                         <input class="syl-input grow" type="text" name="title" maxlength="250" value="<?= $e($t['title']) ?>" aria-label="Topic title">
                                         <input class="syl-input sm" type="number" name="week_no" min="1" max="52" placeholder="Week" value="<?= $t['week_no'] !== null ? (int) $t['week_no'] : '' ?>" aria-label="Week number">
-                                        <input class="syl-input date" type="date" name="due_date" value="<?= $e($t['due_date']) ?>" aria-label="Due date">
+                                        <label class="mini">Opens on <input class="syl-input date" type="date" name="available_from" value="<?= $e($t['available_from']) ?>"></label>
+                                        <label class="mini">Deadline <input class="syl-input date" type="date" name="due_date" value="<?= $e($t['due_date']) ?>"></label>
                                         <button type="button" class="syl-btn inline" data-action="save-task" data-task="<?= (int) $t['taskID'] ?>">Save</button>
                                         <button type="button" class="syl-btn inline" data-action="cancel-edit">Cancel</button>
                                     </div>
@@ -208,21 +229,22 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
 
                                 <?php if ($canEdit): ?>
                                     <div>
-                                        <select class="status-select" data-task="<?= (int) $t['taskID'] ?>" aria-label="Topic status">
-                                            <?php foreach ($dbStatuses as $val => $label): ?>
-                                            <option value="<?= $e($val) ?>"<?= $t['status'] === $val ? ' selected' : '' ?>><?= $e($label) ?></option>
-                                            <?php endforeach; ?>
-                                        </select>
+                                        <div class="agg">
+                                            <strong><?= (int) $t['done_n'] ?>/<?= (int) $sum['students'] ?></strong> completed<br>
+                                            <?= (int) $t['opened_n'] ?> opened
+                                        </div>
+                                        <div class="status-badge <?= $e($badgeClass[$t['view']]) ?>"><?= $e($badgeLabels[$t['view']]) ?></div>
                                     </div>
                                     <div class="row-actions">
-                                        <button type="button" class="icon-btn" data-action="edit-task" title="Edit topic">&#9998;</button>
+                                        <button type="button" class="icon-btn" data-action="edit-task" title="Edit topic and dates">&#9998;</button>
                                         <button type="button" class="icon-btn" data-action="delete-task" data-task="<?= (int) $t['taskID'] ?>" title="Delete topic">&#10005;</button>
                                     </div>
                                 <?php else: ?>
                                     <div class="status-badge <?= $e($badgeClass[$t['view']]) ?>"><?= $e($badgeLabels[$t['view']]) ?></div>
                                 <?php endif; ?>
                             </div>
-</div>
+
+                        </div>
                         <?php endforeach; ?>
 
                         <?php if (!$m['tasks'] && !$canEdit): ?>
@@ -233,7 +255,8 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                         <form class="task-form" data-module="<?= (int) $m['moduleID'] ?>">
                             <input class="syl-input grow" type="text" name="title" maxlength="250" placeholder="New topic title" aria-label="New topic title">
                             <input class="syl-input sm" type="number" name="week_no" min="1" max="52" placeholder="Week" aria-label="Week number">
-                            <input class="syl-input date" type="date" name="due_date" aria-label="Due date">
+                            <label class="mini">Opens on <input class="syl-input date" type="date" name="available_from"></label>
+                            <label class="mini">Deadline <input class="syl-input date" type="date" name="due_date"></label>
                             <button type="submit" class="syl-btn inline">Add topic</button>
                         </form>
                         <?php endif; ?>
@@ -257,15 +280,27 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
 
                     <div class="syl-widget">
                         <h3>Quick Stats</h3>
-                        <div class="stats-text"><strong><?= (int) $sum['done'] ?>/<?= (int) $sum['total'] ?></strong> Topics Completed</div>
-                        <div class="stats-text"><strong><?= (int) $sum['progress'] ?></strong> In Progress</div>
-                        <div class="stats-text"><strong><?= (int) $sum['remaining'] ?></strong> Remaining</div>
-                        <div class="stats-text"><strong><?= (int) $sum['materials'] ?></strong> Learning Material<?= $sum['materials'] === 1 ? '' : 's' ?></div>
-                        <?php if ($sum['overdue'] > 0): ?>
-                        <div class="stats-text" style="color:#ff6b6b;"><strong><?= (int) $sum['overdue'] ?></strong> Overdue</div>
+                        <?php if ($mode === 'student'): ?>
+                            <div class="stats-text"><strong><?= (int) $sum['done'] ?>/<?= (int) $sum['total'] ?></strong> Topics Completed</div>
+                            <div class="stats-text"><strong><?= (int) $sum['progress'] ?></strong> In Progress</div>
+                            <div class="stats-text"><strong><?= (int) $sum['remaining'] ?></strong> Not Started</div>
+                            <div class="stats-text"><strong><?= (int) $sum['upcoming'] ?></strong> Upcoming</div>
+                            <?php if ($sum['overdue'] > 0): ?>
+                            <div class="stats-text" style="color:#ff6b6b;"><strong><?= (int) $sum['overdue'] ?></strong> Overdue</div>
+                            <?php endif; ?>
+                        <?php elseif ($mode === 'staff'): ?>
+                            <div class="stats-text"><strong><?= (int) $sum['total'] ?></strong> Topic<?= $sum['total'] === 1 ? '' : 's' ?></div>
+                            <div class="stats-text"><strong><?= (int) $sum['students'] ?></strong> Enrolled Student<?= $sum['students'] === 1 ? '' : 's' ?></div>
+                            <div class="stats-text"><strong><?= (int) $sum['pct'] ?>%</strong> Class Average Completion</div>
+                            <div class="stats-text"><strong><?= (int) $sum['materials'] ?></strong> Learning Material<?= $sum['materials'] === 1 ? '' : 's' ?></div>
+                            <div class="stats-text"><strong><?= (int) $sum['upcoming'] ?></strong> Upcoming (locked)</div>
+                        <?php else: ?>
+                            <div class="stats-text"><strong><?= (int) $sum['total'] ?></strong> Topic<?= $sum['total'] === 1 ? '' : 's' ?></div>
+                            <div class="stats-text"><strong><?= (int) $sum['upcoming'] ?></strong> Upcoming (locked)</div>
                         <?php endif; ?>
                     </div>
 
+                    <?php if ($mode === 'student'): ?>
                     <div class="syl-widget">
                         <h3>Current Topic</h3>
                         <?php $cur = $sum['current']; ?>
@@ -275,15 +310,39 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                                 <?= $e($cur['module_title']) ?><br>
                                 <?= $cur['due_date'] ? 'Deadline: ' . $e($fmt($cur['due_date'])) : 'No deadline set' ?>
                             </div>
-                            <?php if ($canEdit): ?>
-                            <button type="button" class="syl-btn" data-action="mark-done" data-task="<?= (int) $cur['taskID'] ?>">Mark as Done</button>
-                            <?php endif; ?>
+                            <a class="syl-btn" style="display:block;text-align:center;text-decoration:none;" href="<?= $e($topicUrl($cur['taskID'])) ?>"><?= $cur['view'] === 'progress' ? 'Continue' : 'Start' ?></a>
+                        <?php elseif ($sum['total'] > 0 && $sum['done'] === $sum['total']): ?>
+                            <div class="stats-text">All topics are completed. Well done!</div>
                         <?php elseif ($sum['total'] > 0): ?>
-                            <div class="stats-text">All topics are completed.</div>
+                            <div class="stats-text">Nothing is open right now.</div>
+                            <?php if ($sum['next_open']): ?>
+                            <div class="milestone-subtext">Next topic opens <?= $e($fmt($sum['next_open']['available_from'])) ?></div>
+                            <?php endif; ?>
                         <?php else: ?>
                             <div class="stats-text">No topics yet.</div>
                         <?php endif; ?>
                     </div>
+                    <?php endif; ?>
+
+                    <?php if ($mode === 'staff'): ?>
+                    <div class="syl-widget">
+                        <h3>Class Progress</h3>
+                        <?php if (!$sum['people']): ?>
+                            <div class="milestone-subtext">No students are enrolled in this class yet.</div>
+                        <?php else: ?>
+                        <div class="people-list">
+                            <?php foreach ($sum['people'] as $pp): ?>
+                            <div class="person">
+                                <div class="person-head"><?= $e($pp['name']) ?> <span><?= (int) $pp['done'] ?>/<?= (int) $sum['total'] ?> &middot; <?= (int) $pp['pct'] ?>%</span></div>
+                                <div class="mod-bar"><div style="width: <?= (int) $pp['pct'] ?>%;"></div></div>
+                                <?php if ($pp['restudy'] > 0): ?><span class="chip warn"><?= (int) $pp['restudy'] ?> topic<?= $pp['restudy'] === 1 ? '' : 's' ?> to study again</span><?php endif; ?>
+                                <?php if ($pp['last']): ?><small class="milestone-subtext">Last active <?= $e(date('M j, g:i A', strtotime($pp['last']))) ?></small><?php endif; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
 
                     <div class="syl-widget">
                         <h3>Upcoming Deadline</h3>
@@ -297,6 +356,9 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                             </div>
                         <?php else: ?>
                             <div class="milestone-subtext">No upcoming deadlines.</div>
+                        <?php endif; ?>
+                        <?php if ($sum['next_open']): ?>
+                            <div class="milestone-subtext" style="margin-top:10px;">Next to open: <?= $e($sum['next_open']['title']) ?> on <?= $e($fmt($sum['next_open']['available_from'])) ?></div>
                         <?php endif; ?>
                     </div>
 
