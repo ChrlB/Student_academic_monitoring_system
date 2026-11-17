@@ -26,7 +26,6 @@
   color: #ffd6d6;
 }
 
-/* ---------- search + actions ---------- */
 .reg-tools {
   display: flex;
   flex-wrap: wrap;
@@ -110,7 +109,6 @@
   outline-offset: 2px;
 }
 
-/* ---------- role chips ---------- */
 .reg-filters {
   display: flex;
   flex-wrap: wrap;
@@ -137,7 +135,6 @@
   border-color: #fff;
 }
 
-/* ---------- directory ---------- */
 .reg-directory {
   background: var(--panel);
   padding: 18px 20px 14px;
@@ -179,7 +176,7 @@
 }
 .reg-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 860px;
   border-collapse: collapse;
   font-size: 0.82rem;
 }
@@ -218,6 +215,9 @@
 .reg-table td:last-child,
 .reg-table th:last-child {
   text-align: right;
+}
+.reg-table th:last-child {
+  padding-right: 18px;
 }
 .tag {
   display: inline-block;
@@ -266,7 +266,6 @@
   color: rgba(255, 255, 255, 0.75);
 }
 
-/* ---------- dialogs (white card) ---------- */
 .reg-dlg {
   width: min(94vw, 480px);
 }
@@ -428,7 +427,6 @@
   font-family: ui-monospace, 'SFMono-Regular', Consolas, monospace;
 }
 
-/* ---------- toast ---------- */
 .reg-toast {
   position: fixed;
   left: 50%;
@@ -458,4 +456,72 @@
   .rf-row {
     grid-template-columns: 1fr;
   }
+}
+
+.reg-row-actions {
+  white-space: nowrap;
+}
+.row-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  margin-left: 6px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(214, 196, 255, 0.55);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.row-btn svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.row-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.row-btn-delete {
+  border-color: rgba(255, 138, 160, 0.7);
+  background: rgba(214, 60, 100, 0.32);
+  color: #ffd9e0;
+}
+.row-btn-delete:hover {
+  background: rgba(214, 60, 100, 0.5);
+}
+.row-btn:focus-visible {
+  outline: 2px solid #c58bff;
+  outline-offset: 2px;
+}
+.row-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.row-btn:disabled:hover {
+  background: inherit;
+}
+
+.reg-confirm {
+  margin: 8px 0 12px;
+  color: #1a1030;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.dlg-light .pill.pill-danger {
+  background: #c30f1b;
+  color: #fff;
+}
+.dlg-light .pill.pill-danger:hover {
+  background: #a50c17;
+}
+.dlg-light .pill.pill-danger:disabled {
+  opacity: 0.6;
 }
