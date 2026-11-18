@@ -122,11 +122,35 @@ class ProjectsLogic
         exit;
     }
 
+    /**
+     * Send a clean JSON response for AJAX calls.
+     * Discards any warnings / HTML that were printed earlier so the
+     * browser always receives valid JSON.
+     */
+    private function json($payload)
+    {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json');
+        echo json_encode($payload);
+        exit;
+    }
+
+    private function isAjaxRequest()
+    {
+        return !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
+            && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+    }
+
     public function handlePost()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
 
+        $isAjax = $this->isAjaxRequest();
+
         if (!$this->checkCsrf()) {
+            if ($isAjax) $this->json(['success' => false, 'error' => 'CSRF token expired']);
             $this->error = 'Your session expired. Please try again.';
             return;
         }
@@ -139,14 +163,20 @@ class ProjectsLogic
             return;
         }
 
-        if (!$this->isMember($projectID)) {
+        if ($action === 'delete_project') {
+            $this->deleteProject($projectID);
+            return;
+        }
+
+        if (!$this->isMember($projectID) && $this->group === 'student') {
+            if ($isAjax) $this->json(['success' => false, 'error' => 'You are not part of that project.']);
             $this->error = 'You are not part of that project.';
             return;
         }
 
         if ($action === 'submit_project') $this->submitProject($projectID);
         if ($action === 'update_task')    $this->updateTask($projectID);
-        if ($action === 'add_task')       $this->addTask($projectID); // NEW
+        if ($action === 'add_task')       $this->addTask($projectID); 
     }
 
     private static function profSql()
@@ -202,10 +232,40 @@ class ProjectsLogic
         return (bool)$st->fetchColumn();
     }
 
-    // NEW: Add task function
+    private function deleteProject($projectID)
+    {
+        if ($this->group !== 'faculty') {
+            $this->error = 'Only instructors can delete projects.';
+            return;
+        }
+
+        if (!$this->isInstructorOf($projectID)) {
+            $this->error = 'You do not have permission to delete this project.';
+            return;
+        }
+
+        try {
+            $this->db->beginTransaction();
+
+            $tables = ['project_task', 'project_submission', 'project_members', 'project_info'];
+            foreach ($tables as $table) {
+                $st = $this->db->prepare("DELETE FROM $table WHERE projectID = ?");
+                $st->execute([$projectID]);
+            }
+
+            $st = $this->db->prepare("DELETE FROM projects WHERE projectID = ?");
+            $st->execute([$projectID]);
+
+            $this->db->commit();
+            $this->flash('success', 'Project deleted successfully.');
+        } catch (Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            $this->error = 'Failed to delete the project.';
+        }
+    }
+
     private function addTask($projectID)
     {
-        // Any team member can add a task
         $title    = trim($_POST['task_title'] ?? '');
         $deadline = trim($_POST['task_deadline'] ?? '');
 
@@ -266,6 +326,12 @@ class ProjectsLogic
             }
         }
 
+        // BACKEND VALIDATION: Require a file if one doesn't exist yet
+        if (empty($attachmentPath)) {
+            $this->error = 'Please attach a file before submitting.';
+            return;
+        }
+
         if ($file === '') {
             $this->error = 'Add a project file or repository URL before submitting.';
             return;
@@ -281,26 +347,37 @@ class ProjectsLogic
         $st->execute([$projectID, $this->studentID, $file, $attachmentPath, $notes]);
 
         $this->flash('success', 'Project submitted to your professor.');
-        $this->redirect(['project' => $projectID]);
+        $this->redirect(); // CHANGED THIS TO PREVENT 404 ERROR
     }
 
     private function updateTask($projectID)
     {
         $taskID = (int)($_POST['task_id'] ?? 0);
         $status = $_POST['status'] ?? '';
+        
+        $isAjax = $this->isAjaxRequest();
 
         if (!in_array($status, ['todo', 'progress', 'done'], true)) {
+            if ($isAjax) $this->json(['success' => false, 'error' => 'Invalid task status']);
             $this->error = 'Invalid task status.';
             return;
         }
 
-        $st = $this->db->prepare(
-            "UPDATE project_task SET satatus = ? WHERE taskID = ? AND projectID = ?"
-        );
-        $st->execute([$status, $taskID, $projectID]);
+        try {
+            $st = $this->db->prepare(
+                "UPDATE project_task SET satatus = ? WHERE taskID = ? AND projectID = ?"
+            );
+            $st->execute([$status, $taskID, $projectID]);
+            
+            if ($isAjax) $this->json(['success' => true]);
 
-        $this->flash('success', 'Task updated.');
-        $this->redirect(['project' => $projectID]);
+            $this->flash('success', 'Task updated.');
+            $this->redirect(['project' => $projectID]);
+
+        } catch (Throwable $e) {
+            if ($isAjax) $this->json(['success' => false, 'error' => $e->getMessage()]);
+            $this->error = 'Database error.';
+        }
     }
 
     private static function taskColumn($value)
@@ -320,7 +397,6 @@ class ProjectsLogic
 
         $name     = trim($_POST['name'] ?? '');
         $deadline = trim($_POST['deadline'] ?? '');
-        $instr    = trim($_POST['instructions'] ?? '');
         $leader   = (int)($_POST['leader'] ?? 0);
         $members  = array_map('intval', (array)($_POST['members'] ?? []));
         $members  = array_values(array_diff(array_unique(array_filter($members)), [$leader]));
@@ -331,23 +407,38 @@ class ProjectsLogic
         if (!$date || $date->format('Y-m-d') !== $deadline) { $this->error = 'Choose a valid deadline date.'; return; }
         if ($leader <= 0)                                   { $this->error = 'Choose a team leader.'; return; }
 
+        $instructionPath = null;
+        if (isset($_FILES['instruction_file']) && $_FILES['instruction_file']['error'] === UPLOAD_ERR_OK) {
+            $uploadDir = __DIR__ . '/../uploads/instructions/'; 
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0777, true);
+            }
+            
+            $fileName = basename($_FILES['instruction_file']['name']);
+            $fileName = preg_replace("/[^a-zA-Z0-9.\-_]/", "_", $fileName);
+            $uniqueName = time() . '_' . $fileName; 
+            $targetFile = $uploadDir . $uniqueName;
+            
+            if (move_uploaded_file($_FILES['instruction_file']['tmp_name'], $targetFile)) {
+                $instructionPath = 'uploads/instructions/' . $uniqueName;
+            }
+        }
+
         $in = implode(',', array_fill(0, count($picked), '?'));
+        
         $st = $this->db->prepare(
             "SELECT es.enrolled_subjectID, es.studentID
                FROM enrolled_subjects es
-              WHERE es.enrolled_subjectID IN ($in)
-                AND EXISTS (SELECT 1 FROM subject_schedules ss
-                             WHERE ss.enrollmentID = es.enrollmentID
-                               AND ss.subjectID = es.subjectID
-                               AND ss.facultyID = ?)"
+              WHERE es.enrolled_subjectID IN ($in)"
         );
-        $st->execute(array_merge($picked, [$this->facultyID]));
+        $st->execute($picked);
         $found = [];
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $found[(int)$r['enrolled_subjectID']] = (int)$r['studentID'];
         }
+        
         if (count($found) !== count($picked)) {
-            $this->error = 'One of the selected students is not in your class.';
+            $this->error = 'One of the selected students is invalid.';
             return;
         }
 
@@ -363,8 +454,8 @@ class ProjectsLogic
             $st->execute([$leadEnrolled, $name, $deadline . ' 23:59:59']);
             $projectID = (int)$this->db->lastInsertId();
 
-            $st = $this->db->prepare("INSERT INTO project_info (projectID, instructions) VALUES (?, ?)");
-            $st->execute([$projectID, $instr]);
+            $st = $this->db->prepare("INSERT INTO project_info (projectID, instruction_file) VALUES (?, ?)");
+            $st->execute([$projectID, $instructionPath]);
 
             $st = $this->db->prepare("INSERT IGNORE INTO project_members (projectID, studentID) VALUES (?, ?)");
             foreach ($found as $studentID) {
@@ -437,17 +528,15 @@ class ProjectsLogic
         $this->stats = ['total' => $total, 'submitted' => $submitted, 'pending' => $total - $submitted];
 
         $st = $this->db->prepare(
-            "SELECT es.enrolled_subjectID, es.subjectID, s.first_name, s.last_name
+            "SELECT MIN(es.enrolled_subjectID) AS enrolled_subjectID, 
+                    GROUP_CONCAT(DISTINCT es.subjectID SEPARATOR ', ') AS subjectID, 
+                    s.first_name, s.last_name
                FROM enrolled_subjects es
                JOIN students s ON s.studentID = es.studentID
-              WHERE EXISTS (SELECT 1 FROM subject_schedules ss
-                             WHERE ss.enrollmentID = es.enrollmentID
-                               AND ss.subjectID = es.subjectID
-                               AND ss.facultyID = ?)
-           GROUP BY es.enrolled_subjectID, es.subjectID, s.first_name, s.last_name
+           GROUP BY s.studentID, s.first_name, s.last_name
            ORDER BY s.last_name, s.first_name"
         );
-        $st->execute([$this->facultyID]);
+        $st->execute();
         $this->studentOptions = $st->fetchAll(PDO::FETCH_ASSOC);
 
         $next = (int)$this->db->query("SELECT COALESCE(MAX(projectID), 0) + 1 FROM projects")->fetchColumn();
@@ -502,7 +591,7 @@ class ProjectsLogic
                     CONCAT('PRJ-', LPAD(p.projectID, 3, '0')) AS code,
                     p.name, p.deadline,
                     " . self::profSql() . " AS assigned_by,
-                    COALESCE(i.instructions, '') AS instructions
+                    i.instruction_file
                FROM projects p
                JOIN enrolled_subjects es ON es.enrolled_subjectID = p.enrolled_subjectID
           LEFT JOIN project_info i ON i.projectID = p.projectID

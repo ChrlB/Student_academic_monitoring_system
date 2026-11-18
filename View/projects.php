@@ -1,4 +1,5 @@
 <?php
+ob_start();
 require_once __DIR__ . "/../PageLogic/projects_logic.php";
 
 $logic = new ProjectsLogic();
@@ -112,6 +113,8 @@ textarea.form-control { min-height: 110px; resize: vertical; }
 .proj-chip-sel button { padding: 0 2px; border: 0; background: none; color: #fff; font-size: 15px; line-height: 1; cursor: pointer; }
 .proj-nomatch { display: none; margin: 6px; font-size: 13px; }
 .proj-picker-list { display: none; position: absolute; z-index: 5; left: 0; right: 0; top: calc(100% + 4px); max-height: 190px; overflow-y: auto; padding: 8px; border: 1px solid rgba(220, 185, 255, 0.35); border-radius: 9px; background: #2a1235; }
+.proj-picker.open .proj-picker-list { display: block; }
+
 .proj-check { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; }
 .proj-check:hover { background: rgba(190, 130, 255, 0.15); }
 .proj-check input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
@@ -277,7 +280,15 @@ textarea.form-control { min-height: 110px; resize: vertical; }
 
                         <hr class="proj-divider">
                         <h3 class="proj-section-title">PROJECT INSTRUCTIONS</h3>
-                        <p style="font-size: 14px; margin: 0;"><?= nl2br(proj_e($selected['instructions'])) ?></p>
+                        
+                        <!-- SHOW OPEN BUTTON IF FILE EXISTS -->
+                        <?php if (!empty($selected['instruction_file'])): ?>
+                            <a href="<?= BASE_PATH ?>/<?= proj_e($selected['instruction_file']) ?>" target="_blank" class="btn-proj" style="margin-bottom: 15px;">
+                                Open Instructions File
+                            </a>
+                        <?php else: ?>
+                            <p style="font-size: 14px; margin: 0;">No instructions attached.</p>
+                        <?php endif; ?>
 
                         <hr class="proj-divider">
                         <p style="font-size: 13px; margin: 0;">Deadline: <?= proj_e(proj_date($selected['deadline'])) ?> &middot; <?= proj_badge($submitted) ?></p>
@@ -301,7 +312,6 @@ textarea.form-control { min-height: 110px; resize: vertical; }
 
                         <hr class="proj-divider">
                         
-                        <!-- UPDATED: Task Board with Add Button -->
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                             <h3 class="proj-section-title" style="margin: 0;">TASK BREAKDOWN &amp; PROGRESS</h3>
                             <?php if (!$submitted): ?>
@@ -315,7 +325,8 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                         ?>
                         <div class="proj-board">
                             <?php foreach ($columns as $key => $label): ?>
-                                <div class="proj-col">
+                                <!-- ADDED ID HERE FOR JAVASCRIPT -->
+                                <div class="proj-col" id="col-<?= $key ?>">
                                     <h4><?= $label ?>:</h4>
 
                                     <?php foreach ($logic->tasks[$key] as $t): ?>
@@ -324,12 +335,13 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                                             <div class="proj-task-foot">
                                                 <span>Due <?= proj_e(proj_date($t['deadline'])) ?></span>
 
-                                                <form method="POST" action="<?= $formAction ?>">
+                                                <!-- ADDED CLASS, REMOVED onchange, ACTION WILL BE OVERRIDDEN IN JS -->
+                                                <form class="task-update-form" method="POST" action="">
                                                     <input type="hidden" name="csrf" value="<?= proj_e($csrf) ?>">
                                                     <input type="hidden" name="project_action" value="update_task">
                                                     <input type="hidden" name="project_id" value="<?= (int)$selected['id'] ?>">
                                                     <input type="hidden" name="task_id" value="<?= (int)$t['id'] ?>">
-                                                    <select name="status" onchange="this.form.submit()" aria-label="Task status">
+                                                    <select name="status" class="task-status-select" aria-label="Task status" data-original="<?= $key ?>">
                                                         <?php foreach ($options as $val => $text): ?>
                                                             <option value="<?= $val ?>" <?= $val === $key ? 'selected' : '' ?>><?= $text ?></option>
                                                         <?php endforeach; ?>
@@ -349,7 +361,6 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                     <h3 class="proj-section-title" style="font-size: 17px;">Pass / Submit Project</h3>
                     <hr class="proj-divider" style="margin-top: 0;">
 
-                    <!-- ADDED enctype FOR FILE UPLOAD -->
                     <form method="POST" action="<?= $formAction ?>" enctype="multipart/form-data">
                         <input type="hidden" name="csrf" value="<?= proj_e($csrf) ?>">
                         <input type="hidden" name="project_action" value="submit_project">
@@ -369,15 +380,14 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                         <div class="form-group">
                             <label>FILE / ATTACHMENT</label>
                             
-                            <!-- CHANGED TO type="file" WITH X BUTTON WRAPPER -->
                             <div class="file-input-wrapper">
-                                <input type="file" name="attachment" id="student-file-input" class="form-control" <?= $locked ? 'disabled' : '' ?> style="padding-top: 8px;">
+                                <input type="file" name="attachment" id="student-file-input" class="form-control" <?= $locked ? 'disabled' : '' ?> style="padding-top: 8px;" <?= (!$locked && empty($logic->submission['attachment'])) ? 'required' : '' ?>>
                                 <button type="button" id="clear-file-btn" class="file-clear-btn" style="display: none;" title="Remove selected file">&times;</button>
                             </div>
                             
                             <?php if (!empty($logic->submission['attachment'])): ?>
                                 <a href="<?= BASE_PATH ?>/<?= proj_e($logic->submission['attachment']) ?>" target="_blank" class="btn-proj" style="margin-top: 10px; width: 100%; background: #3a1d44; border-color: #d8b8f2;">
-                                    📁 View Uploaded File
+                                    View Uploaded File
                                 </a>
                             <?php endif; ?>
                         </div>
@@ -465,16 +475,25 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                                     <td><?= proj_e(proj_date($p['deadline'])) ?></td>
                                     <td><?= proj_badge($done) ?></td>
                                     <td>
-                                        <button type="button" class="btn-proj btn-view js-view-project" aria-label="View <?= proj_e($p['name']) ?>"
-                                            data-id="<?= (int)$p['id'] ?>"
-                                            data-code="<?= proj_e($p['code']) ?>"
-                                            data-name="<?= proj_e($p['name']) ?>"
-                                            data-by="<?= proj_e($p['assigned_by']) ?>"
-                                            data-deadline="<?= proj_e(proj_date($p['deadline'])) ?>"
-                                            data-done="<?= $done ? 1 : 0 ?>"
-                                            data-file="<?= proj_e($p['file_url'] ?? '') ?>"
-                                            data-attachment="<?= proj_e($p['attachment'] ?? '') ?>"
-                                            data-notes="<?= proj_e($p['notes'] ?? '') ?>"><img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="" class="btn-view-icon"></button>
+                                        <div style="display: flex; gap: 6px; align-items: center;">
+                                            <button type="button" class="btn-proj btn-view js-view-project" aria-label="View <?= proj_e($p['name']) ?>"
+                                                data-id="<?= (int)$p['id'] ?>"
+                                                data-code="<?= proj_e($p['code']) ?>"
+                                                data-name="<?= proj_e($p['name']) ?>"
+                                                data-by="<?= proj_e($p['assigned_by']) ?>"
+                                                data-deadline="<?= proj_e(proj_date($p['deadline'])) ?>"
+                                                data-done="<?= $done ? 1 : 0 ?>"
+                                                data-file="<?= proj_e($p['file_url'] ?? '') ?>"
+                                                data-attachment="<?= proj_e($p['attachment'] ?? '') ?>"
+                                                data-notes="<?= proj_e($p['notes'] ?? '') ?>"><img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="" class="btn-view-icon"></button>
+                                            
+                                            <form method="POST" action="<?= $formAction ?>" onsubmit="return confirm('Are you sure you want to delete this project? This cannot be undone.');" style="margin: 0;">
+                                                <input type="hidden" name="csrf" value="<?= proj_e($csrf) ?>">
+                                                <input type="hidden" name="project_action" value="delete_project">
+                                                <input type="hidden" name="project_id" value="<?= (int)$p['id'] ?>">
+                                                <button type="submit" class="btn-proj btn-view" style="background: rgba(255, 60, 60, 0.2); border-color: rgba(255, 60, 60, 0.4); color: #ffb3b3; padding: 4px 12px; min-height: 26px; font-size: 11px; font-weight: 700;" title="Delete Project">Delete</button>
+                                            </form>
+                                        </div>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -513,7 +532,7 @@ textarea.form-control { min-height: 110px; resize: vertical; }
 
             <!-- ASSIGN NEW PROJECT POPUP -->
             <div class="proj-backdrop" id="assign-backdrop">
-                <form class="proj-modal proj-assign" method="POST" action="<?= $formAction ?>" role="dialog" aria-modal="true" aria-labelledby="assign-title">
+                <form class="proj-modal proj-assign" method="POST" action="<?= $formAction ?>" enctype="multipart/form-data" role="dialog" aria-modal="true" aria-labelledby="assign-title">
                     <input type="hidden" name="csrf" value="<?= proj_e($csrf) ?>">
                     <input type="hidden" name="project_action" value="create_project">
 
@@ -584,8 +603,8 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                     </div>
 
                     <div class="form-group">
-                        <label for="a-instr">INSTRUCTIONS DESCRIPTION</label>
-                        <textarea id="a-instr" name="instructions" class="form-control" placeholder="Describe what the students need to do"></textarea>
+                        <label for="a-instr">INSTRUCTIONS FILE (OPTIONAL)</label>
+                        <input type="file" id="a-instr" name="instruction_file" class="form-control" style="padding-top: 8px;">
                     </div>
 
                     <div class="proj-actions">
@@ -638,8 +657,9 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                         });
                     }
 
-                    input.addEventListener('focus', function () { el.classList.add('open'); });
+                    input.addEventListener('focus', function () { el.classList.add('open'); filter(); });
                     input.addEventListener('input', function () { el.classList.add('open'); filter(); });
+                    input.addEventListener('click', function () { el.classList.add('open'); filter(); });
 
                     input.addEventListener('keydown', function (e) {
                         if (e.key === 'Enter') {
@@ -724,7 +744,7 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                 });
 
                 var d = new Date();
-                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                d.setMinutes(d.getTimezoneOffset());
                 document.getElementById('a-deadline').min = d.toISOString().slice(0, 10);
             })();
             </script>
@@ -747,7 +767,15 @@ textarea.form-control { min-height: 110px; resize: vertical; }
 
                         <hr class="proj-divider">
                         <h3 class="proj-section-title">PROJECT INSTRUCTIONS</h3>
-                        <p style="font-size: 14px; margin: 0;"><?= nl2br(proj_e($selected['instructions'])) ?></p>
+                        
+                        <!-- SHOW OPEN BUTTON IF FILE EXISTS -->
+                        <?php if (!empty($selected['instruction_file'])): ?>
+                            <a href="<?= BASE_PATH ?>/<?= proj_e($selected['instruction_file']) ?>" target="_blank" class="btn-proj" style="margin-bottom: 15px;">
+                                Open Instructions File
+                            </a>
+                        <?php else: ?>
+                            <p style="font-size: 14px; margin: 0;">No instructions attached.</p>
+                        <?php endif; ?>
 
                         <hr class="proj-divider">
                         <p style="font-size: 13px; margin: 0;">Deadline: <?= proj_e(proj_date($selected['deadline'])) ?> &middot; <?= proj_badge($submitted) ?></p>
@@ -783,7 +811,6 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                                             <p><?= proj_e($t['title']) ?></p>
                                             <div class="proj-task-foot">
                                                 <span>Due <?= proj_e(proj_date($t['deadline'])) ?></span>
-                                                <!-- Removed select element for read-only view -->
                                             </div>
                                         </div>
                                     <?php endforeach; ?>
@@ -816,9 +843,8 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                         <div class="form-group">
                             <label>FILE / ATTACHMENT</label>
                             <?php if (!empty($logic->submission['attachment'])): ?>
-                                <!-- Uses BASE_PATH to download from server -->
                                 <a href="<?= BASE_PATH ?>/<?= proj_e($logic->submission['attachment']) ?>" target="_blank" class="btn-proj" style="width: 100%; background: #3a1d44; border-color: #d8b8f2;">
-                                    📁 Download / Open File
+                                    Download / Open File
                                 </a>
                             <?php else: ?>
                                 <div class="proj-field" style="background: rgba(14, 5, 24, 0.6);">—</div>
@@ -859,15 +885,13 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                 setText('pm-deadline', d.deadline);
                 setText('pm-file', d.file, 'Nothing submitted yet.');
                 
-                // --- UPDATED ATTACHMENT LOGIC ---
                 var attContainer = document.getElementById('pm-attachment');
                 if (d.attachment && d.attachment.trim() !== '') {
                     var attUrl = d.attachment.startsWith('http') ? d.attachment : '<?= BASE_PATH ?>/' + d.attachment;
-                    attContainer.innerHTML = '<a href="' + attUrl + '" target="_blank" class="btn-proj" style="width: 100%; background: #3a1d44; border-color: #d8b8f2;">📁 Open Attachment / Link</a>';
+                    attContainer.innerHTML = '<a href="' + attUrl + '" target="_blank" class="btn-proj" style="width: 100%; background: #3a1d44; border-color: #d8b8f2;">Open Attachment / Link</a>';
                 } else {
                     attContainer.innerHTML = '—';
                 }
-                // --------------------------------
 
                 setText('pm-notes', d.notes, '—');
 
@@ -912,7 +936,6 @@ textarea.form-control { min-height: 110px; resize: vertical; }
         </script>
         <?php endif; ?>
 
-        <!-- SCRIPT FOR FILE CLEAR BUTTON -->
         <script>
         document.addEventListener('DOMContentLoaded', function() {
             const fileInput = document.getElementById('student-file-input');
@@ -935,7 +958,6 @@ textarea.form-control { min-height: 110px; resize: vertical; }
         });
         </script>
 
-        <!-- NEW SCRIPT FOR ADD TASK MODAL -->
         <script>
         document.addEventListener('DOMContentLoaded', function() {
             const taskBackdrop = document.getElementById('add-task-backdrop');
@@ -968,17 +990,74 @@ textarea.form-control { min-height: 110px; resize: vertical; }
                     }
                 });
 
-                // Prevent past dates for new tasks
                 var d = new Date();
-                d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+                d.setMinutes(d.getTimezoneOffset());
                 document.getElementById('t-deadline').min = d.toISOString().slice(0, 10);
             }
+        });
+        </script>
+
+        <!-- AJAX TASK STATUS UPDATE (shows the real server response on failure) -->
+        <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.task-status-select').forEach(function (select) {
+                select.addEventListener('change', function () {
+                    var self = this;
+                    var form = self.closest('.task-update-form');
+                    var formData = new FormData(form);
+                    var taskCard = self.closest('.proj-task');
+                    var newStatus = self.value;
+                    var originalStatus = self.dataset.original;
+
+                    self.disabled = true;
+
+                    fetch(window.location.href, {
+                        method: 'POST',
+                        body: formData,
+                        credentials: 'same-origin',
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    })
+                    .then(function (response) {
+                        return response.text().then(function (text) {
+                            var data;
+                            try {
+                                data = JSON.parse(text);
+                            } catch (e) {
+                                // Show what the server really sent
+                                console.error('HTTP ' + response.status + ' - not JSON:', text);
+                                throw new Error('HTTP ' + response.status + '\n\n' + text.substring(0, 400));
+                            }
+                            return data;
+                        });
+                    })
+                    .then(function (data) {
+                        if (data.success) {
+                            var targetCol = document.getElementById('col-' + newStatus);
+                            if (targetCol && taskCard) {
+                                targetCol.appendChild(taskCard);
+                                self.dataset.original = newStatus;
+                            }
+                        } else {
+                            alert('Failed to update task: ' + (data.error || 'Unknown error'));
+                            self.value = originalStatus;
+                        }
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                        alert('Error updating task:\n\n' + err.message);
+                        self.value = originalStatus;
+                    })
+                    .finally(function () {
+                        self.disabled = false;
+                    });
+                });
+            });
         });
         </script>
 
       </main>
     </div>
   </div>
-  <?php require_once __DIR__ . "/components/logout.php"; ?>
+
 </body>
 </html>
