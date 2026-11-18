@@ -4,7 +4,6 @@ require_once __DIR__ . "/../PageLogic/account_actions.php";
 $acct = getAccountInfo();
 $dlg  = takeDialogState();      
 
-// One labelled, read-only box. $w = how wide it is (CSS class).
 function field(string $label, string $value, string $w = ''): void { ?>
   <label class="f <?= e($w) ?>">
     <span><?= e($label) ?></span>
@@ -16,11 +15,14 @@ function field(string $label, string $value, string $w = ''): void { ?>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AMS | Student Account</title>
+  <title>AMS | <?= $acct['isStudent'] ? 'Student' : e(ucwords($acct['role'])) ?> Account</title>
   <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/general.css">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/account.css">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/account_dialogs.css">
+  <?php if (!$acct['isStudent']): ?>
+  <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/faculty_account.css">
+  <?php endif; ?>
 </head>
 <body>
 
@@ -30,6 +32,9 @@ function field(string $label, string $value, string $w = ''): void { ?>
 
     <div class="column" style="flex: 1; min-width: 0;">
       <main class="account scrollbar" data-role="<?= e(str_replace(' ', '-', $acct['role'])) ?>">
+<?php if (!$acct['isStudent']): ?>
+        <?php require __DIR__ . '/faculty/faculty_account.php'; // dean / program coordinator / professor / registrar ?>
+<?php else: ?>
         <div class="acc-banner">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c0 1.4 2.7 3 6 3s6-1.6 6-3v-4.5M22 9v6"/></svg>
           <span class="bar" aria-hidden="true"></span>
@@ -139,6 +144,7 @@ function field(string $label, string $value, string $w = ''): void { ?>
           </details>
         </section>
         <?php endif; ?>
+<?php endif; ?>
 
       </main>
     </div>
@@ -146,6 +152,9 @@ function field(string $label, string $value, string $w = ''): void { ?>
 
   <?php require_once __DIR__ . "/components/account_dialogs.php"; ?>
   <script src="<?= BASE_PATH ?>/View/script/account.js" defer></script>
+  <?php if (!$acct['isStudent']): ?>
+  <script src="<?= BASE_PATH ?>/View/script/faculty_account.js" defer></script>
+  <?php endif; ?>
   <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>
