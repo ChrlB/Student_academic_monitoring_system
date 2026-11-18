@@ -4,7 +4,6 @@ require_once __DIR__ . "/../PageLogic/account_actions.php";
 $acct = getAccountInfo();
 $dlg  = takeDialogState();      
 
-// One labelled, read-only box. $w = how wide it is (CSS class).
 function field(string $label, string $value, string $w = ''): void { ?>
   <label class="f <?= e($w) ?>">
     <span><?= e($label) ?></span>
@@ -145,7 +144,7 @@ function field(string $label, string $value, string $w = ''): void { ?>
           </details>
         </section>
         <?php endif; ?>
-<?php endif; // student vs faculty ?>
+<?php endif; ?>
 
       </main>
     </div>
