@@ -6,6 +6,7 @@ require_once __DIR__."/../Services/session.php";
 require_once __DIR__."/../Services/imageHandler.php";
 require_once __DIR__ . '/../Services/ClearanceDocumentHandler.php';
 require_once __DIR__.'/../PageLogic/faculty_account_actions.php';
+require_once __DIR__.'/../PageLogic/registration_actions.php';
 class Router {
     private array $routes = [];
 
@@ -82,6 +83,7 @@ $router->post('/enrollment',  fn() => require __DIR__ . '/../View/enrollment.php
 $router->get('/grades', fn() => require __DIR__ . '/../View/grades.php');
 $router->post('/grades', fn() => require __DIR__ . '/../View/grades.php');
 $router->get('/projects',  fn() => require __DIR__ . '/../View/projects.php');
+$router->post('/projects', fn() => require __DIR__ . '/../View/projects.php');
 $router->get('/syllabus',  fn() => require __DIR__ . '/../View/syllabus.php');
 $router->post('/syllabus', fn() => require __DIR__ . '/../PageLogic/syllabus_logic.php');
 $router->get('/syllabus-file', fn() => require __DIR__ . '/../PageLogic/syllabus_file.php');
@@ -89,6 +91,12 @@ $router->get('/syllabus-topic', fn() => require __DIR__ . '/../View/syllabus_top
 
 $router->get('/registration',  fn() => require __DIR__ . '/../View/registration.php');
 $router->post('/registration',  fn($request) => require __DIR__ . '/../View/registration.php');
+$router->post('/registration-add',      fn() => registrationAdd($_POST));
+$router->post('/registration-restrict', fn() => registrationRestrict($_POST));
+$router->post('/registration-update',   fn() => registrationUpdate($_POST));
+$router->post('/registration-delete',   fn() => registrationDelete($_POST));
+$router->post('/registration-assign',   fn() => registrationAssign($_POST));
+$router->post('/registration-unassign', fn() => registrationUnassign($_POST));
 
 $router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    

@@ -9,13 +9,24 @@ $data = [];
 $labels = [];
 $values = [];
 
+$currentAY = $clearanceDAO->executeQuery('getCurrentAcadYear')[0]['acad_year_sem'] ?? 'ALL';
+
 $search = "ALL";
 $status = "ALL";
 $department = 'ALL';
 $block = 'ALL';
 $year = 'ALL';
 $program = 'ALL';
-$acadyear = 'ALL';
+$acadyear = $currentAY ;
+
+// var_dump($currentAY );
+
+$Fblock  = 'ALL';
+$Facadyear  = $currentAY ;
+$FstudentID  = 'ALL';
+
+// $currentAY = 
+
 
 $allowedViews = ($_SESSION["role"] == 'student')
     ? ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE', 'UPDATES', 'SUBJECT-REQUIREMENTS','FACULTY-REQUIREMENTS','OFFICE-REQUIREMENTS']
@@ -59,7 +70,13 @@ if($_SESSION["role"] == "student"){
     if ($program === '') { $program = 'ALL'; }  
 
     $acadyear = trim($_GET['acadyearfilter'] ?? '');
-    if ($acadyear === '') { $acadyear = 'ALL'; }
+    if ($acadyear === '' ) { $acadyear = $currentAY; }
+
+    $Facadyear = trim($_GET['Facadyearfilter'] ??  '');
+    if ($Facadyear === '' ) { $Facadyear = $currentAY; }
+
+    $Fblock = trim($_GET['Fblockfilter'] ?? '');
+    if ($Fblock === '') { $Fblock = 'ALL'; }  
     
     // echo $subjectID.$status;
 // }elseif(in_array($student_view, ["SUBJECT-REQUIREMENTS", "FACULTY-REQUIREMENTS", "OFFICE-REQUIREMENTS"])){
@@ -74,15 +91,20 @@ function statusClass(string $status): string{
     return  $class;
 }
 
-function getSubjectsClearance($subjectID = 'ALL',$status = 'ALL'){
+function getSubjectsClearance($acad_year = 'ALL', $subjectID = 'ALL',$status = 'ALL'){
     global $clearanceDAO;
     
     
 
     $records = $clearanceDAO->executeQuery("getSubjectsClearance",[
+        
         $subjectID, $subjectID,
-        $_SESSION["userID"], 
-        $status,$status
+        $status,$status,
+        $_SESSION["userID"],
+        $acad_year,$acad_year
+        
+
+       
     ]);
 
     return $records;
@@ -108,10 +130,16 @@ function getfacultyClearance($faculty_lastname = 'ALL',$status = 'ALL'){
 }
 
 
-function getSubjectRequireMents($subjectID, $studentID = 'self'){
+function getSubjectRequireMents($subjectID,$acadyear, $studentID = 'self'){
     global $clearanceDAO;
+    
     if($studentID == 'self') $studentID = $_SESSION['userID'];
-    $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ $subjectID ,$studentID,$_SESSION['userID']]);
+
+    $records = $clearanceDAO->executeQuery("getSubjectRequirements",[ 
+        $subjectID ,
+        $studentID,
+        $acadyear,
+        $_SESSION['userID']]);
 
     return $records;
 }
@@ -123,9 +151,10 @@ function getUploadedSubjectRequireMents($subjectID){
     return $records;
 }
 
-function getFacultyRequireMents($facultyID){
+function getFacultyRequireMents($facultyID, $studentID = 'self'){
     global $clearanceDAO;
-    $records = $clearanceDAO->executeQuery("getFacultyRequirements",[$facultyID, $_SESSION['userID'], $_SESSION['userID']]);
+    if($studentID == 'self') $studentID = $_SESSION['userID'];
+    $records = $clearanceDAO->executeQuery("getFacultyRequirements",[$facultyID, $studentID, $_SESSION['userID']]);
 
     return $records;
 }
@@ -217,9 +246,27 @@ function editStudentsForSubjectClearance($department = 'ALL', $subjectID = 'ALL'
     return $records;
 }
 
-function getFacultyUploadedRequirements($subjectID){
+function getStudentsForFacultyClearance($block = 'ALL',$acad_year = 'ALL', $studentID = 'ALL'){
     global $clearanceDAO;
-    $records = $clearanceDAO->executeQuery("getFacultyUploadedRequirements",[ $subjectID ,$_SESSION['userID']]);
+
+    $records = $clearanceDAO->executeQuery("getStudentsForFacultyClearance",[
+        $_SESSION['real_userID'],
+        $acad_year,$acad_year,
+        $block,$block, 
+        $studentID,$studentID,
+        $_SESSION['program']]);
+
+    return $records;
+}
+
+function getFacultyUploadedRequirements($subjectID,$acadyear = ''){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getFacultyUploadedRequirements",[ 
+        $subjectID ,
+        $acadyear,
+        $_SESSION['userID']
+        ]
+    );
 
     return $records;
 }

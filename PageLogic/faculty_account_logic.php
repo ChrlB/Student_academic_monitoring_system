@@ -54,7 +54,7 @@ function facultyRoleConfig(string $role): array {
         ],
         'registrar' => [
             'key' => 'registrar', 'name' => 'Registrar', 'idLabel' => 'Staff ID:',
-            'officeLabel' => 'Office:', 'badge' => 'REG', 'banner' => 'bank',
+            'officeLabel' => 'Office:', 'badge' => 'REG', 'banner' => 'book',
         ],
     ];
     return $roles[$role] ?? [
@@ -92,7 +92,7 @@ function facultySections(string $role): array {
                     [['role', 'w4'], ['department', 'w4'], ['program', 'w4']],
                     [['status', 'w4'], ['date_created', 'w4']],
                 ]],
-                $contact('Contact & Office Directory'),
+                $contact('Contact Information'),
             ];
         case 'registrar':
             return [
@@ -101,7 +101,7 @@ function facultySections(string $role): array {
                     [['role', 'w4'], ['department', 'w4'], ['status', 'w4']],
                     [['date_created', 'w4']],
                 ]],
-                $contact('Contact & Office Directory'),
+                $contact('Contact Information'),
             ];
         default: // prof
             return [
@@ -110,7 +110,7 @@ function facultySections(string $role): array {
                     [['role', 'w4'], ['department', 'w4'], ['program', 'w4']],
                     [['status', 'w4'], ['date_created', 'w4']],
                 ]],
-                $contact('Contact & Office Directory'),
+                $contact('Contact Information'),
             ];
     }
 }

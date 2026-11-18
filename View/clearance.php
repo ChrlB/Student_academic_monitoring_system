@@ -137,7 +137,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 </tbody>
               </table>
             </div>              
-          <?php elseif ($student_view === "SUBJECTS"): $subjects = getSubjectsClearance($search,$status)?>
+          <?php elseif ($student_view === "SUBJECTS"): $subjects = getSubjectsClearance($acadyear,$search,$status)?>
+                    <?php var_dump($acadyear.$search.$status);var_dump(getSubjectsClearance($acadyear)) ?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">SUBJECTS</b>
               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
@@ -147,16 +148,25 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <div class="row searchbar_frame">
                 <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($search === "ALL" ? '':$search) ?>">
                 <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
-                    <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons" style="padding:5px">
+                    <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons search_icon" style="padding:5px">
                 </button>
               </div>
               
               <select name="statusfilter" class="filter" onchange="this.form.submit()">
                 <option value="ALL" <?= $status === 'ALL' ? 'selected' : '' ?>>ALL</option>
-                <?php $options = []; foreach( getSubjectsClearance() as $subject): if(!in_array($subject["status"],$options)): $options[] = $subject["status"];?>
+                <?php $options = []; foreach( getSubjectsClearance($acadyear) as $subject): if(!in_array($subject["status"],$options)): $options[] = $subject["status"];?>
                   <option  value="<?= $subject["status"] ?>" <?php if($status == $subject["status"]) echo 'selected'?>><?= $subject["status"] ?></option>
                 <?php endif; endforeach ?>
               </select>
+
+              <div  class="row" style="gap:20px; align-items:center; ">
+                <b>ACAD-YEAR:</b>
+                <select name="acadyearfilter" class="filter" onchange="this.form.submit()">
+                  <?php $options = []; foreach( getSubjectsClearance() as $subject): if(!in_array($subject["acad_year_sem"],$options)): $options[] = $subject["acad_year_sem"];?>
+                    <option  value="<?= $subject["acad_year_sem"] ?>" <?php if($acadyear == $subject["acad_year_sem"]) echo 'selected'?>><?= $subject["acad_year_sem"] ?></option>
+                  <?php endif; endforeach ?>
+                </select>
+              </div>
             </form>
             <div class="column" style="gap: 20px;">
               <?php foreach( $subjects as $subject):?>
@@ -173,13 +183,15 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                       <img src="<?= BASE_PATH?>/View/resources/openClearance.png" alt="" class="open_button" >
                     </button>
                     <input type="hidden" name="search" value="<?php echo $subject["subjectID"] ?>">
+                    <input type="hidden" name="acadyear" value="<?php echo $acadyear ?>">
                   </div>
 
                 </form>
               <?php endforeach ?>
             </div> 
 
-          <?php elseif ($student_view === "SUBJECT-REQUIREMENTS"): $subject_info = getSubjectRequireMents($search); ?>
+          <?php elseif ($student_view === "SUBJECT-REQUIREMENTS"): $subject_info = getSubjectRequireMents($search,$_GET['acadyear']); ?>
+                <?php echo ( $search.$acadyear) ?>
           
                 <div class="row" style="justify-content: space-between; align-items:center">
                   <b class="view_title"><?= $subject_info[0]["name"] ?></b>
@@ -345,7 +357,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <div class="row searchbar_frame">
                 <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($_GET["search"] ??  '') ?>">
                 <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
-                    <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons" style="padding:5px">
+                    <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons search_icon" style="padding:5px">
                 </button>
               </div>
               
@@ -421,12 +433,12 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     </div> -->
                     <div class="row" style="align-items:center;">
                       <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
-                        <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S" target="_blank">
+                        <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=F" target="_blank">
                           <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
                         </a>
                       <?php endif ?>
                       
-                      <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S&amp;download=1">
+                      <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=F&amp;download=1">
                         <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
                       </a>
                     </div>
@@ -533,7 +545,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <div class="row searchbar_frame">
                 <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($_GET["search"] ??  '') ?>">
                 <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
-                    <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons" style="padding:5px">
+                    <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons search_icon" style="padding:5px">
                 </button>
               </div>
               
@@ -610,12 +622,12 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     </div> -->
                     <div class="row" style="align-items:center;">
                       <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
-                        <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S" target="_blank">
+                        <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=O" target="_blank">
                           <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
                         </a>
                       <?php endif ?>
                       
-                      <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S&amp;download=1">
+                      <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=O&amp;download=1">
                         <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
                       </a>
                     </div>
@@ -722,7 +734,13 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             
 
             <?php $offices = getOffices(); if(count($offices) > 0): ?>
+              <div>
+                <hr>
+              </div>
               <b class="view_title">OFFICE</b>
+              <div>
+                <hr>
+              </div>
               <div class="row" style=" gap:20px; flex-wrap: wrap; width:100%">
                 <?php foreach($offices as $office):?>
                   <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
@@ -739,10 +757,16 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             <?php endif ?>
 
             <?php if(in_array($_SESSION["role"],["dean","program coordinator"])): ?>
+              <div>
+                <hr>
+              </div>
               <b class="view_title">FACULTY</b>
+              <div>
+                <hr>
+              </div>
               <div class="row" style=" gap:20px; flex-wrap: wrap; width:100%">
                 <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
-                  <img src="<?= BASE_PATH ?>/View/resources/image1.png" class="clearance_categ_box_upper_part">
+                  <img src="<?= BASE_PATH ?>/View/resources/image3.png" class="clearance_categ_box_upper_part">
                   
                   <div class="clearance_categ_box_buttom_part column">
                     <b><?php echo $_SESSION["role"] ?></b>
@@ -754,9 +778,14 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             <?php endif ?>
 
 
-            <?php $subjects_handling = getSubjects(); if(count($subjects_handling) > 0): $filtered_subjects_handling = getSubjects($department,$search,$block,$year,$acadyear); ?>
-              
-              <?php var_dump($department.$search.$block.$year.$acadyear) ?>
+            <?php $subjects_handling = getSubjects(); 
+                  if(count($subjects_handling) > 0): $filtered_subjects_handling = getSubjects($department,$search,$block,$year,$acadyear); ?>
+
+                  <?php //var_dump($subjects_handling) ?>
+              <div>
+                <hr>
+              </div>
+              <?php //var_dump($department.$search.$block.$year.$acadyear) ?>
               <form class="column" style="gap: 20px;" action="<?= BASE_PATH ?>/clearance" method="get">
                 <input type="hidden" name="view" value="MAIN">
                 <div class="row" style="justify-content:space-between; align-items:center; gap:20px" >
@@ -764,7 +793,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   <div class="row searchbar_frame " style="width: 50%;">
                     <input type="text" name="search"  placeholder="SEARCH" class="searchbar" value="<?= htmlspecialchars($search === "ALL" ? '':$search) ?>">
                     <button type="submit" onclick="this.form.submit()" style="border: 0px;background-color:transparent;">
-                        <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons" style="padding:5px">
+                        <img src="<?= BASE_PATH?>/View/resources/search.png" alt="" class="back_buttons search_icon" style="padding:5px">
                     </button>
                   </div>
                   <div  class="row" style="gap:20px; align-items:center; ">
@@ -817,7 +846,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <div class="row" style=" gap:20px; flex-wrap: wrap; width:100%; ">
                 <?php foreach($filtered_subjects_handling as $subject):?>
                   <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
-                    <img src="<?= BASE_PATH ?>/View/resources/image1.png" class="clearance_categ_box_upper_part">
+                    <img src="<?= BASE_PATH ?>/View/resources/image2.png" class="clearance_categ_box_upper_part">
                     
                     <div class="clearance_categ_box_buttom_part column">
                       <b style="font-size: 15px;"><?php echo $subject['name']?></b>
@@ -872,6 +901,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           <?php elseif($student_view == "SUBJECT"): $students_for_clearance = getStudentsForSubjectClearance($department,$_GET['subjectID'],$block,$year,$acadyear)?>
             
             <?php //var_dump($department." ".$_GET['subjectID']." ".$block." ".$year." ".$acadyear) ?>
+            <?php //var_dump($students_for_clearance) ?>
             <?php if(!isset($_GET['edit'])): ?>
               <div class="row" style="justify-content: space-between; align-items:center">
                 <b class="view_title"><?= $_GET['subjectID'].' - '.$_GET['name'] ?>  </b>
@@ -965,7 +995,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   </form>
 
 
-                <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getFacultyUploadedRequirements($_GET['subjectID']);?>
+                <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getFacultyUploadedRequirements($_GET['subjectID'],$acadyear);?>
                       <div class="uploads_container uploaded_container">
                           <div class="row"  style="justify-content: space-between;">
                               <b>UPLOADED FILES</b>
@@ -1015,7 +1045,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               </div>
             <?php elseif(isset($_GET['edit']) && ($_GET['edit'] == 1)): $students_for_clearance = (editStudentsForSubjectClearance($department,$_GET['subjectID'],$block,$year,$acadyear, $_GET['studentID']))[0]?>
                    
-                
+                <?php var_dump($department.$_GET['subjectID'].$block.$year.$acadyear. $_GET['studentID']) ?>
                 <div class="row" style="justify-content: space-between; align-items:center">
                   <b class="view_title"><?= $_GET['subjectID'].' - '.$_GET['name'] ?>  </b>
                   <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
@@ -1023,7 +1053,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 <div>
                   <hr>
                 </div>
-                <div class="row" style="gap: 20px;"><?php $uploaded_files = getSubjectRequireMents($_GET['subjectID'],$students_for_clearance['studentID']); ?>
+                <div class="row" style="gap: 20px;"><?php $uploaded_files = getSubjectRequireMents($_GET['subjectID'],$acadyear,$students_for_clearance['studentID']); ?>
                     <div class="column"  style="gap: 20px;">
                       <div class="student_clearance_panel">
                         <h3>STUDENT INFO:</h3>
@@ -1117,13 +1147,186 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 
             <?php endif ?>
 
-          <?php elseif($student_view == "FACULTY"): ?>
-                
+          <?php elseif($student_view == "FACULTY"): 
+
+
+                $students_for_faculty_clearance = getStudentsForFacultyClearance(); 
+                $students_for_clearance = getStudentsForFacultyClearance($Fblock,$Facadyear,$FstudentID)
+                ?>
+
+                <?php //var_dump($students_for_clearance) ?>
+                <?php //var_dump($Facadyear) ?>
+            <?php if(!isset($_GET['edit'])): ?>
+              <div class="row" style="justify-content: space-between; align-items:center">
+                <b class="view_title"><?= strtoupper($_SESSION['role']).' - '.$_SESSION['program']?>  </b>
+                <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+              </div>
+
+              <form action="<?= BASE_PATH ?>/clearance" method="get">
+               <div class="row" style="gap: 20px; align-items:center; border-bottom: 2px solid white; padding-bottom: 20px;" >
+
+                  <b>BLOCK:</b>
+                  <select name="Fblockfilter" class="filter" onchange="this.form.submit()">
+                    <option  value="ALL" <?php if($Fblock === "ALL") echo 'selected'?>>ALL</option>
+                    <?php $options = []; foreach( $students_for_faculty_clearance as $subject): if(!in_array($subject["block"],$options)): $options[] = $subject["block"];?>
+                      <option  value="<?= $subject["block"] ?>" <?php if($Fblock == $subject["block"]) echo 'selected'?>><?= $subject["block"] ?></option>
+                    <?php endif; endforeach ?>
+                  </select>
+
+                  <b>ACAD-YEAR:</b>
+                  <select name="Facadyearfilter" class="filter" onchange="this.form.submit()">
+                    <?php $options = []; foreach( $students_for_faculty_clearance as $subject): if(!in_array($subject["acad_year_sem"],$options)): $options[] = $subject["acad_year_sem"];?>
+                      <option  value="<?= $subject["acad_year_sem"] ?>" <?php if($Facadyear == $subject["acad_year_sem"]) echo 'selected'?>><?= $subject["acad_year_sem"] ?></option>
+                    <?php endif; endforeach ?>
+                  </select>
+                </div >
+                <input type="hidden" name="view" value="FACULTY">
+              </form>
+              <!-- <div>
+                <hr>
+              </div> -->
+              <div class="updates_frame2  ">
+                <table class="updates_table">
+                  <thead style="position: relative;z-index: 1;">
+                    <tr>
+                      <th class="col_name">ID</th>
+                      <th class="col_about">NAME</th>
+                      <th class="col_date">DATE</th>
+                      <th class="col_status">STATUS</th>
+                      <th class="col_status">ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody class="updates_records">
+                    <?php foreach ($students_for_clearance as $row): ?>
+                      <tr onclick="toggleRemark(this)" class="update_record">
+                        <td title="<?= htmlspecialchars($row['studentID']) ?>">
+                          <?= htmlspecialchars($row['studentID']) ?>
+                        </td>
+                        <td title="<?= htmlspecialchars($row['student_name']) ?>">
+                          <?= htmlspecialchars($row['student_name']) ?>
+                        </td>
+                        <td><?= htmlspecialchars($row['date_cleared']) ?></td>
+                        <td>
+                          <span class="status_badge <?php statusClass($row['status']) ?>">
+                            <?= htmlspecialchars(strtoupper($row['status'])); ?>
+                          </span>
+                        </td>
+                        <td>
+                          
+                          <div>
+                            <a href="<?= BASE_PATH ?>/clearance?view=FACULTY&studentID=<?= $row['studentID']?>&edit=1"><button type="submit">EDIT</button></a>
+                          </div>
+                        </td>
+                        
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+
+
+            <?php elseif(isset($_GET['edit']) && ($_GET['edit'] == 1)): $students_for_clearance = getStudentsForFacultyClearance($block,$acadyear,$_GET['studentID'])[0]?>
+                      <?php //var_dump($students_for_clearance) ?>
+
+                <div class="row" style="justify-content: space-between; align-items:center">
+                  <b class="view_title"><?= strtoupper($_SESSION['role']).' - '.$_SESSION['program'] ?>  </b>
+                  <a href="<?= BASE_PATH ?>/clearance?view=FACULTY" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+                </div>
+                <div>
+                  <hr>
+                </div>
+                <div class="row" style="gap: 20px;"><?php $uploaded_files = getFacultyRequirements($_SESSION['userID'],$_GET['studentID']); ?>
+                    <div class="column"  style="gap: 20px;">
+                      <div class="student_clearance_panel">
+                        <h3>STUDENT INFO:</h3>
+                        <div class="row" style="gap: 20px; ">
+                          <div class="column" style="gap: 10px; ">
+                            <span>ID:</span>
+                            <span>NAME:</span>
+                            <span>COURSE-BLOCK:</span>     
+                          </div>
+                          <div class="column" style="gap: 10px;">
+                            <b> <?= '&emsp;&emsp;'.strtoupper($students_for_clearance['studentID']) ?>  </b>
+                            <b> <?= '&emsp;&emsp;'.strtoupper($students_for_clearance['student_name']) ?>  </b>
+                            <b> <?= '&emsp;&emsp;'.strtoupper($students_for_clearance['program'].' - '.strtoupper($students_for_clearance['block'])) ?> </b>             
+                                     
+                          </div>
+                        </div>
+                      </div>
+                      <div class="student_clearance_panel">
+                        <h3>UPLOADED REQUIMENTS:</h3>
+                        <div class="column subject_uploaded_file_container" style="gap:20px;  " >
+                          <?php foreach($uploaded_files as $requirement): if ($requirement["file_name"] === null) continue;?>
+                            <div  class="row uploaded_file_container"  >
+                              <div class="row" style="align-items:center;">
+                                <img src="<?= BASE_PATH?>/View/resources/Document.png" alt="" class="file_icons">
+                                <b><?= $requirement["file_name"]?></b>
+                              </div>
+                              
+                              <b><?= $requirement['file_size'] ?></b>
+                              <!-- <div class="row" style="align-items:center;">
+                                <a href=""><img src="<= BASE_PATH?>/View/resources/Eye.png" alt="" class="file_icons"></a>
+                                <a href=""><img src="<= BASE_PATH?>/View/resources/Download.png" alt="" class="file_icons"></a>
+                              </div> -->
+                              <div class="row" style="align-items:center;">
+                                <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
+                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearanceSigning&amp;categ=S&amp;studentID=<?= $students_for_clearance['studentID'] ?>" target="_blank">
+                                    <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
+                                  </a>
+                                <?php endif ?>
+                                
+                                <a href="<?= BASE_PATH ?>/download-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearanceSigning&amp;categ=S&amp;download=1&amp;studentID=<?= $students_for_clearance['studentID']?>">
+                                  <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons">
+                                </a>
+                                
+                              </div>
+                            </div>
+
+                          <?php endforeach ?>
+                        </div>                    
+                      </div>  
+                      <div class="student_clearance_panel">
+                        <h3>PROJECTS:</h3>
+                      </div>                 
+                    </div>  
+                    
+                    <div class="column"  style="gap: 20px;">
+                      
+                      <form method="post" action="<?= BASE_PATH ?>/update_clearance"   class="column student_clearance_panel" style="gap: 20px; ">
+                        REMARKS:
+                        <textarea name="remarks" id="" style="min-width:500px; max-width:650px; height:150px; padding:20px" class="filter" ><?= htmlspecialchars($students_for_clearance['remarks'] ?? '')?>
+                        </textarea>
+                        STATUS:<?php $clearance_status = $students_for_clearance['status'] ?? 'NOT YET CLEARED'; ?>
+                        <select name="clearance_status_filter" class="filter" onchange="this.style.color = this.options[this.selectedIndex].style.color"  style="color: <?php 
+                              {echo (strtoupper($clearance_status) === 'CLEARED') ? 'green' : 
+                                  ((strtoupper($clearance_status) === 'NOT YET CLEARED') ? 'yellow' : 
+                                  ((strtoupper($clearance_status) === 'REJECT') ? 'red' : 'white')); }
+                            ?>;">
+
+                          <option value="CLEARED" style="color:green" <?php if(strtoupper($clearance_status) === 'CLEARED') echo 'selected'  ?>>CLEARED</option>
+                          <option value="NOT YET CLEARED" style="color:yellow" <?php if(strtoupper($clearance_status) === 'NOT YET CLEARED') echo 'selected'  ?>>NOT YET CLEARED</option>
+                          <option value="REJECT" style="color:red" <?php if(strtoupper($clearance_status) === 'REJECT') echo 'selected'  ?> >REJECT</option>
+                        </select>
+
+                        <input type="hidden" name="clearance_categ" value="<?= $student_view ?>">
+                        <input type="hidden" name="clearanceID" value="<?= $students_for_clearance['subject_clearanceID'] ?? '' ?>">
+                        <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">          
+                        <button type="submit">SAVE</button>
+                      </form>
+                      <div class="student_clearance_panel">
+                        <h3>REQUIREMENTS:</h3>
+                        <div class="column" style="gap:20px;  " >
+                          
+                          
+                        </div>                    
+                      </div>   
+                    </div>
+                </div>
+            <?php endif ?>
           <?php endif ?>
 
 
 
-          <!-- INSERT INTO `subject_clearance_requirements` (`ID`, `enrolled_subjectID`, `fileID`, `file_name`, `file_size`, `uploaded_at`, `uploaded_by`) VALUES (NULL, '', '', '', '', CURRENT_TIMESTAMP, '') -->
         <?php endif ?>
 
         <!-- <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-profile">
