@@ -1142,29 +1142,33 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 ?>
 
                 <?php //var_dump($students_for_clearance) ?>
+                <?php //var_dump($Facadyear) ?>
             <?php if(!isset($_GET['edit'])): ?>
               <div class="row" style="justify-content: space-between; align-items:center">
                 <b class="view_title"><?= strtoupper($_SESSION['role']).' - '.$_SESSION['program']?>  </b>
                 <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
               </div>
+
+              <form action="<?= BASE_PATH ?>/clearance" method="get">
                <div class="row" style="gap: 20px; align-items:center; border-bottom: 2px solid white; padding-bottom: 20px;" >
-                  
-                  
+
                   <b>BLOCK:</b>
-                  <select name="blockfilter" class="filter" onchange="this.form.submit()">
-                    <option  value="ALL" <?php if($block === "ALL") echo 'selected'?>>ALL</option>
+                  <select name="Fblockfilter" class="filter" onchange="this.form.submit()">
+                    <option  value="ALL" <?php if($Fblock === "ALL") echo 'selected'?>>ALL</option>
                     <?php $options = []; foreach( $students_for_faculty_clearance as $subject): if(!in_array($subject["block"],$options)): $options[] = $subject["block"];?>
-                      <option  value="<?= $subject["block"] ?>" <?php if($block == $subject["block"]) echo 'selected'?>><?= $subject["block"] ?></option>
+                      <option  value="<?= $subject["block"] ?>" <?php if($Fblock == $subject["block"]) echo 'selected'?>><?= $subject["block"] ?></option>
                     <?php endif; endforeach ?>
                   </select>
 
                   <b>ACAD-YEAR:</b>
-                  <select name="acadyearfilter" class="filter" onchange="this.form.submit()">
+                  <select name="Facadyearfilter" class="filter" onchange="this.form.submit()">
                     <?php $options = []; foreach( $students_for_faculty_clearance as $subject): if(!in_array($subject["acad_year_sem"],$options)): $options[] = $subject["acad_year_sem"];?>
-                      <option  value="<?= $subject["acad_year_sem"] ?>" <?php if($acadyear == $subject["acad_year_sem"]) echo 'selected'?>><?= $subject["acad_year_sem"] ?></option>
+                      <option  value="<?= $subject["acad_year_sem"] ?>" <?php if($Facadyear == $subject["acad_year_sem"]) echo 'selected'?>><?= $subject["acad_year_sem"] ?></option>
                     <?php endif; endforeach ?>
                   </select>
                 </div >
+                <input type="hidden" name="view" value="FACULTY">
+              </form>
               <!-- <div>
                 <hr>
               </div> -->
@@ -1188,10 +1192,10 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                         <td title="<?= htmlspecialchars($row['student_name']) ?>">
                           <?= htmlspecialchars($row['student_name']) ?>
                         </td>
-                        <td><?php htmlspecialchars($row['date_cleared']) ?></td>
+                        <td><?= htmlspecialchars($row['date_cleared']) ?></td>
                         <td>
                           <span class="status_badge <?php statusClass($row['status']) ?>">
-                            <?php htmlspecialchars(strtoupper($row['status'])) ?>
+                            <?= htmlspecialchars(strtoupper($row['status'])); ?>
                           </span>
                         </td>
                         <td>
@@ -1209,7 +1213,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
 
             <?php elseif(isset($_GET['edit']) && ($_GET['edit'] == 1)): $students_for_clearance = getStudentsForFacultyClearance($block,$acadyear,$_GET['studentID'])[0]?>
-                      <?php var_dump($students_for_clearance) ?>
+                      <?php //var_dump($students_for_clearance) ?>
 
                 <div class="row" style="justify-content: space-between; align-items:center">
                   <b class="view_title"><?= strtoupper($_SESSION['role']).' - '.$_SESSION['program'] ?>  </b>
@@ -1274,15 +1278,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     </div>  
                     
                     <div class="column"  style="gap: 20px;">
-                      <div class="student_clearance_panel">
-                        <h3>GRADES:</h3>
-                        <div class="column" style="gap:20px;  " >
-                          <div class="row" style="gap: 10px; justify-content:space-between; max-width:200px"><b>MIDTERM: </b><b><?php echo ($students_for_clearance['midterm_grade'] ?? 'N/A') ?></b></div>
-                          <div class="row" style="gap: 10px; justify-content:space-between; max-width:200px"><b>FINALS: </b><b><?php echo ($students_for_clearance['final_grade']) ?? 'N/A'?>  </b></div>
-                          
-                          
-                        </div>                    
-                      </div>
+                      
                       <form method="post" action="<?= BASE_PATH ?>/update_clearance"   class="column student_clearance_panel" style="gap: 20px; ">
                         REMARKS:
                         <textarea name="remarks" id="" style="min-width:500px; max-width:650px; height:150px; padding:20px" class="filter" ><?= htmlspecialchars($students_for_clearance['remarks'] ?? '')?>
@@ -1303,7 +1299,14 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                         <input type="hidden" name="clearanceID" value="<?= $students_for_clearance['subject_clearanceID'] ?? '' ?>">
                         <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">          
                         <button type="submit">SAVE</button>
-                      </form>   
+                      </form>
+                      <div class="student_clearance_panel">
+                        <h3>REQUIREMENTS:</h3>
+                        <div class="column" style="gap:20px;  " >
+                          
+                          
+                        </div>                    
+                      </div>   
                     </div>
                 </div>
             <?php endif ?>
@@ -1311,7 +1314,6 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
 
 
-          <!-- INSERT INTO `subject_clearance_requirements` (`ID`, `enrolled_subjectID`, `fileID`, `file_name`, `file_size`, `uploaded_at`, `uploaded_by`) VALUES (NULL, '', '', '', '', CURRENT_TIMESTAMP, '') -->
         <?php endif ?>
 
         <!-- <form method="post" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-profile">

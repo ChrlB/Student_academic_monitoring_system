@@ -71,6 +71,12 @@ if($_SESSION["role"] == "student"){
 
     $acadyear = trim($_GET['acadyearfilter'] ?? '');
     if ($acadyear === '' ) { $acadyear = $currentAY; }
+
+    $Facadyear = trim($_GET['Facadyearfilter'] ??  '');
+    if ($Facadyear === '' ) { $Facadyear = $currentAY; }
+
+    $Fblock = trim($_GET['Fblockfilter'] ?? '');
+    if ($Fblock === '') { $Fblock = 'ALL'; }  
     
     // echo $subjectID.$status;
 // }elseif(in_array($student_view, ["SUBJECT-REQUIREMENTS", "FACULTY-REQUIREMENTS", "OFFICE-REQUIREMENTS"])){
