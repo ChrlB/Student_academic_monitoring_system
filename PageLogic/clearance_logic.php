@@ -112,7 +112,7 @@ function getSubjectsClearance($acad_year = 'ALL', $subjectID = 'ALL',$status = '
     // var_dump($_SESSION["userID"]);
     // var_dump($records);
 }
-function getfacultyClearance($faculty_lastname = 'ALL',$status = 'ALL'){
+function getfacultyClearance($acad_year = 'ALL', $faculty_lastname = 'ALL',$status = 'ALL'){
     global $clearanceDAO;
     
     
@@ -120,6 +120,7 @@ function getfacultyClearance($faculty_lastname = 'ALL',$status = 'ALL'){
     $records = $clearanceDAO->executeQuery("getFacultyClearance",[
         $faculty_lastname, $faculty_lastname,
         $_SESSION["userID"], 
+        $acad_year,$acad_year,
         $status,$status
     ]);
 
@@ -139,34 +140,50 @@ function getSubjectRequireMents($subjectID,$acadyear, $studentID = 'self'){
         $subjectID ,
         $studentID,
         $acadyear,
-        $_SESSION['userID']]);
+        $_SESSION['userID']
+    ]);
 
     return $records;
 }
 
-function getUploadedSubjectRequireMents($subjectID){
+function getUploadedSubjectRequireMents($acadyear, $subjectID){
     global $clearanceDAO;
-    $records = $clearanceDAO->executeQuery("getUploadedSubjectRequirements",[ $subjectID ,$_SESSION['userID'],$_SESSION['userID']]);
+    $records = $clearanceDAO->executeQuery("getUploadedSubjectRequirements",[ 
+        $subjectID ,
+        $_SESSION['userID'],
+        $acadyear,
+        $_SESSION['userID']
+    ]);
 
     return $records;
 }
 
-function getFacultyRequireMents($facultyID, $studentID = 'self'){
+function getFacultyRequireMents($acadyear,$facultyID,  $studentID = 'self'){
     global $clearanceDAO;
     if($studentID == 'self') $studentID = $_SESSION['userID'];
-    $records = $clearanceDAO->executeQuery("getFacultyRequirements",[$facultyID, $studentID, $_SESSION['userID']]);
+    $records = $clearanceDAO->executeQuery("getFacultyRequirements",[
+        $_SESSION['userID'],
+        $facultyID, 
+        $studentID, 
+        $acadyear,$acadyear
+    ]);
 
     return $records;
 }
 
-function getUploadedFacultyRequireMents($facultyID){
+function getUploadedFacultyRequireMents($acadyear, $facultyID){
     global $clearanceDAO;
-    $records = $clearanceDAO->executeQuery("getUploadedFacultyRequirements",[ $facultyID ,$_SESSION['userID'],$_SESSION['userID']]);
+    $records = $clearanceDAO->executeQuery("getUploadedFacultyRequirements",[
+        $_SESSION['userID'],
+        $facultyID, 
+        $_SESSION['userID'], 
+        $acadyear,$acadyear
+    ]);
 
     return $records;
 }
 
-function getOfficeClearance($faculty_lastname = 'ALL',$status = 'ALL'){
+function getOfficeClearance($acadyear = 'ALL',$faculty_lastname = 'ALL',$status = 'ALL'){
     global $clearanceDAO;
     
     
@@ -174,6 +191,7 @@ function getOfficeClearance($faculty_lastname = 'ALL',$status = 'ALL'){
     $records = $clearanceDAO->executeQuery("getOfficeClearance",[
         $faculty_lastname, $faculty_lastname,
         $_SESSION["userID"], 
+        $acadyear,$acadyear,
         $status,$status
     ]);
 
@@ -183,16 +201,26 @@ function getOfficeClearance($faculty_lastname = 'ALL',$status = 'ALL'){
     // var_dump($records);
 }
 
-function getOfficeRequireMents($officeID){
+function getOfficeRequireMents($acadyear,$officeID){
     global $clearanceDAO;
-    $records = $clearanceDAO->executeQuery("getOfficeRequirements",[$officeID, $_SESSION['userID'], $_SESSION['userID']]);
+    $records = $clearanceDAO->executeQuery("getOfficeRequirements",[
+        $_SESSION['userID'], 
+        $officeID, 
+        $_SESSION['userID'],
+        $acadyear,$acadyear
+    ]);
 
     return $records;
 }
 
-function getUploadedOfficeRequireMents($officeID){
+function getUploadedOfficeRequireMents($acadyear,$officeID){
     global $clearanceDAO;
-    $records = $clearanceDAO->executeQuery("getUploadedOfficeRequireMents",[ $officeID ,$_SESSION['userID'],$_SESSION['userID']]);
+    $records = $clearanceDAO->executeQuery("getUploadedOfficeRequireMents",[
+        $_SESSION['userID'], 
+        $officeID, 
+        $_SESSION['userID'],
+        $acadyear,$acadyear
+    ]);
 
     return $records;
 }

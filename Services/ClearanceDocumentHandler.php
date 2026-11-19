@@ -74,18 +74,32 @@ function uploadDocument($request): void
             $savedMimeType
         );
 
+        if($request['docs_for'] === 'addSubjectRequirement'){
+            $clearanceDAO->executeUpdate($request['docs_for'],
+                [
+                    $request["ID"],
+                    $driveFileId,
+                    $validation['originalName'],
+                    $savedMimeType,
+                    (int) $uploadedFile['size'],
+                    $_SESSION['userID'],
+                    $request["enrollmentID"]
+                ]
+            );
+        }else{
+            $clearanceDAO->executeUpdate($request['docs_for'],
+                [
+                    $request["ID"],
+                    $driveFileId,
+                    $validation['originalName'],
+                    $savedMimeType,
+                    (int) $uploadedFile['size'],
+                    $_SESSION['userID'],
+                ]
+            );
+        }
 
-
-        $clearanceDAO->executeUpdate($request['docs_for'],
-            [
-                $request["ID"],
-                $driveFileId,
-                $validation['originalName'],
-                $savedMimeType,
-                (int) $uploadedFile['size'],
-                $_SESSION['userID'],
-            ]
-        );
+        
 
         $_SESSION['message'] = 'Document uploaded!';
     } catch (Throwable $error) {
