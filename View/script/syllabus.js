@@ -138,7 +138,30 @@
     var action = btn.dataset.action;
     var row = btn.closest('.week-item');
 
-    if (action === 'rename-module') {
+    if (action === 'open-copy') {
+      e.preventDefault();
+      var panel = document.getElementById('copyPanel');
+      if (panel) { panel.classList.remove('is-hidden'); panel.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+
+    } else if (action === 'close-copy') {
+      var panel2 = document.getElementById('copyPanel');
+      if (panel2) panel2.classList.add('is-hidden');
+
+    } else if (action === 'run-copy') {
+      var source = document.getElementById('copySource');
+      if (!source || !source.value) { toast('Choose a class to copy from.', true); return; }
+      if (!window.confirm('Copy that syllabus into this class? Existing modules here are kept, and the copy is added after them.')) return;
+      btn.disabled = true;
+      toast('Copying... this can take a minute if there are large videos.', false);
+      run('copy_class', {
+        targetSched: sched,
+        sourceSched: source.value,
+        include_pages: document.getElementById('copyPages').checked ? '1' : '0',
+        include_files: document.getElementById('copyFiles').checked ? '1' : '0',
+        include_quizzes: document.getElementById('copyQuizzes').checked ? '1' : '0'
+      }).then(function () { btn.disabled = false; });
+
+    } else if (action === 'rename-module') {
       var current = btn.dataset.title || '';
       var next = window.prompt('Rename module:', current);
       if (next === null) return;

@@ -1,4 +1,4 @@
-/* --- Syllabus Tracker Specific Styles --- */
+    /* --- Syllabus Tracker Specific Styles --- */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
     .syllabus-wrapper {
@@ -521,3 +521,109 @@ label.mini.check { flex-direction: row; align-items: center; gap: 6px; color: #d
 .progress-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .progress-table th, .progress-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #3a1c4a; white-space: nowrap; }
 .progress-table th { color: #b0a3c2; font-weight: 600; font-size: 12px; }
+
+/* ---------- v4: quiz modes, practice, runner ---------- */
+.section-label { font-size: 13px; font-weight: 700; color: #fff; margin: 4px 0 6px; }
+.section-label span { font-weight: 400; color: #b0a3c2; font-size: 11px; }
+.practice-box { margin-top: 14px; padding-top: 12px; border-top: 1px solid #4a2b5e; }
+.practice-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 6px; }
+.practice-btns .syl-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+.mode-only.is-hidden { display: none !important; }
+.mode-desc { color: #d1c4e9; background: #1f1230; border-radius: 8px; padding: 8px 10px; line-height: 1.5; }
+.more-opts { margin: 4px 0; font-size: 13px; color: #d1c4e9; }
+.more-opts summary { cursor: pointer; padding: 4px 0; }
+.more-opts textarea { width: 100%; min-height: 60px; margin: 6px 0; resize: vertical; }
+
+.run-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: #555; margin-bottom: 12px; }
+.run-timer { font-size: 22px; font-weight: 700; color: #6d28d9; margin-bottom: 12px; }
+.run-timer.low { color: #b91c1c; }
+.hearts { color: #dc2626; font-size: 18px; letter-spacing: 2px; }
+.conf-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0 2px 2px; align-items: center; font-size: 12px; color: #555; }
+.conf-row label { padding: 3px 10px; border-radius: 14px; margin: 0; font-size: 12px; }
+.flash-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.quiz-feedback { padding: 12px 14px; border-radius: 10px; margin: 10px 0; font-size: 14px; line-height: 1.5; }
+.quiz-feedback.good { background: #dcfce7; color: #14532d; }
+.quiz-feedback.bad  { background: #fee2e2; color: #7f1d1d; }
+.quiz-feedback .why { margin-top: 6px; color: #333; }
+.quiz-box .chip { border-color: #c4b5fd; color: #6d28d9; }
+.quiz-notes { text-align: left; font-size: 14px; margin: 8px 0; padding-left: 18px; }
+
+/* ---------- v5: simpler flow ---------- */
+
+/* student: the one next step */
+.next-step {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    background: #2c1a38; border: 1px solid #a855f7; border-radius: 14px; padding: 14px 18px; margin-bottom: 18px;
+}
+.next-step strong { display: block; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: #c4b5fd; margin-bottom: 2px; }
+.next-step div { font-size: 15px; }
+.syl-btn.primary { width: auto; display: inline-block; margin: 0; padding: 12px 26px; font-size: 15px; font-weight: 700; background: #a855f7; border-color: #a855f7; color: #fff; }
+.syl-btn.primary:hover { background: #9333ea; }
+
+/* student: after a failed attempt */
+.banner-link { color: #fff; text-decoration: underline; margin-left: 4px; }
+.missed-box { margin-top: 10px; font-size: 13px; }
+.missed-box ul { margin: 4px 0 0; padding-left: 20px; color: #fde68a; }
+.missed-box li { margin-bottom: 3px; }
+.restudy-banner .syl-btn { margin-top: 12px; }
+
+/* list rows: status + one next action */
+.status-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.next-action { font-size: 12px; font-weight: 600; color: #c4b5fd; white-space: nowrap; }
+.week-item[data-href]:hover .next-action { color: #fff; }
+
+/* professor: 3-step checklist */
+.checklist { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; }
+.check-step {
+    display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 20px;
+    background: #2c1a38; border: 1px solid #4a2b5e; color: #d1c4e9; text-decoration: none; font-size: 13px;
+}
+.check-step:hover { border-color: #a855f7; color: #fff; }
+.check-step em { color: #b0a3c2; font-style: normal; font-size: 11px; }
+.check-step .tick {
+    display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px;
+    border-radius: 50%; border: 1px solid #8b7a9e; font-size: 11px;
+}
+.check-step.done { border-color: #4ade80; color: #bbf7d0; }
+.check-step.done .tick { background: #4ade80; border-color: #4ade80; color: #0f2e1b; font-weight: 700; }
+.check-hint { font-size: 11px; color: #b0a3c2; }
+
+/* professor: copy from another class */
+.copy-panel {
+    background: #2c1a38; border: 1px dashed #a855f7; border-radius: 14px; padding: 16px 18px; margin-bottom: 18px;
+    display: flex; flex-direction: column; gap: 8px;
+}
+.copy-panel select { width: 100%; }
+
+/* professor: quiz builder extras */
+.adv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0; }
+.import-box { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #4a2b5e; }
+.import-box textarea { width: 100%; min-height: 110px; margin: 6px 0; resize: vertical; }
+.import-example {
+    background: #1a0f2e; color: #d1c4e9; border-radius: 8px; padding: 8px 12px; font-size: 12px;
+    margin: 6px 0; white-space: pre-wrap; font-family: Consolas, Menlo, monospace;
+}
+
+/* professor: who needs help */
+.help-list { max-height: 260px; overflow-y: auto; }
+.help-item { padding: 8px 0; border-bottom: 1px solid #3a1c4a; font-size: 13px; }
+.help-item:last-child { border-bottom: none; }
+.help-item strong { display: block; margin-bottom: 2px; }
+
+/* ---------- phones ---------- */
+@media (max-width: 700px) {
+    .syl-header { flex-direction: column; align-items: flex-start; gap: 14px; }
+    .completion-bar-container { width: 100%; }
+    .topic-header-side { align-items: flex-start; min-width: 0; }
+    .next-step { flex-direction: column; align-items: stretch; }
+    .syl-btn.primary { width: 100%; text-align: center; }
+    .adv-grid { grid-template-columns: 1fr; }
+    .quiz-box { padding: 16px 14px; }
+    .quiz-overlay { padding: 12px 8px; }
+    .doc-statusbar { gap: 8px; }
+    #editor .ql-editor, .lesson-body { padding: 18px 16px; }
+    .assess-wrap { grid-template-columns: 1fr; }
+    .checklist { gap: 8px; }
+    .check-step { font-size: 12px; padding: 6px 10px; }
+}

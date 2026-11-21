@@ -280,16 +280,6 @@ class SyllabusLogic
         return $row;
     }
 
-    /** A student opened a PDF/video: counts toward the "study again" requirement after a failed quiz. */
-    public function noteMaterialOpened(int $taskID): void
-    {
-        if (!$this->isStudent) return;
-        $this->run(
-            "UPDATE syllabus_progress SET restudy_hits = restudy_hits + 1
-              WHERE studentID = :s AND taskID = :t AND needs_restudy = 1",
-            [':s' => $this->userID, ':t' => $taskID]
-        );
-    }
 
     /* ---------------------------------------------------------
        TRACKER DATA + COMPUTATIONS
@@ -445,6 +435,7 @@ class SyllabusLogic
             'mode' => $mode, 'total' => 0, 'done' => 0, 'progress' => 0, 'upcoming' => 0, 'remaining' => 0,
             'pct' => 0, 'overdue' => 0, 'materials' => count($contents), 'students' => $nStudents,
             'current' => null, 'next' => null, 'next_open' => null, 'people' => [],
+            'open_topics' => 0, 'help' => [], 'hard' => [],
         ];
         $firstProgress = null;
         $firstOpen     = null;
@@ -459,6 +450,7 @@ class SyllabusLogic
             foreach ($m['tasks'] as $t) {
                 $t['module_title'] = $m['title'];
                 $sum['total']++;
+                if (!$t['locked']) $sum['open_topics']++;
                 $m['class_done'] += $t['done_n'];
                 $classDone       += $t['done_n'];
 
@@ -517,6 +509,8 @@ class SyllabusLogic
                     'restudy' => $s['restudy'],
                 ];
             }
+            $sum['help'] = $this->needsHelp($schedID, $roster, $stu, (int)$sum['open_topics']);
+            $sum['hard'] = $this->hardQuestions($schedID);
         }
 
         $sum['current'] = $firstProgress ?? $firstOpen;
@@ -606,7 +600,7 @@ class SyllabusLogic
     private function questionsOf(int $quizID, bool $withAnswers): array
     {
         $qs = $this->all(
-            "SELECT questionID, prompt FROM syllabus_questions WHERE quizID = :q ORDER BY sort_order, questionID",
+            "SELECT questionID, prompt, explanation, difficulty FROM syllabus_questions WHERE quizID = :q ORDER BY sort_order, questionID",
             [':q' => $quizID]
         );
         foreach ($qs as &$q) {
@@ -630,7 +624,7 @@ class SyllabusLogic
     {
         $out  = ['quiz' => null, 'exam' => null];
         $rows = $this->all(
-            "SELECT quizID, kind, title, pass_percent, cooldown_minutes, draw_count, is_published
+            "SELECT quizID, kind, mode, title, pass_percent, cooldown_minutes, draw_count, time_limit_minutes, lives, allow_practice, is_published
                FROM syllabus_quizzes WHERE taskID = :t",
             [':t' => $taskID]
         );
@@ -661,31 +655,51 @@ class SyllabusLogic
         return $out;
     }
 
+    /** Prompts the student missed on their last failed attempt of a checkpoint. */
+    private function lastMissed(int $quizID): array
+    {
+        $a = $this->one(
+            "SELECT answers FROM syllabus_attempts WHERE quizID = :q AND studentID = :s AND passed = 0 ORDER BY attemptID DESC LIMIT 1",
+            [':q' => $quizID, ':s' => $this->userID]
+        );
+        if (!$a) return [];
+        $answers = json_decode((string)$a['answers'], true);
+        if (!is_array($answers)) return [];
+        $out = [];
+        foreach ($answers as $qid => $x) {
+            if (!empty($x['ok'])) continue;
+            $prompt = $this->value("SELECT prompt FROM syllabus_questions WHERE questionID = :q", [':q' => (int)$qid]);
+            if ($prompt !== false) $out[] = $prompt;
+        }
+        return array_slice($out, 0, 10);
+    }
+
     /** What the student may do next on this topic. */
-    public function studentFlow(array $assess, ?array $progress, bool $hasFiles): array
+    public function studentFlow(array $assess, ?array $progress): array
     {
         $quiz = $assess['quiz'];
         $exam = $assess['exam'];
-        $required  = $exam ? 'exam' : ($quiz ? 'quiz' : null);
         $completed = ($progress && $progress['status'] === 'completed');
-        $restudy   = ($progress && (int)$progress['needs_restudy'] === 1 && !$completed);
+        $flagged   = ($progress && (int)$progress['needs_restudy'] === 1 && !$completed);
 
-        $secsLeft  = 0;
-        $needFiles = false;
+        $secsLeft    = 0;
         $failedTitle = '';
-        if ($restudy) {
-            $failQuiz = (int)($progress['last_fail_quizID'] ?? 0);
+        $failedQuiz  = 0;
+        $missed      = [];
+        if ($flagged) {
+            $failedQuiz = (int)($progress['last_fail_quizID'] ?? 0);
             $cool = 0;
             foreach ([$quiz, $exam] as $q) {
-                if ($q && (int)$q['quizID'] === $failQuiz) {
+                if ($q && (int)$q['quizID'] === $failedQuiz) {
                     $cool = (int)$q['cooldown_minutes'];
                     $failedTitle = $q['title'];
                 }
             }
-            $failAt    = $progress['last_fail_at'] ? strtotime($progress['last_fail_at']) : time();
-            $secsLeft  = max(0, $failAt + $cool * 60 - time());
-            $needFiles = ($hasFiles && (int)($progress['restudy_hits'] ?? 0) < 1);
+            $failAt   = $progress['last_fail_at'] ? strtotime($progress['last_fail_at']) : time();
+            $secsLeft = max(0, $failAt + $cool * 60 - time());
+            if ($failedQuiz > 0) $missed = $this->lastMissed($failedQuiz);
         }
+        $waiting = ($flagged && $secsLeft > 0);
 
         $state = ['quiz' => null, 'exam' => null];
         foreach (self::QUIZ_KINDS as $k) {
@@ -693,21 +707,29 @@ class SyllabusLogic
             if (!$q) continue;
             if ($q['passed'])                                   $s = 'passed';
             elseif ($completed)                                 $s = 'closed';
-            elseif ($restudy)                                   $s = 'restudy';
+            elseif ($waiting)                                   $s = 'restudy';
             elseif ($k === 'exam' && $quiz && !$quiz['passed']) $s = 'needs_quiz';
             else                                                $s = 'ready';
             $state[$k] = $s;
         }
 
+        $next = null;                       // the one thing the student should do now
+        if (!$completed && !$waiting) {
+            foreach (self::QUIZ_KINDS as $k) {
+                if ($state[$k] === 'ready') { $next = $k; break; }
+            }
+        }
+
         return [
-            'required'        => $required,
-            'completed'       => $completed,
-            'restudy'         => $restudy,
-            'seconds_left'    => $secsLeft,
-            'need_files'      => $needFiles,
-            'failed_title'    => $failedTitle,
-            'can_finish_review' => ($restudy && $secsLeft === 0 && !$needFiles),
-            'state'           => $state,
+            'completed'    => $completed,
+            'flagged'      => $flagged,
+            'waiting'      => $waiting,
+            'seconds_left' => $secsLeft,
+            'failed_title' => $failedTitle,
+            'failed_quiz'  => $failedQuiz,
+            'missed'       => $missed,
+            'next'         => $next,
+            'state'        => $state,
         ];
     }
 
@@ -1064,7 +1086,7 @@ class SyllabusLogic
         $action = (string)($_POST['action'] ?? '');
 
         try {
-            if (in_array($action, ['mark_finished', 'quiz_start', 'quiz_submit', 'finish_review'], true)) {
+            if (in_array($action, ['mark_finished', 'run_start', 'run_answer', 'run_submit'], true)) {
                 if (!$this->isStudent) $this->fail('Only students can do this.', 403);
                 $this->handleStudentAction($action);
             } else {
@@ -1124,144 +1146,739 @@ class SyllabusLogic
                 );
                 break;
 
-            case 'quiz_start':
-                $quiz = $this->one(
-                    "SELECT z.*, (SELECT COUNT(*) FROM syllabus_questions q WHERE q.quizID = z.quizID) AS qn
-                       FROM syllabus_quizzes z WHERE z.quizID = :q",
-                    [':q' => $this->intParam('quizID')]
-                );
-                if (!$quiz || (int)$quiz['is_published'] !== 1 || (int)$quiz['qn'] < 1) $this->fail('This checkpoint is not available.', 404);
-                $taskID = (int)$quiz['taskID'];
-                $this->studentTask($taskID);
-                $this->recordOpen($taskID);
-
-                $p = $this->progressFor($taskID);
-                if ($p && $p['status'] === 'completed') $this->fail('You have already completed this topic.', 409);
-                if ($p && (int)$p['needs_restudy'] === 1) $this->fail('Study the topic again first. Your retake is locked until you finish the review.', 409);
-
-                if ($quiz['kind'] === 'exam') {
-                    $pa = $this->publishedAssessments($taskID);
-                    if ($pa['quiz'] && !$this->value(
-                        "SELECT 1 FROM syllabus_attempts WHERE quizID = :q AND studentID = :s AND passed = 1 LIMIT 1",
-                        [':q' => $pa['quiz']['quizID'], ':s' => $this->userID]
-                    )) {
-                        $this->fail('Pass the mini quiz before the mock exam.', 409);
-                    }
-                }
-
-                $questions = $this->questionsOf((int)$quiz['quizID'], false);
-                shuffle($questions);
-                if ($quiz['kind'] === 'exam' && $quiz['draw_count'] !== null && (int)$quiz['draw_count'] > 0) {
-                    $questions = array_slice($questions, 0, (int)$quiz['draw_count']);
-                }
-
-                $ids = [];
-                $payload = [];
-                foreach ($questions as $q) {
-                    $ids[] = (int)$q['questionID'];
-                    $ch = $q['choices'];
-                    shuffle($ch);
-                    $payload[] = [
-                        'id'      => (int)$q['questionID'],
-                        'prompt'  => $q['prompt'],
-                        'choices' => array_map(fn($c) => ['id' => (int)$c['choiceID'], 'label' => $c['label']], $ch),
-                    ];
-                }
-                $_SESSION['syl_quiz'][(int)$quiz['quizID']] = ['q' => $ids, 'at' => time()];
-
-                $this->reply(['ok' => true, 'quiz' => [
-                    'id' => (int)$quiz['quizID'], 'title' => $quiz['title'], 'kind' => $quiz['kind'],
-                    'pass_percent' => (int)$quiz['pass_percent'], 'questions' => $payload,
-                ]]);
+            case 'run_start':
+                if ((string)($_POST['type'] ?? '') === 'practice') $this->startPractice(); else $this->startCheckpoint();
                 break;
 
-            case 'quiz_submit':
-                $quizID = $this->intParam('quizID');
-                $served = $_SESSION['syl_quiz'][$quizID] ?? null;
-                if (!$served || empty($served['q'])) $this->fail('Start the quiz first.', 409);
-                $quiz = $this->one("SELECT * FROM syllabus_quizzes WHERE quizID = :q", [':q' => $quizID]);
-                if (!$quiz) $this->fail('This checkpoint is not available.', 404);
-                $taskID = (int)$quiz['taskID'];
-                $this->studentTask($taskID);
+            case 'run_answer':
+                $this->runAnswer();
+                break;
 
-                $answers = json_decode((string)($_POST['answers'] ?? ''), true);
-                if (!is_array($answers)) $answers = [];
+            case 'run_submit':
+                $this->runSubmit();
+                break;
 
-                $correct = 0;
-                $total   = 0;
-                $missed  = [];
-                $review  = [];
-                foreach ($served['q'] as $qid) {
-                    $qrow = $this->one("SELECT prompt FROM syllabus_questions WHERE questionID = :q AND quizID = :z", [':q' => $qid, ':z' => $quizID]);
-                    if (!$qrow) continue;
-                    $right  = $this->one("SELECT choiceID, label FROM syllabus_choices WHERE questionID = :q AND is_correct = 1 ORDER BY choiceID LIMIT 1", [':q' => $qid]);
-                    $picked = (int)($answers[(string)$qid] ?? 0);
-                    $ok     = ($right && (int)$right['choiceID'] === $picked);
-                    $total++;
-                    if ($ok) $correct++; else $missed[] = $qrow['prompt'];
-                    $review[] = ['prompt' => $qrow['prompt'], 'correct' => $right['label'] ?? '', 'ok' => $ok];
+        }
+    }
+
+    /* ---------------------------------------------------------
+       QUIZ RUNNER  (graded checkpoints + ungraded practice)
+
+       Graded modes  (quiz/exam row -> `mode`)
+         standard    all questions on one page, submit at the end
+         instant     one question at a time, right answer + explanation shown straight away
+         timed       simulated exam: countdown, answers locked until submit, no feedback
+         confidence  student rates how sure they are; sure+right earns more, sure+wrong costs points
+         adaptive    next question gets harder after a correct answer, easier after a miss
+         survival    limited lives; a wrong answer costs one
+       Practice modes (never affect completion)
+         study | flash | mistakes | spaced
+       Answers are always checked on the server; the browser never receives the answer key
+       before the student has answered.
+    --------------------------------------------------------- */
+    private const MODES       = ['standard', 'instant', 'timed', 'confidence', 'adaptive', 'survival'];
+    private const BATCH_MODES = ['standard', 'timed', 'confidence'];
+    private const SAVE_MODES  = ['standard', 'instant', 'timed'];   // the modes professors can pick today (the others keep working for old quizzes)
+    private const SRS_SECONDS = [600, 86400, 259200, 604800, 1209600, 2592000];   // box 0..5: 10 min, 1d, 3d, 7d, 14d, 30d
+
+    private function loadQuestion(int $qid): ?array
+    {
+        $q = $this->one(
+            "SELECT questionID, quizID, prompt, explanation, difficulty FROM syllabus_questions WHERE questionID = :q",
+            [':q' => $qid]
+        );
+        if (!$q) return null;
+        $q['choices'] = $this->all(
+            "SELECT choiceID, label, is_correct FROM syllabus_choices WHERE questionID = :q ORDER BY sort_order, choiceID",
+            [':q' => $qid]
+        );
+        return $q;
+    }
+
+    private function correctChoice(array $q): ?array
+    {
+        foreach ($q['choices'] as $c) {
+            if ((int)$c['is_correct'] === 1) return $c;
+        }
+        return null;
+    }
+
+    /** A question as the student's browser may see it (no answer key). */
+    private function publicQuestion(array $q): array
+    {
+        $ch = $q['choices'];
+        shuffle($ch);
+        return [
+            'id'      => (int)$q['questionID'],
+            'prompt'  => $q['prompt'],
+            'choices' => array_map(fn($c) => ['id' => (int)$c['choiceID'], 'label' => $c['label']], $ch),
+        ];
+    }
+
+    /** Remember how the student did on a question (feeds Mistake review + Spaced review). */
+    private function recordAnswer(int $questionID, bool $ok): void
+    {
+        $row = $this->one(
+            "SELECT streak, wrong_count, correct_count, box, mistake_open FROM syllabus_qstate WHERE studentID = :s AND questionID = :q",
+            [':s' => $this->userID, ':q' => $questionID]
+        );
+        $streak = $row ? (int)$row['streak'] : 0;
+        $box    = $row ? (int)$row['box'] : 0;
+        $wrong  = $row ? (int)$row['wrong_count'] : 0;
+        $right  = $row ? (int)$row['correct_count'] : 0;
+        $open   = $row ? (int)$row['mistake_open'] : 0;
+
+        if ($ok) {
+            $streak++;
+            $right++;
+            $box = min(5, $box + 1);
+            if ($open === 1 && $streak >= 2) $open = 0;     // cleared: two correct in a row
+        } else {
+            $streak = 0;
+            $wrong++;
+            $box  = 0;
+            $open = 1;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $due = date('Y-m-d H:i:s', time() + self::SRS_SECONDS[$box]);
+        $this->run(
+            "INSERT INTO syllabus_qstate (studentID, questionID, streak, wrong_count, correct_count, box, due_at, mistake_open, last_seen)
+             VALUES (:s, :q, :st, :w, :c, :b, :d, :m, :n)
+             ON DUPLICATE KEY UPDATE streak = :st2, wrong_count = :w2, correct_count = :c2, box = :b2, due_at = :d2, mistake_open = :m2, last_seen = :n2",
+            [
+                ':s' => $this->userID, ':q' => $questionID, ':st' => $streak, ':w' => $wrong, ':c' => $right, ':b' => $box, ':d' => $due, ':m' => $open, ':n' => $now,
+                ':st2' => $streak, ':w2' => $wrong, ':c2' => $right, ':b2' => $box, ':d2' => $due, ':m2' => $open, ':n2' => $now,
+            ]
+        );
+    }
+
+    /** Question ids a student may practise on this topic (published checkpoints that allow practice). */
+    private function practiceQuestionIds(int $taskID): array
+    {
+        $rows = $this->all(
+            "SELECT q.questionID
+               FROM syllabus_questions q
+               JOIN syllabus_quizzes z ON z.quizID = q.quizID
+              WHERE z.taskID = :t AND z.is_published = 1 AND z.allow_practice = 1
+              ORDER BY q.questionID",
+            [':t' => $taskID]
+        );
+        return array_map('intval', array_column($rows, 'questionID'));
+    }
+
+    /** Numbers shown on the student's Practice buttons. */
+    public function practiceInfo(int $taskID): array
+    {
+        $info = ['pool' => 0, 'review' => 0];
+        $ids  = $this->practiceQuestionIds($taskID);
+        if (!$ids || !$this->isStudent) return $info;
+        $in = implode(',', $ids);   // integers only
+        $info['pool']   = count($ids);
+        $info['review'] = (int)$this->value(
+            "SELECT COUNT(*) FROM syllabus_qstate
+              WHERE studentID = :s AND questionID IN ({$in}) AND (mistake_open = 1 OR due_at <= :n)",
+            [':s' => $this->userID, ':n' => date('Y-m-d H:i:s')]
+        );
+        return $info;
+    }
+
+    private function storeRun(array $run): string
+    {
+        $token = bin2hex(random_bytes(8));
+        $runs  = $_SESSION['syl_run'] ?? [];
+        while (count($runs) >= 6) array_shift($runs);        // keep the session small
+        $runs[$token] = $run;
+        $_SESSION['syl_run'] = $runs;
+        return $token;
+    }
+
+    private function getRun(string $token): array
+    {
+        $run = $_SESSION['syl_run'][$token] ?? null;
+        if (!$run || (int)$run['sid'] !== $this->userID) $this->fail('This session expired. Please start again.', 409);
+        return $run;
+    }
+
+    private function baseRun(string $type, string $mode, int $taskID, int $quizID, int $n): array
+    {
+        return [
+            'sid' => $this->userID, 'type' => $type, 'mode' => $mode, 'taskID' => $taskID, 'quizID' => $quizID,
+            'started' => time(), 'deadline' => null, 'N' => $n, 'lives' => 0,
+            'order' => [], 'diff' => [], 'answers' => [], 'level' => 2, 'path' => [],
+            'streak' => 0, 'best' => 0, 'count' => 0, 'current' => 0,
+        ];
+    }
+
+    private function nextQuestionId(array $run): int
+    {
+        if ($run['mode'] === 'adaptive') {
+            $asked = array_map('intval', array_keys($run['answers']));
+            $want  = (int)$run['level'];
+            foreach ([0, 1, -1, 2, -2] as $d) {            // closest available difficulty
+                $lvl = $want + $d;
+                if ($lvl < 1 || $lvl > 3) continue;
+                $cands = [];
+                foreach ($run['diff'] as $qid => $df) {
+                    if ((int)$df === $lvl && !in_array((int)$qid, $asked, true)) $cands[] = (int)$qid;
                 }
-                unset($_SESSION['syl_quiz'][$quizID]);
+                if ($cands) return $cands[array_rand($cands)];
+            }
+            return 0;
+        }
+        return (int)($run['order'][$run['count']] ?? 0);
+    }
 
-                $pct    = $total > 0 ? (int)round($correct / $total * 100) : 0;
-                $passed = ($pct >= (int)$quiz['pass_percent']);
-                $now    = $this->nowStr();
+    private function startCheckpoint(): void
+    {
+        $quiz = $this->one(
+            "SELECT z.*, (SELECT COUNT(*) FROM syllabus_questions q WHERE q.quizID = z.quizID) AS qn
+               FROM syllabus_quizzes z WHERE z.quizID = :q",
+            [':q' => $this->intParam('quizID')]
+        );
+        if (!$quiz || (int)$quiz['is_published'] !== 1 || (int)$quiz['qn'] < 1) $this->fail('This checkpoint is not available.', 404);
+        $taskID = (int)$quiz['taskID'];
+        $this->studentTask($taskID);
+        $this->recordOpen($taskID);
 
-                $this->run(
-                    "INSERT INTO syllabus_attempts (quizID, studentID, score_pct, correct_count, total_count, passed, answers, submitted_at)
-                     VALUES (:q, :s, :p, :c, :t, :ps, :a, :n)",
-                    [':q' => $quizID, ':s' => $this->userID, ':p' => $pct, ':c' => $correct, ':t' => $total,
-                     ':ps' => $passed ? 1 : 0, ':a' => json_encode($answers), ':n' => $now]
-                );
+        $p = $this->progressFor($taskID);
+        if ($p && $p['status'] === 'completed') $this->fail('You have already completed this topic.', 409);
+        if ($p && (int)$p['needs_restudy'] === 1) {
+            $cool = (int)$this->value("SELECT cooldown_minutes FROM syllabus_quizzes WHERE quizID = :q", [':q' => (int)($p['last_fail_quizID'] ?? 0)]);
+            $left = strtotime($p['last_fail_at'] ?: $this->nowStr()) + $cool * 60 - time();
+            if ($left > 0) $this->fail('Review the lesson first. You can retake in ' . (int)ceil($left / 60) . ' minute(s).', 409);
+            // the wait is over: the retake is open again
+            $this->run("UPDATE syllabus_progress SET needs_restudy = 0 WHERE studentID = :s AND taskID = :t", [':s' => $this->userID, ':t' => $taskID]);
+        }
 
-                $completed = false;
-                if ($passed) {
-                    $pa = $this->publishedAssessments($taskID);
-                    $required = $pa['exam'] ? 'exam' : ($pa['quiz'] ? 'quiz' : null);
-                    if ($required === $quiz['kind']) {
-                        $this->run(
-                            "UPDATE syllabus_progress SET status = 'completed', completed_at = :n, needs_restudy = 0
-                              WHERE studentID = :s AND taskID = :t",
-                            [':n' => $now, ':s' => $this->userID, ':t' => $taskID]
-                        );
-                        $completed = true;
-                    }
+        if ($quiz['kind'] === 'exam') {
+            $pa = $this->publishedAssessments($taskID);
+            if ($pa['quiz'] && !$this->value(
+                "SELECT 1 FROM syllabus_attempts WHERE quizID = :q AND studentID = :s AND passed = 1 LIMIT 1",
+                [':q' => $pa['quiz']['quizID'], ':s' => $this->userID]
+            )) {
+                $this->fail('Pass the mini quiz before the mock exam.', 409);
+            }
+        }
+
+        $mode = in_array($quiz['mode'], self::MODES, true) ? $quiz['mode'] : 'standard';
+        $rows = $this->all("SELECT questionID, difficulty FROM syllabus_questions WHERE quizID = :q ORDER BY questionID", [':q' => $quiz['quizID']]);
+        shuffle($rows);
+        $count = count($rows);
+        $limit = $quiz['draw_count'] ? (int)$quiz['draw_count'] : ($mode === 'adaptive' ? 10 : $count);
+        $limit = max(1, min($limit, $count));
+
+        $run = $this->baseRun('checkpoint', $mode, $taskID, (int)$quiz['quizID'], $limit);
+        $out = [
+            'ok' => true, 'mode' => $mode, 'title' => $quiz['title'], 'kind' => $quiz['kind'],
+            'pass_percent' => (int)$quiz['pass_percent'], 'total' => $limit,
+        ];
+
+        if ($mode === 'adaptive') {
+            foreach ($rows as $r) $run['diff'][(int)$r['questionID']] = (int)$r['difficulty'];
+        } else {
+            $run['order'] = array_map(fn($r) => (int)$r['questionID'], array_slice($rows, 0, $limit));
+        }
+        if ($mode === 'survival') {
+            $run['lives'] = max(1, (int)$quiz['lives']);
+            $out['lives'] = $run['lives'];
+        }
+        if ($mode === 'timed') {
+            $minutes = $quiz['time_limit_minutes'] ? (int)$quiz['time_limit_minutes'] : 20;
+            $run['deadline']   = time() + $minutes * 60;
+            $out['time_limit'] = $minutes * 60;
+        }
+
+        if (in_array($mode, self::BATCH_MODES, true)) {
+            $questions = [];
+            foreach ($run['order'] as $qid) {
+                $q = $this->loadQuestion((int)$qid);
+                if ($q) $questions[] = $this->publicQuestion($q);
+            }
+            $out['batch']     = true;
+            $out['questions'] = $questions;
+            $out['run']       = $this->storeRun($run);
+        } else {
+            $run['current'] = $this->nextQuestionId($run);
+            $first = $run['current'] ? $this->loadQuestion($run['current']) : null;
+            if (!$first) $this->fail('This checkpoint is not available.', 404);
+            $out['batch'] = false;
+            $out['first'] = $this->publicQuestion($first);
+            $out['run']   = $this->storeRun($run);
+        }
+        $this->reply($out);
+    }
+
+    private function startPractice(): void
+    {
+        $taskID = $this->intParam('taskID');
+        $this->studentTask($taskID);
+        $this->recordOpen($taskID);
+
+        $mode = (string)($_POST['mode'] ?? 'study');
+        if (!in_array($mode, ['study', 'flash', 'review'], true)) $this->fail('Unknown practice mode.');
+
+        $ids = $this->practiceQuestionIds($taskID);
+        if (!$ids) $this->fail('There are no practice questions for this topic yet.', 404);
+        $in = implode(',', $ids);   // integers only
+
+        if ($mode === 'review') {   // questions missed before + questions that are due to come back
+            $ids = array_map('intval', array_column($this->all(
+                "SELECT questionID FROM syllabus_qstate
+                  WHERE studentID = :s AND questionID IN ({$in}) AND (mistake_open = 1 OR due_at <= :n)",
+                [':s' => $this->userID, ':n' => date('Y-m-d H:i:s')]
+            ), 'questionID'));
+            if (!$ids) $this->fail('Nothing to review right now. Nice work!', 409);
+        }
+
+        shuffle($ids);
+        $ids = array_slice($ids, 0, $mode === 'review' ? 10 : 20);
+
+        $run = $this->baseRun('practice', $mode, $taskID, 0, count($ids));
+        $run['order']   = $ids;
+        $run['current'] = $ids[0];
+        $first = $this->loadQuestion($run['current']);
+        if (!$first) $this->fail('Question not found.', 404);
+
+        $this->reply([
+            'ok' => true, 'batch' => false, 'mode' => $mode, 'total' => count($ids),
+            'first' => $this->publicQuestion($first), 'run' => $this->storeRun($run),
+        ]);
+    }
+
+    /** One answer in a step-by-step run (instant / adaptive / survival / all practice modes). */
+    private function runAnswer(): void
+    {
+        $token = (string)($_POST['run'] ?? '');
+        $run   = $this->getRun($token);
+        if (in_array($run['mode'], self::BATCH_MODES, true)) $this->fail('Submit the whole attempt at once.', 409);
+
+        $qid = $this->intParam('questionID');
+        if ($qid !== (int)$run['current']) $this->fail('Unexpected question. Please start again.', 409);
+        $q = $this->loadQuestion($qid);
+        if (!$q) $this->fail('Question not found.', 404);
+
+        $right  = $this->correctChoice($q);
+        $picked = $this->intParam('choiceID');                       // 0 = "I don't know"
+        $ok     = ($right && (int)$right['choiceID'] === $picked);
+        $this->recordAnswer($qid, $ok);
+
+        $run['answers'][$qid] = ['ok' => $ok];
+        $run['count']++;
+        if ($ok) { $run['streak']++; $run['best'] = max($run['best'], $run['streak']); } else { $run['streak'] = 0; }
+        if ($run['mode'] === 'survival' && !$ok) $run['lives']--;
+        if ($run['mode'] === 'adaptive') {
+            $run['path'][] = (int)$run['level'];
+            $run['level']  = $ok ? min(3, $run['level'] + 1) : max(1, $run['level'] - 1);
+        }
+
+        $fb = ['ok' => true, 'correct' => $ok, 'lives' => (int)$run['lives']];
+        if ($run['type'] === 'practice' || $run['mode'] === 'instant') {      // full feedback only where the mode promises it
+            $fb['correct_label'] = $right['label'] ?? '';
+            $fb['explanation']   = $q['explanation'] ?? '';
+        }
+        if ($run['mode'] === 'adaptive') $fb['level'] = (int)$run['level'];
+
+        $finished = ($run['count'] >= $run['N']) || ($run['mode'] === 'survival' && $run['lives'] <= 0);
+        if (!$finished) {
+            $next = $this->nextQuestionId($run);
+            if ($next === 0) {
+                $finished = true;
+            } else {
+                $nq = $this->loadQuestion($next);
+                if (!$nq) $finished = true;
+                else {
+                    $run['current'] = $next;
+                    $fb['next']  = $this->publicQuestion($nq);
+                    $fb['index'] = $run['count'] + 1;
+                }
+            }
+        }
+
+        if ($finished) {
+            unset($_SESSION['syl_run'][$token]);
+            if ($run['type'] === 'checkpoint') {
+                $fb['result'] = $this->finishCheckpoint($run);
+            } else {
+                $good = 0;
+                foreach ($run['answers'] as $a) { if (!empty($a['ok'])) $good++; }
+                $fb['summary'] = ['correct' => $good, 'total' => $run['count'], 'mode' => $run['mode']];
+            }
+        } else {
+            $_SESSION['syl_run'][$token] = $run;
+        }
+        $this->reply($fb);
+    }
+
+    /** Whole-attempt submit for standard / timed / confidence. */
+    private function runSubmit(): void
+    {
+        $token = (string)($_POST['run'] ?? '');
+        $run   = $this->getRun($token);
+        if ($run['type'] !== 'checkpoint' || !in_array($run['mode'], self::BATCH_MODES, true)) $this->fail('Unexpected submit.', 409);
+
+        $answers = json_decode((string)($_POST['answers'] ?? ''), true);
+        $confs   = json_decode((string)($_POST['conf'] ?? ''), true);
+        if (!is_array($answers)) $answers = [];
+        if (!is_array($confs))   $confs = [];
+
+        $timedOut = ($run['deadline'] !== null && time() > $run['deadline'] + 20);   // 20 s grace for slow networks
+        $levels   = ['low', 'med', 'high'];
+
+        if ($run['mode'] === 'confidence' && !$timedOut) {
+            foreach ($run['order'] as $qid) {
+                $picked = (int)($answers[(string)$qid] ?? 0);
+                if ($picked > 0 && !in_array((string)($confs[(string)$qid] ?? ''), $levels, true)) {
+                    $this->fail('Tell us how sure you are for every question.', 400);
+                }
+            }
+        }
+
+        $run['answers'] = [];
+        foreach ($run['order'] as $qid) {
+            $q = $this->loadQuestion((int)$qid);
+            if (!$q) continue;
+            $right  = $this->correctChoice($q);
+            $picked = $timedOut ? 0 : (int)($answers[(string)$qid] ?? 0);
+            $ok     = ($right && (int)$right['choiceID'] === $picked);
+            $conf   = (string)($confs[(string)$qid] ?? 'med');
+            if (!in_array($conf, $levels, true)) $conf = 'med';
+            $this->recordAnswer((int)$qid, $ok);
+            $run['answers'][(int)$qid] = ['ok' => $ok, 'conf' => $conf];
+        }
+
+        unset($_SESSION['syl_run'][$token]);
+        $res = $this->finishCheckpoint($run);
+        if ($timedOut) $res['notes'][] = 'Time ran out, so this attempt was marked as not passed.';
+        $this->reply($res);
+    }
+
+    /** Scores a finished graded attempt, saves it, and updates the student's progress. */
+    private function finishCheckpoint(array $run): array
+    {
+        $quizID  = (int)$run['quizID'];
+        $taskID  = (int)$run['taskID'];
+        $quiz    = $this->one("SELECT * FROM syllabus_quizzes WHERE quizID = :q", [':q' => $quizID]);
+        $mode    = $run['mode'];
+        $planned = max(1, (int)$run['N']);
+        $answers = $run['answers'];
+
+        $correct = 0;
+        foreach ($answers as $a) { if (!empty($a['ok'])) $correct++; }
+        $score   = (int)round($correct / $planned * 100);
+        $notes   = [];
+        $details = ['mode' => $mode];
+
+        if ($mode === 'confidence') {
+            $pts = 0; $hiWrong = 0; $loRight = 0;
+            foreach ($answers as $a) {
+                $c = $a['conf'] ?? 'med';
+                if (!empty($a['ok'])) {
+                    $pts += ['low' => 1, 'med' => 2, 'high' => 3][$c] ?? 2;
+                    if ($c === 'low') $loRight++;
                 } else {
+                    $pts += ['low' => 0, 'med' => -2, 'high' => -6][$c] ?? -2;
+                    if ($c === 'high') $hiWrong++;
+                }
+            }
+            $score = (int)round(max(0, $pts) / (3 * $planned) * 100);
+            $details += ['points' => $pts, 'high_wrong' => $hiWrong, 'low_right' => $loRight];
+            $notes[] = $correct . ' of ' . $planned . ' answers were correct. Confidence score: ' . $score . '%.';
+            if ($hiWrong > 0) $notes[] = 'You were very sure but wrong on ' . $hiWrong . ' question' . ($hiWrong === 1 ? '' : 's') . '. Those cost the most points.';
+            if ($loRight > 0) $notes[] = 'You got ' . $loRight . ' right while unsure. Trust what you know.';
+        } elseif ($mode === 'adaptive') {
+            $pts = 0;
+            foreach ($answers as $qid => $a) { if (!empty($a['ok'])) $pts += (int)($run['diff'][$qid] ?? 2); }
+            $score = (int)round($pts / (3 * $planned) * 100);
+            $names = [1 => 'Easy', 2 => 'Medium', 3 => 'Hard'];
+            $details += ['final_level' => (int)$run['level'], 'path' => $run['path']];
+            $notes[] = 'You finished at the ' . $names[(int)$run['level']] . ' level. Harder questions are worth more points.';
+        } elseif ($mode === 'survival') {
+            $details += ['lives_left' => (int)$run['lives'], 'best_streak' => (int)$run['best']];
+            if ($run['lives'] <= 0) $notes[] = 'You ran out of lives after ' . count($answers) . ' answer' . (count($answers) === 1 ? '' : 's') . '.';
+            else                    $notes[] = 'You made it to the end with ' . (int)$run['lives'] . ' life' . ($run['lives'] === 1 ? '' : 's') . ' left.';
+            $notes[] = 'Longest streak: ' . (int)$run['best'] . ' in a row.';
+        } elseif ($mode === 'timed') {
+            $details['seconds'] = time() - (int)$run['started'];
+        }
+
+        $score  = max(0, min(100, $score));
+        $passed = ($score >= (int)$quiz['pass_percent']);
+        if ($mode === 'survival' && $run['lives'] <= 0) $passed = false;
+        $now = $this->nowStr();
+
+        $this->run(
+            "INSERT INTO syllabus_attempts (quizID, studentID, score_pct, correct_count, total_count, passed, answers, submitted_at, mode, details)
+             VALUES (:q, :s, :p, :c, :t, :ps, :a, :n, :m, :d)",
+            [
+                ':q' => $quizID, ':s' => $this->userID, ':p' => $score, ':c' => $correct, ':t' => $planned,
+                ':ps' => $passed ? 1 : 0, ':a' => json_encode($answers), ':n' => $now, ':m' => $mode, ':d' => json_encode($details),
+            ]
+        );
+
+        $completed = false;
+        if ($passed) {
+            $pa = $this->publishedAssessments($taskID);
+            $required = $pa['exam'] ? 'exam' : ($pa['quiz'] ? 'quiz' : null);
+            if ($required === $quiz['kind']) {
+                $this->run(
+                    "UPDATE syllabus_progress SET status = 'completed', completed_at = :n, needs_restudy = 0
+                      WHERE studentID = :s AND taskID = :t",
+                    [':n' => $now, ':s' => $this->userID, ':t' => $taskID]
+                );
+                $completed = true;
+            }
+        } else {
+            $this->run(
+                "UPDATE syllabus_progress SET needs_restudy = 1, last_fail_at = :n, last_fail_quizID = :q, restudy_hits = 0
+                  WHERE studentID = :s AND taskID = :t AND status <> 'completed'",
+                [':n' => $now, ':q' => $quizID, ':s' => $this->userID, ':t' => $taskID]
+            );
+        }
+
+        $missed = [];
+        $review = [];
+        foreach ($answers as $qid => $a) {
+            $q = $this->loadQuestion((int)$qid);
+            if (!$q) continue;
+            $right = $this->correctChoice($q);
+            if (empty($a['ok'])) $missed[] = $q['prompt'];
+            $review[] = ['prompt' => $q['prompt'], 'correct' => $right['label'] ?? '', 'explanation' => $q['explanation'] ?? '', 'ok' => !empty($a['ok'])];
+        }
+
+        return [
+            'ok' => true, 'passed' => $passed, 'score' => $score, 'correct' => $correct, 'total' => $planned,
+            'pass_percent' => (int)$quiz['pass_percent'], 'completed' => $completed, 'kind' => $quiz['kind'],
+            'mode' => $mode, 'cooldown' => (int)$quiz['cooldown_minutes'], 'notes' => $notes,
+            'missed' => $passed ? [] : $missed,
+            'review' => $passed ? $review : [],
+        ];
+    }
+
+    /* ---------------------------------------------------------
+       COPY A SYLLABUS FROM ANOTHER CLASS
+       Dates are never copied. Quizzes arrive as drafts.
+    --------------------------------------------------------- */
+    /** number of topics per class, for the "copy from another class" list */
+    public function topicCounts(array $schedIDs): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $schedIDs)));
+        if (!$ids) return [];
+        $in  = implode(',', $ids);   // integers only
+        $out = [];
+        foreach ($this->all(
+            "SELECT m.schedID, COUNT(t.taskID) AS n
+               FROM syllabus_modules m
+               LEFT JOIN syllabus_tasks t ON t.moduleID = m.moduleID
+              WHERE m.schedID IN ({$in})
+              GROUP BY m.schedID"
+        ) as $r) {
+            $out[(int)$r['schedID']] = (int)$r['n'];
+        }
+        return $out;
+    }
+
+    /** Duplicates an uploaded file under a new random name. Returns the new stored name, or null. */
+    private function copyStored(string $stored, array &$created): ?string
+    {
+        if (!preg_match(self::STORED_RE, $stored)) return null;
+        $dir = self::ensureStorage();
+        $src = $dir . '/' . $stored;
+        if (!is_file($src)) return null;
+        $ext = strtolower(pathinfo($stored, PATHINFO_EXTENSION));
+        $new = bin2hex(random_bytes(16)) . '.' . $ext;
+        if (!@copy($src, $dir . '/' . $new)) return null;
+        $created[] = $new;
+        return $new;
+    }
+
+    private function copyClass(int $source, int $target, bool $pages, bool $files, bool $quizzes): void
+    {
+        @set_time_limit(0);                     // big videos can take a while to duplicate
+        $created = [];                          // files we made, removed again if anything fails
+        $this->pdo->beginTransaction();
+        try {
+            $base = (int)$this->value("SELECT COALESCE(MAX(sort_order), 0) FROM syllabus_modules WHERE schedID = :s", [':s' => $target]);
+            $mods = $this->all("SELECT moduleID, title FROM syllabus_modules WHERE schedID = :s ORDER BY sort_order, moduleID", [':s' => $source]);
+
+            foreach ($mods as $i => $m) {
+                $this->run("INSERT INTO syllabus_modules (schedID, title, sort_order) VALUES (:s, :t, :o)", [':s' => $target, ':t' => $m['title'], ':o' => $base + $i + 1]);
+                $newMod = (int)$this->pdo->lastInsertId();
+
+                $tasks = $this->all("SELECT taskID, title, week_no, sort_order FROM syllabus_tasks WHERE moduleID = :m ORDER BY sort_order, taskID", [':m' => $m['moduleID']]);
+                foreach ($tasks as $t) {
                     $this->run(
-                        "UPDATE syllabus_progress SET needs_restudy = 1, last_fail_at = :n, last_fail_quizID = :q, restudy_hits = 0
-                          WHERE studentID = :s AND taskID = :t AND status <> 'completed'",
-                        [':n' => $now, ':q' => $quizID, ':s' => $this->userID, ':t' => $taskID]
+                        "INSERT INTO syllabus_tasks (moduleID, title, week_no, sort_order) VALUES (:m, :t, :w, :o)",
+                        [':m' => $newMod, ':t' => $t['title'], ':w' => $t['week_no'], ':o' => $t['sort_order']]
+                    );
+                    $newTask = (int)$this->pdo->lastInsertId();
+                    $oldTask = (int)$t['taskID'];
+
+                    if ($pages)   $this->copyPage($oldTask, $newTask, $created);
+                    if ($files)   $this->copyContents($oldTask, $newTask, $created);
+                    if ($quizzes) $this->copyQuizzes($oldTask, $newTask);
+                }
+            }
+            $this->pdo->commit();
+        } catch (PDOException $ex) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            $this->removeFiles($created);
+            throw $ex;
+        }
+    }
+
+    private function copyPage(int $oldTask, int $newTask, array &$created): void
+    {
+        $page = $this->one("SELECT html, delta FROM syllabus_pages WHERE taskID = :t", [':t' => $oldTask]);
+        if (!$page || (trim((string)$page['html']) === '' && trim((string)$page['delta']) === '')) return;
+
+        // pictures inside the lesson: copy them and point the copied lesson at the new copies
+        $map = [];
+        foreach ($this->all(
+            "SELECT imageID, stored_name, file_name, mime_type, file_size FROM syllabus_images WHERE taskID = :t",
+            [':t' => $oldTask]
+        ) as $img) {
+            $stored = $this->copyStored((string)$img['stored_name'], $created);
+            if ($stored === null) continue;
+            $this->run(
+                "INSERT INTO syllabus_images (taskID, stored_name, file_name, mime_type, file_size, uploaded_by) VALUES (:t, :s, :n, :m, :z, :u)",
+                [':t' => $newTask, ':s' => $stored, ':n' => $img['file_name'], ':m' => $img['mime_type'], ':z' => $img['file_size'], ':u' => $this->userID]
+            );
+            $map[(int)$img['imageID']] = (int)$this->pdo->lastInsertId();
+        }
+        $rewrite = function ($text) use ($map) {
+            return preg_replace_callback('/syllabus-file\?image=(\d+)/', function ($m) use ($map) {
+                return 'syllabus-file?image=' . ($map[(int)$m[1]] ?? $m[1]);
+            }, (string)$text);
+        };
+        $this->run(
+            "INSERT INTO syllabus_pages (taskID, html, delta, updated_by) VALUES (:t, :h, :d, :u)",
+            [':t' => $newTask, ':h' => $rewrite($page['html']), ':d' => $rewrite($page['delta']), ':u' => $this->userID]
+        );
+    }
+
+    private function copyContents(int $oldTask, int $newTask, array &$created): void
+    {
+        foreach ($this->all(
+            "SELECT kind, title, description, body, file_name, stored_name, mime_type, file_size, is_published, sort_order
+               FROM syllabus_contents WHERE taskID = :t ORDER BY sort_order, contentID",
+            [':t' => $oldTask]
+        ) as $c) {
+            $stored = null;
+            if (!empty($c['stored_name'])) {
+                $stored = $this->copyStored((string)$c['stored_name'], $created);
+                if ($stored === null) continue;      // the original file is missing: skip it
+            }
+            $this->run(
+                "INSERT INTO syllabus_contents (taskID, kind, title, description, body, file_name, stored_name, mime_type, file_size, is_published, sort_order, uploaded_by)
+                 VALUES (:t, :k, :ti, :d, :b, :fn, :sn, :mt, :fs, :p, :o, :u)",
+                [
+                    ':t' => $newTask, ':k' => $c['kind'], ':ti' => $c['title'], ':d' => $c['description'], ':b' => $c['body'],
+                    ':fn' => $c['file_name'], ':sn' => $stored, ':mt' => $c['mime_type'], ':fs' => $c['file_size'],
+                    ':p' => $c['is_published'], ':o' => $c['sort_order'], ':u' => $this->userID,
+                ]
+            );
+        }
+    }
+
+    private function copyQuizzes(int $oldTask, int $newTask): void
+    {
+        foreach ($this->all(
+            "SELECT quizID, kind, mode, title, pass_percent, cooldown_minutes, draw_count, time_limit_minutes, lives, allow_practice
+               FROM syllabus_quizzes WHERE taskID = :t",
+            [':t' => $oldTask]
+        ) as $z) {
+            $this->run(
+                "INSERT INTO syllabus_quizzes (taskID, kind, mode, title, pass_percent, cooldown_minutes, draw_count, time_limit_minutes, lives, allow_practice, is_published)
+                 VALUES (:t, :k, :m, :ti, :p, :c, :d, :tl, :lv, :ap, 0)",
+                [
+                    ':t' => $newTask, ':k' => $z['kind'], ':m' => $z['mode'], ':ti' => $z['title'], ':p' => $z['pass_percent'],
+                    ':c' => $z['cooldown_minutes'], ':d' => $z['draw_count'], ':tl' => $z['time_limit_minutes'],
+                    ':lv' => $z['lives'], ':ap' => $z['allow_practice'],
+                ]
+            );
+            $newQuiz = (int)$this->pdo->lastInsertId();
+
+            foreach ($this->all(
+                "SELECT questionID, prompt, explanation, difficulty, sort_order FROM syllabus_questions WHERE quizID = :q ORDER BY sort_order, questionID",
+                [':q' => $z['quizID']]
+            ) as $q) {
+                $this->run(
+                    "INSERT INTO syllabus_questions (quizID, prompt, explanation, difficulty, sort_order) VALUES (:z, :p, :e, :d, :o)",
+                    [':z' => $newQuiz, ':p' => $q['prompt'], ':e' => $q['explanation'], ':d' => $q['difficulty'], ':o' => $q['sort_order']]
+                );
+                $newQ = (int)$this->pdo->lastInsertId();
+                foreach ($this->all(
+                    "SELECT label, is_correct, sort_order FROM syllabus_choices WHERE questionID = :q ORDER BY sort_order, choiceID",
+                    [':q' => $q['questionID']]
+                ) as $c) {
+                    $this->run(
+                        "INSERT INTO syllabus_choices (questionID, label, is_correct, sort_order) VALUES (:q, :l, :c, :o)",
+                        [':q' => $newQ, ':l' => $c['label'], ':c' => $c['is_correct'], ':o' => $c['sort_order']]
                     );
                 }
-
-                $this->reply([
-                    'ok' => true, 'passed' => $passed, 'score' => $pct, 'correct' => $correct, 'total' => $total,
-                    'pass_percent' => (int)$quiz['pass_percent'], 'completed' => $completed, 'kind' => $quiz['kind'],
-                    'cooldown' => (int)$quiz['cooldown_minutes'],
-                    'missed' => $passed ? [] : $missed,
-                    'review' => $passed ? $review : [],
-                ]);
-                break;
-
-            case 'finish_review':
-                $taskID = $this->intParam('taskID');
-                $this->studentTask($taskID);
-                $p = $this->progressFor($taskID);
-                if (!$p || (int)$p['needs_restudy'] !== 1 || $p['status'] === 'completed') $this->fail('There is nothing to review right now.', 409);
-
-                $cool = (int)$this->value("SELECT cooldown_minutes FROM syllabus_quizzes WHERE quizID = :q", [':q' => (int)($p['last_fail_quizID'] ?? 0)]);
-                $left = strtotime($p['last_fail_at'] ?: $this->nowStr()) + $cool * 60 - time();
-                if ($left > 0) $this->fail('Keep studying. You can retake in ' . (int)ceil($left / 60) . ' minute(s).', 409);
-
-                $hasFiles = (int)$this->value(
-                    "SELECT COUNT(*) FROM syllabus_contents WHERE taskID = :t AND is_published = 1 AND kind IN ('pdf','video')",
-                    [':t' => $taskID]
-                ) > 0;
-                if ($hasFiles && (int)$p['restudy_hits'] < 1) $this->fail('Open at least one learning material (PDF or video) again before retaking.', 409);
-
-                $this->run("UPDATE syllabus_progress SET needs_restudy = 0 WHERE studentID = :s AND taskID = :t", [':s' => $this->userID, ':t' => $taskID]);
-                break;
+            }
         }
+    }
+
+    /* ---------------------------------------------------------
+       FACULTY INSIGHTS: who needs help, which questions are hardest
+    --------------------------------------------------------- */
+    private function needsHelp(int $schedID, array $roster, array $stu, int $openTopics): array
+    {
+        $reasons = [];
+        foreach ($this->all(
+            "SELECT a.studentID, z.title, COUNT(*) AS tries, SUM(a.passed) AS passes
+               FROM syllabus_attempts a
+               JOIN syllabus_quizzes z ON z.quizID = a.quizID
+               JOIN syllabus_tasks t ON t.taskID = z.taskID
+               JOIN syllabus_modules m ON m.moduleID = t.moduleID
+              WHERE m.schedID = :s
+              GROUP BY a.studentID, a.quizID, z.title",
+            [':s' => $schedID]
+        ) as $r) {
+            if ((int)$r['passes'] === 0 && (int)$r['tries'] >= 2) {
+                $reasons[(int)$r['studentID']][] = 'Failed "' . $r['title'] . '" ' . (int)$r['tries'] . ' times';
+            }
+        }
+
+        $weekAgo = time() - 7 * 86400;
+        $out = [];
+        foreach ($roster as $r) {
+            $sid  = (int)$r['studentID'];
+            $list = $reasons[$sid] ?? [];
+            if ($openTopics > 0) {
+                $last = $stu[$sid]['last'] ?? null;
+                if ($last === null)                         $list[] = "Hasn't opened any topic yet";
+                elseif (strtotime($last) < $weekAgo)        $list[] = 'No activity in 7+ days';
+            }
+            if ($list) $out[] = ['name' => $r['name'], 'reasons' => $list];
+        }
+        usort($out, fn($a, $b) => count($b['reasons']) <=> count($a['reasons']));
+        return array_slice($out, 0, 8);
+    }
+
+    private function hardQuestions(int $schedID): array
+    {
+        $rows = $this->all(
+            "SELECT q.prompt, SUM(s.wrong_count) AS wrong, SUM(s.wrong_count + s.correct_count) AS total
+               FROM syllabus_qstate s
+               JOIN syllabus_questions q ON q.questionID = s.questionID
+               JOIN syllabus_quizzes z ON z.quizID = q.quizID
+               JOIN syllabus_tasks t ON t.taskID = z.taskID
+               JOIN syllabus_modules m ON m.moduleID = t.moduleID
+              WHERE m.schedID = :s
+              GROUP BY q.questionID, q.prompt
+             HAVING SUM(s.wrong_count + s.correct_count) >= 3 AND SUM(s.wrong_count) > 0
+              ORDER BY SUM(s.wrong_count) / SUM(s.wrong_count + s.correct_count) DESC, SUM(s.wrong_count) DESC
+              LIMIT 3",
+            [':s' => $schedID]
+        );
+        foreach ($rows as &$r) {
+            $r['rate'] = (int)round((int)$r['wrong'] / max(1, (int)$r['total']) * 100);
+        }
+        unset($r);
+        return $rows;
     }
 
     /* ---------------- faculty actions ---------------- */
@@ -1365,6 +1982,7 @@ class SyllabusLogic
                 $this->requireCanManageTask($taskID);
                 $kind = (string)($_POST['kind'] ?? '');
                 if (!in_array($kind, self::KINDS, true)) $this->fail('Choose a content type.');
+                if ($kind === 'note') $this->fail('Write notes in the lesson editor instead.');
                 $title = $this->titleParam('title', 200);
                 $desc  = $this->optionalText('description', 500);
                 $body  = null;
@@ -1482,21 +2100,31 @@ class SyllabusLogic
                 $this->requireCanManageTask($taskID);
                 $kind = (string)($_POST['kind'] ?? '');
                 if (!in_array($kind, self::QUIZ_KINDS, true)) $this->fail('Choose quiz or exam.');
-                $title = $this->optionalText('title', 200) ?? ($kind === 'exam' ? 'Mock exam' : 'Mini quiz');
+                $mode    = (string)($_POST['mode'] ?? 'standard');
+                $oldMode = (string)$this->value("SELECT mode FROM syllabus_quizzes WHERE taskID = :t AND kind = :k", [':t' => $taskID, ':k' => $kind]);
+                if (!in_array($mode, self::SAVE_MODES, true) && $mode !== $oldMode) $this->fail('Choose how this checkpoint is run.');
+                if (!in_array($mode, self::MODES, true)) $this->fail('Choose how this checkpoint is run.');
+                $title = $this->optionalText('title', 200) ?? ($kind === 'exam' ? 'Mock exam' : 'Quiz');
                 $pass  = $this->intRangeParam('pass_percent', 1, 100, 70);
-                $cool  = $this->intRangeParam('cooldown_minutes', 0, 1440, 5);
+                $cool  = $this->intRangeParam('cooldown_minutes', 0, 1440, 2);
                 $draw  = null;
-                if ($kind === 'exam' && trim((string)($_POST['draw_count'] ?? '')) !== '') {
+                if (trim((string)($_POST['draw_count'] ?? '')) !== '') {
                     $draw = $this->intRangeParam('draw_count', 1, 500, 1);
                 }
-                $pub = (($_POST['published'] ?? '') === '1') ? 1 : 0;
+                $limit = ($mode === 'timed') ? $this->intRangeParam('time_limit_minutes', 1, 300, 20) : null;
+                $lives = ($mode === 'survival') ? $this->intRangeParam('lives', 1, 10, 3) : 3;
+                $prac  = (($_POST['allow_practice'] ?? '') === '1') ? 1 : 0;
+                $pub   = (($_POST['published'] ?? '') === '1') ? 1 : 0;
                 $this->run(
-                    "INSERT INTO syllabus_quizzes (taskID, kind, title, pass_percent, cooldown_minutes, draw_count, is_published)
-                     VALUES (:t, :k, :ti, :p, :c, :d, :u)
-                     ON DUPLICATE KEY UPDATE title = :ti2, pass_percent = :p2, cooldown_minutes = :c2, draw_count = :d2, is_published = :u2",
+                    "INSERT INTO syllabus_quizzes (taskID, kind, mode, title, pass_percent, cooldown_minutes, draw_count, time_limit_minutes, lives, allow_practice, is_published)
+                     VALUES (:t, :k, :m, :ti, :p, :c, :d, :tl, :lv, :ap, :u)
+                     ON DUPLICATE KEY UPDATE mode = :m2, title = :ti2, pass_percent = :p2, cooldown_minutes = :c2, draw_count = :d2,
+                                             time_limit_minutes = :tl2, lives = :lv2, allow_practice = :ap2, is_published = :u2",
                     [
-                        ':t' => $taskID, ':k' => $kind, ':ti' => $title, ':p' => $pass, ':c' => $cool, ':d' => $draw, ':u' => $pub,
-                        ':ti2' => $title, ':p2' => $pass, ':c2' => $cool, ':d2' => $draw, ':u2' => $pub,
+                        ':t' => $taskID, ':k' => $kind, ':m' => $mode, ':ti' => $title, ':p' => $pass, ':c' => $cool, ':d' => $draw,
+                        ':tl' => $limit, ':lv' => $lives, ':ap' => $prac, ':u' => $pub,
+                        ':m2' => $mode, ':ti2' => $title, ':p2' => $pass, ':c2' => $cool, ':d2' => $draw,
+                        ':tl2' => $limit, ':lv2' => $lives, ':ap2' => $prac, ':u2' => $pub,
                     ]
                 );
                 break;
@@ -1523,17 +2151,19 @@ class SyllabusLogic
                 }
                 $correct = (int)($_POST['correct'] ?? -1);
                 if ($correct < 0 || $correct >= count($choices)) $this->fail('Mark which choice is the correct one.');
+                $explain = $this->optionalText('explanation', 1500, true);
+                $diff    = $this->intRangeParam('difficulty', 1, 3, 2);
 
                 if ($qid > 0 && !$this->value("SELECT 1 FROM syllabus_questions WHERE questionID = :q AND quizID = :z", [':q' => $qid, ':z' => $quiz['quizID']])) {
                     $this->fail('Question not found.', 404);
                 }
                 $this->pdo->beginTransaction();
                 if ($qid > 0) {
-                    $this->run("UPDATE syllabus_questions SET prompt = :p WHERE questionID = :q", [':p' => $prompt, ':q' => $qid]);
+                    $this->run("UPDATE syllabus_questions SET prompt = :p, explanation = :e, difficulty = :d WHERE questionID = :q", [':p' => $prompt, ':e' => $explain, ':d' => $diff, ':q' => $qid]);
                     $this->run("DELETE FROM syllabus_choices WHERE questionID = :q", [':q' => $qid]);
                 } else {
                     $next = (int)$this->value("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM syllabus_questions WHERE quizID = :z", [':z' => $quiz['quizID']]);
-                    $this->run("INSERT INTO syllabus_questions (quizID, prompt, sort_order) VALUES (:z, :p, :o)", [':z' => $quiz['quizID'], ':p' => $prompt, ':o' => $next]);
+                    $this->run("INSERT INTO syllabus_questions (quizID, prompt, explanation, difficulty, sort_order) VALUES (:z, :p, :e, :d, :o)", [':z' => $quiz['quizID'], ':p' => $prompt, ':e' => $explain, ':d' => $diff, ':o' => $next]);
                     $qid = (int)$this->pdo->lastInsertId();
                 }
                 foreach ($choices as $i => $label) {
@@ -1552,6 +2182,88 @@ class SyllabusLogic
                 $this->pdo->beginTransaction();
                 $this->run("DELETE FROM syllabus_choices WHERE questionID = :q", [':q' => $qid]);
                 $this->run("DELETE FROM syllabus_questions WHERE questionID = :q", [':q' => $qid]);
+                $this->pdo->commit();
+                break;
+
+            /* ----- copy a syllabus from another class ----- */
+            case 'copy_class':
+                $target = $this->intParam('targetSched');
+                $source = $this->intParam('sourceSched');
+                if ($target === $source) $this->fail('Choose a different class to copy from.');
+                if (!$this->canManageSched($target)) $this->fail('You cannot edit this class.', 403);
+                if (!$this->canManageSched($source)) $this->fail('You can only copy from a class you manage.', 403);
+                if (!(int)$this->value("SELECT COUNT(*) FROM syllabus_modules WHERE schedID = :s", [':s' => $source])) $this->fail('That class has no syllabus to copy yet.');
+                $this->copyClass(
+                    $source, $target,
+                    ($_POST['include_pages'] ?? '') === '1',
+                    ($_POST['include_files'] ?? '') === '1',
+                    ($_POST['include_quizzes'] ?? '') === '1'
+                );
+                break;
+
+            /* ----- bulk question import + duplicate ----- */
+            case 'import_questions':
+                $quiz  = $this->requireCanManageQuiz($this->intParam('quizID'));
+                $items = json_decode((string)($_POST['questions'] ?? ''), true);
+                if (!is_array($items) || !$items) $this->fail('There are no questions to import.');
+                if (count($items) > 200) $this->fail('Import up to 200 questions at a time.');
+
+                $clean = [];
+                foreach (array_values($items) as $n => $it) {
+                    $num = $n + 1;
+                    if (!is_array($it)) $this->fail("Question {$num} is not valid.");
+                    $prompt = trim((string)($it['prompt'] ?? ''));
+                    if ($prompt === '' || mb_strlen($prompt) > 2000) $this->fail("Question {$num}: write the question (max 2000 characters).");
+                    $choices = array_values(array_map(fn($c) => trim((string)$c), (array)($it['choices'] ?? [])));
+                    if (count($choices) < 2 || count($choices) > 6) $this->fail("Question {$num}: give between 2 and 6 answer choices.");
+                    foreach ($choices as $c) {
+                        if ($c === '' || mb_strlen($c) > 500) $this->fail("Question {$num}: every choice needs text (max 500 characters).");
+                    }
+                    $correct = (int)($it['correct'] ?? -1);
+                    if ($correct < 0 || $correct >= count($choices)) $this->fail("Question {$num}: mark which choice is correct.");
+                    $expl = trim((string)($it['explanation'] ?? ''));
+                    if (mb_strlen($expl) > 1500) $this->fail("Question {$num}: the explanation is too long (max 1500 characters).");
+                    $diff = (int)($it['difficulty'] ?? 2);
+                    if ($diff < 1 || $diff > 3) $diff = 2;
+                    $clean[] = ['prompt' => $prompt, 'choices' => $choices, 'correct' => $correct, 'explanation' => $expl === '' ? null : $expl, 'difficulty' => $diff];
+                }
+
+                $this->pdo->beginTransaction();
+                $next = (int)$this->value("SELECT COALESCE(MAX(sort_order), 0) FROM syllabus_questions WHERE quizID = :z", [':z' => $quiz['quizID']]);
+                foreach ($clean as $it) {
+                    $next++;
+                    $this->run(
+                        "INSERT INTO syllabus_questions (quizID, prompt, explanation, difficulty, sort_order) VALUES (:z, :p, :e, :d, :o)",
+                        [':z' => $quiz['quizID'], ':p' => $it['prompt'], ':e' => $it['explanation'], ':d' => $it['difficulty'], ':o' => $next]
+                    );
+                    $qid = (int)$this->pdo->lastInsertId();
+                    foreach ($it['choices'] as $i => $label) {
+                        $this->run(
+                            "INSERT INTO syllabus_choices (questionID, label, is_correct, sort_order) VALUES (:q, :l, :c, :o)",
+                            [':q' => $qid, ':l' => $label, ':c' => ($i === $it['correct']) ? 1 : 0, ':o' => $i + 1]
+                        );
+                    }
+                }
+                $this->pdo->commit();
+                break;
+
+            case 'duplicate_question':
+                $src = $this->one("SELECT questionID, quizID, prompt, explanation, difficulty FROM syllabus_questions WHERE questionID = :q", [':q' => $this->intParam('questionID')]);
+                if (!$src) $this->fail('Question not found.', 404);
+                $this->requireCanManageQuiz((int)$src['quizID']);
+                $this->pdo->beginTransaction();
+                $next = (int)$this->value("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM syllabus_questions WHERE quizID = :z", [':z' => $src['quizID']]);
+                $this->run(
+                    "INSERT INTO syllabus_questions (quizID, prompt, explanation, difficulty, sort_order) VALUES (:z, :p, :e, :d, :o)",
+                    [':z' => $src['quizID'], ':p' => $src['prompt'], ':e' => $src['explanation'], ':d' => $src['difficulty'], ':o' => $next]
+                );
+                $newQ = (int)$this->pdo->lastInsertId();
+                foreach ($this->all("SELECT label, is_correct, sort_order FROM syllabus_choices WHERE questionID = :q ORDER BY sort_order, choiceID", [':q' => $src['questionID']]) as $c) {
+                    $this->run(
+                        "INSERT INTO syllabus_choices (questionID, label, is_correct, sort_order) VALUES (:q, :l, :c, :o)",
+                        [':q' => $newQ, ':l' => $c['label'], ':c' => $c['is_correct'], ':o' => $c['sort_order']]
+                    );
+                }
                 $this->pdo->commit();
                 break;
 

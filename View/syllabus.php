@@ -5,14 +5,16 @@ $sl  = new SyllabusLogic();
 $e   = fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
 $fmt = fn($d) => $d ? date('M j, Y', strtotime($d)) : '';
 
-$setupError = false;
-$classes    = [];
-$current    = null;
-$tracker    = null;
-$canManage  = false;
-$preview    = false;
-$canEdit    = false;
-$mode       = 'observer';
+$setupError  = false;
+$classes     = [];
+$current     = null;
+$tracker     = null;
+$canManage   = false;
+$preview     = false;
+$canEdit     = false;
+$mode        = 'observer';
+$copySources = [];
+$topicCounts = [];
 
 try {
     $classes   = $sl->classes();
@@ -25,6 +27,13 @@ try {
     if ($current) {
         $tracker = $sl->tracker((int) $current['schedID'], $mode);
     }
+    if ($canEdit) {   // other classes this person can copy a syllabus from (only those that have one)
+        foreach ($classes as $c) {
+            if ((int) $c['schedID'] !== (int) $current['schedID']) $copySources[] = $c;
+        }
+        $topicCounts = $sl->topicCounts(array_column($copySources, 'schedID'));
+        $copySources = array_values(array_filter($copySources, fn($c) => ($topicCounts[(int) $c['schedID']] ?? 0) > 0));
+    }
 } catch (PDOException $ex) {
     error_log('Syllabus page: ' . $ex->getMessage());
     $setupError = true;
@@ -34,11 +43,11 @@ $topicUrl = fn($id) => BASE_PATH . '/syllabus-topic?id=' . (int) $id . ($preview
 $sum = $tracker['summary'] ?? [
     'mode' => $mode, 'total' => 0, 'done' => 0, 'progress' => 0, 'upcoming' => 0, 'remaining' => 0, 'pct' => 0,
     'overdue' => 0, 'materials' => 0, 'students' => 0, 'current' => null, 'next' => null, 'next_open' => null, 'people' => [],
+    'open_topics' => 0, 'help' => [], 'hard' => [],
 ];
 
 $badgeLabels = ['completed' => 'COMPLETED', 'progress' => 'IN PROGRESS', 'not-started' => 'NOT STARTED', 'upcoming' => 'UPCOMING', 'open' => 'OPEN', 'closed' => 'PAST DEADLINE'];
 $badgeClass  = ['completed' => 'status-completed', 'progress' => 'status-progress', 'not-started' => 'status-not-started', 'upcoming' => 'status-upcoming', 'open' => 'status-open', 'closed' => 'status-closed'];
-$quizLabel   = ['quiz' => '&#129514; Mini quiz', 'exam' => '&#128221; Mock exam'];
 
 $filters = ($mode === 'staff')
     ? [['open', 'dot-green', 'Open'], ['upcoming', 'dot-purple', 'Upcoming'], ['closed', 'dot-gray', 'Past deadline']]
@@ -87,6 +96,7 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                             <?php else: ?>
                                 <span class="role-chip">FACULTY VIEW</span>
                                 <a class="preview-link" href="<?= $e($classUrl . '&preview=1') ?>">Preview as student</a>
+                                <?php if ($copySources): ?><a class="preview-link" href="#" data-action="open-copy">Copy from another class</a><?php endif; ?>
                             <?php endif; ?>
                         <?php endif; ?>
                     </div>
@@ -138,13 +148,34 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
 
             <?php else: ?>
 
+            <?php if ($canEdit && $copySources): ?>
+            <!-- Faculty: copy a syllabus from another class -->
+            <div class="copy-panel<?= $tracker['modules'] ? ' is-hidden' : '' ?>" id="copyPanel">
+                <strong>Copy a syllabus from another class</strong>
+                <div class="hint">Teaching the same subject to another section? Copy it instead of building it again.</div>
+                <select class="syl-input" id="copySource" aria-label="Class to copy from">
+                    <?php foreach ($copySources as $c): ?>
+                    <option value="<?= (int) $c['schedID'] ?>"><?= $e($c['label']) ?> (<?= (int) ($topicCounts[(int) $c['schedID']] ?? 0) ?> topics)</option>
+                    <?php endforeach; ?>
+                </select>
+                <label class="mini check"><input type="checkbox" id="copyPages" checked> Lesson pages</label>
+                <label class="mini check"><input type="checkbox" id="copyFiles" checked> Materials (PDFs and videos)</label>
+                <label class="mini check"><input type="checkbox" id="copyQuizzes" checked> Quizzes and exams (copied as drafts)</label>
+                <div class="hint">Opening dates and deadlines are not copied. Set them for this class after copying.</div>
+                <div class="cf-row">
+                    <button type="button" class="syl-btn inline" data-action="run-copy">Copy into this class</button>
+                    <button type="button" class="icon-btn" data-action="close-copy">Close</button>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <div class="content-grid">
 
                 <!-- Left column -->
                 <div class="left-column">
 
                     <div class="search-filter">
-                        <input type="text" class="search-bar" placeholder="Search topics or materials..." aria-label="Search topics">
+                        <input type="text" class="search-bar" placeholder="Search topics..." aria-label="Search topics">
                         <div class="filters">
                             <?php foreach ($filters as $f): ?>
                             <div class="filter-item" data-filter="<?= $e($f[0]) ?>" role="button" tabindex="0"><div class="dot <?= $e($f[1]) ?>"></div> <?= $e($f[2]) ?></div>
@@ -154,7 +185,7 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
 
                     <?php if (!$tracker['modules']): ?>
                         <div class="syl-empty">
-                            <?php if ($canEdit): ?>No modules yet. Add your first module below to start building this class's syllabus.
+                            <?php if ($canEdit): ?>No modules yet. Add your first module below<?= $copySources ? ', or copy a syllabus from another class above' : '' ?>.
                             <?php else: ?>The instructor hasn't published a syllabus for this class yet.<?php endif; ?>
                         </div>
                     <?php endif; ?>
@@ -178,9 +209,16 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                         <div class="mod-bar"><div style="width: <?= (int) $m['pct'] ?>%;"></div></div>
 
                         <?php foreach ($m['tasks'] as $t):
-                            $locked   = ($t['locked'] && $mode !== 'staff');   // students cannot open it yet
-                            $nMat     = count($t['contents']);
-                            $search   = mb_strtolower($t['title'] . ' ' . $t['week_label'] . ' ' . implode(' ', array_column($t['contents'], 'title')));
+                            $locked = ($t['locked'] && $mode !== 'staff');   // students cannot open it yet
+                            $search = mb_strtolower($t['title'] . ' ' . $t['week_label']);
+
+                            // the one thing a student should do next on this topic
+                            $action = '';
+                            if ($mode === 'student' && !$locked && !$t['done']) {
+                                if ($t['restudy'])                    $action = 'Study again';
+                                elseif ($t['view'] === 'progress')    $action = $t['quizzes'] ? 'Take the quiz' : 'Continue';
+                                else                                  $action = 'Start';
+                            }
                         ?>
                         <div class="topic" id="topic-<?= (int) $t['taskID'] ?>" data-status="<?= $e($t['view']) ?>" data-text="<?= $e($search) ?>">
 
@@ -197,22 +235,10 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
 
                                         <?php if ($t['available_from'] || $t['due_date']): ?>
                                         <small class="due<?= $t['overdue'] ? ' overdue' : '' ?>">
-                                            <?php if ($t['available_from'] && $t['locked']): ?>Opens <?= $e($fmt($t['available_from'])) ?><?php elseif ($t['available_from']): ?>Opened <?= $e($fmt($t['available_from'])) ?><?php endif; ?>
-                                            <?= ($t['available_from'] && $t['due_date']) ? ' &middot; ' : '' ?>
+                                            <?php if ($t['available_from'] && $t['locked']): ?>Opens <?= $e($fmt($t['available_from'])) ?><?php endif; ?>
+                                            <?= ($t['available_from'] && $t['locked'] && $t['due_date']) ? ' &middot; ' : '' ?>
                                             <?php if ($t['due_date']): ?>Due <?= $e($fmt($t['due_date'])) ?><?= $t['overdue'] ? ' (overdue)' : '' ?><?php endif; ?>
                                         </small>
-                                        <?php endif; ?>
-
-                                        <?php if (!$locked): ?>
-                                        <span class="mat-meta">
-                                            <?php if ($t['has_page']): ?><span class="chip">&#128196; Lesson</span><?php endif; ?>
-                                            <?php if ($nMat > 0): ?><span class="chip">&#128206; <?= $nMat ?> material<?= $nMat === 1 ? '' : 's' ?></span><?php endif; ?>
-                                            <?php foreach ($t['quizzes'] as $kind => $z): ?>
-                                                <span class="chip"><?= $quizLabel[$kind] ?><?= ($mode === 'staff' && (int) $z['is_published'] !== 1) ? ' (draft)' : '' ?></span>
-                                            <?php endforeach; ?>
-                                            <?php if ($t['restudy']): ?><span class="chip warn">Study again to retake</span><?php endif; ?>
-                                            <?php if (!$t['has_page'] && $nMat === 0 && !$t['quizzes'] && $canEdit): ?><span class="chip">Click to add a lesson &amp; materials</span><?php endif; ?>
-                                        </span>
                                         <?php endif; ?>
                                     </div>
                                     <?php if ($canEdit): ?>
@@ -240,7 +266,10 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                                         <button type="button" class="icon-btn" data-action="delete-task" data-task="<?= (int) $t['taskID'] ?>" title="Delete topic">&#10005;</button>
                                     </div>
                                 <?php else: ?>
-                                    <div class="status-badge <?= $e($badgeClass[$t['view']]) ?>"><?= $e($badgeLabels[$t['view']]) ?></div>
+                                    <div class="status-cell">
+                                        <div class="status-badge <?= $e($badgeClass[$t['view']]) ?>"><?= $e($badgeLabels[$t['view']]) ?></div>
+                                        <?php if ($action !== ''): ?><div class="next-action"><?= $e($action) ?> &rsaquo;</div><?php endif; ?>
+                                    </div>
                                 <?php endif; ?>
                             </div>
 
@@ -292,7 +321,6 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                             <div class="stats-text"><strong><?= (int) $sum['total'] ?></strong> Topic<?= $sum['total'] === 1 ? '' : 's' ?></div>
                             <div class="stats-text"><strong><?= (int) $sum['students'] ?></strong> Enrolled Student<?= $sum['students'] === 1 ? '' : 's' ?></div>
                             <div class="stats-text"><strong><?= (int) $sum['pct'] ?>%</strong> Class Average Completion</div>
-                            <div class="stats-text"><strong><?= (int) $sum['materials'] ?></strong> Learning Material<?= $sum['materials'] === 1 ? '' : 's' ?></div>
                             <div class="stats-text"><strong><?= (int) $sum['upcoming'] ?></strong> Upcoming (locked)</div>
                         <?php else: ?>
                             <div class="stats-text"><strong><?= (int) $sum['total'] ?></strong> Topic<?= $sum['total'] === 1 ? '' : 's' ?></div>
@@ -325,6 +353,32 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                     <?php endif; ?>
 
                     <?php if ($mode === 'staff'): ?>
+                    <?php if ($sum['help']): ?>
+                    <div class="syl-widget">
+                        <h3>Who needs help</h3>
+                        <div class="help-list">
+                            <?php foreach ($sum['help'] as $h): ?>
+                            <div class="help-item">
+                                <strong><?= $e($h['name']) ?></strong>
+                                <?php foreach ($h['reasons'] as $rs): ?><span class="chip warn"><?= $e($rs) ?></span><?php endforeach; ?>
+                            </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($sum['hard']): ?>
+                    <div class="syl-widget">
+                        <h3>Most-missed questions</h3>
+                        <?php foreach ($sum['hard'] as $hq): ?>
+                        <div class="help-item">
+                            <div><?= $e(mb_strimwidth($hq['prompt'], 0, 110, '...')) ?></div>
+                            <span class="chip bad">Missed <?= (int) $hq['rate'] ?>% of the time</span>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+
                     <div class="syl-widget">
                         <h3>Class Progress</h3>
                         <?php if (!$sum['people']): ?>
@@ -335,7 +389,6 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                             <div class="person">
                                 <div class="person-head"><?= $e($pp['name']) ?> <span><?= (int) $pp['done'] ?>/<?= (int) $sum['total'] ?> &middot; <?= (int) $pp['pct'] ?>%</span></div>
                                 <div class="mod-bar"><div style="width: <?= (int) $pp['pct'] ?>%;"></div></div>
-                                <?php if ($pp['restudy'] > 0): ?><span class="chip warn"><?= (int) $pp['restudy'] ?> topic<?= $pp['restudy'] === 1 ? '' : 's' ?> to study again</span><?php endif; ?>
                                 <?php if ($pp['last']): ?><small class="milestone-subtext">Last active <?= $e(date('M j, g:i A', strtotime($pp['last']))) ?></small><?php endif; ?>
                             </div>
                             <?php endforeach; ?>
