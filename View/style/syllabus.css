@@ -627,3 +627,18 @@ label.mini.check { flex-direction: row; align-items: center; gap: 6px; color: #d
     .checklist { gap: 8px; }
     .check-step { font-size: 12px; padding: 6px 10px; }
 }
+
+/* ---------- consistency fixes ---------- */
+/* full-width buttons were wider than their card (padding + border added on top of width: 100%) */
+.syl-btn { box-sizing: border-box; max-width: 100%; }
+a.syl-btn { text-decoration: none; }
+
+/* the main action inside a card: same solid purple as the "Next step" button on the topic page */
+.syl-btn.cta { background-color: #a855f7; border-color: #a855f7; font-weight: 600; margin-top: 12px; }
+.syl-btn.cta:hover { background-color: #9333ea; }
+
+/* a deadline that is today or tomorrow */
+.milestone-subtext.soon { color: #facc15; font-weight: 600; }
+
+/* every card in the right column lines up the same way */
+.right-column .syl-widget { box-sizing: border-box; width: 100%; }

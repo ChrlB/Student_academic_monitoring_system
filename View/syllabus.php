@@ -338,7 +338,7 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                                 <?= $e($cur['module_title']) ?><br>
                                 <?= $cur['due_date'] ? 'Deadline: ' . $e($fmt($cur['due_date'])) : 'No deadline set' ?>
                             </div>
-                            <a class="syl-btn" style="display:block;text-align:center;text-decoration:none;" href="<?= $e($topicUrl($cur['taskID'])) ?>"><?= $cur['view'] === 'progress' ? 'Continue' : 'Start' ?></a>
+                            <a class="syl-btn cta" href="<?= $e($topicUrl($cur['taskID'])) ?>"><?= $cur['view'] === 'progress' ? 'Continue' : 'Start' ?></a>
                         <?php elseif ($sum['total'] > 0 && $sum['done'] === $sum['total']): ?>
                             <div class="stats-text">All topics are completed. Well done!</div>
                         <?php elseif ($sum['total'] > 0): ?>
@@ -402,7 +402,7 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                         <?php $next = $sum['next']; ?>
                         <?php if ($next): ?>
                             <div class="stats-text" style="margin-bottom: 0;"><?= $e($next['title']) ?></div>
-                            <div class="milestone-subtext">
+                            <div class="milestone-subtext<?= $next['days_left'] <= 1 ? ' soon' : '' ?>">
                                 <?= $e($fmt($next['due_date'])) ?><br>
                                 <?php if ($next['days_left'] === 0): ?>due today
                                 <?php else: ?>in <?= (int) $next['days_left'] ?> day<?= $next['days_left'] === 1 ? '' : 's' ?><?php endif; ?>
