@@ -3,27 +3,33 @@ require_once __DIR__ . '/../Services/auth.php';
 require_once __DIR__ . '/../PDAO/DAO.php';   // gives us $db_connection (PDO)
 $_SESSION["page"] = "PROJECTS";
 
+/*
+ * REQUIRED DB CHANGE (run once):
+ *   ALTER TABLE project_task ADD COLUMN attachment VARCHAR(255) NULL;
+ * If `satatus` is an ENUM, also allow the new 'review' value:
+ *   ALTER TABLE project_task MODIFY satatus VARCHAR(20) NOT NULL DEFAULT 'todo';
+ */
 class ProjectsLogic
 {
     public $group = 'student';
     public $error = '';
 
-    public $projects  = [];   
+    public $projects  = [];
     public $stats     = ['total' => 0, 'pending' => 0, 'submitted' => 0];
 
-    public $selected   = null; 
+    public $selected   = null;
     public $team       = [];
-    public $tasks      = ['todo' => [], 'progress' => [], 'done' => []];
+    public $tasks      = ['todo' => [], 'progress' => [], 'review' => [], 'done' => []];
     public $submission = null;
     public $isLead     = false;
 
     public $instructorName = '';
-    public $studentOptions = [];   
+    public $studentOptions = [];
     public $nextCode       = 'PRJ-001';
 
     private $db;
-    private $studentID = 0;   
-    private $facultyID = 0;   
+    private $studentID = 0;
+    private $facultyID = 0;
 
     public function __construct()
     {
@@ -122,35 +128,11 @@ class ProjectsLogic
         exit;
     }
 
-    /**
-     * Send a clean JSON response for AJAX calls.
-     * Discards any warnings / HTML that were printed earlier so the
-     * browser always receives valid JSON.
-     */
-    private function json($payload)
-    {
-        while (ob_get_level() > 0) {
-            ob_end_clean();
-        }
-        header('Content-Type: application/json');
-        echo json_encode($payload);
-        exit;
-    }
-
-    private function isAjaxRequest()
-    {
-        return !empty($_SERVER['HTTP_X_REQUESTED_WITH'])
-            && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
-    }
-
     public function handlePost()
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
 
-        $isAjax = $this->isAjaxRequest();
-
         if (!$this->checkCsrf()) {
-            if ($isAjax) $this->json(['success' => false, 'error' => 'CSRF token expired']);
             $this->error = 'Your session expired. Please try again.';
             return;
         }
@@ -158,25 +140,26 @@ class ProjectsLogic
         $action    = $_POST['project_action'] ?? '';
         $projectID = (int)($_POST['project_id'] ?? 0);
 
-        if ($action === 'create_project') {
-            $this->createProject();
-            return;
-        }
+        if ($action === 'create_project') { $this->createProject(); return; }
+        if ($action === 'delete_project') { $this->deleteProject($projectID); return; }
 
-        if ($action === 'delete_project') {
-            $this->deleteProject($projectID);
-            return;
-        }
-
-        if (!$this->isMember($projectID) && $this->group === 'student') {
-            if ($isAjax) $this->json(['success' => false, 'error' => 'You are not part of that project.']);
+        if ($this->group === 'student' && !$this->isMember($projectID)) {
             $this->error = 'You are not part of that project.';
             return;
         }
+        if ($this->group === 'faculty' && !$this->isInstructorOf($projectID)) {
+            $this->error = 'You do not have permission for that project.';
+            return;
+        }
 
-        if ($action === 'submit_project') $this->submitProject($projectID);
-        if ($action === 'update_task')    $this->updateTask($projectID);
-        if ($action === 'add_task')       $this->addTask($projectID); 
+        switch ($action) {
+            case 'submit_project': $this->submitProject($projectID); break;
+            case 'add_task':       $this->addTask($projectID);       break;
+            case 'start_task':     $this->startTask($projectID);     break;
+            case 'pass_task':      $this->passTask($projectID);      break;
+            case 'approve_task':   $this->approveTask($projectID);   break;
+            case 'decline_task':   $this->declineTask($projectID);   break;
+        }
     }
 
     private static function profSql()
@@ -264,6 +247,12 @@ class ProjectsLogic
         }
     }
 
+    /* ------------------------------------------------------------------
+     *  Tasks:  To Do --start--> In Progress --pass (file)--> Review
+     *          Review --approve (instructor)--> Done
+     *          Review --decline (instructor)--> In Progress
+     * ------------------------------------------------------------------ */
+
     private function addTask($projectID)
     {
         $title    = trim($_POST['task_title'] ?? '');
@@ -280,13 +269,169 @@ class ProjectsLogic
         }
 
         $st = $this->db->prepare(
-            "INSERT INTO project_task (projectID, task_title, deadline, satatus) 
+            "INSERT INTO project_task (projectID, task_title, deadline, satatus)
              VALUES (?, ?, ?, 'todo')"
         );
         $st->execute([$projectID, $title, $deadline . ' 23:59:59']);
 
         $this->flash('success', 'Task added to the board.');
         $this->redirect(['project' => $projectID]);
+    }
+
+    /** Returns the task's current board column, or null if the task isn't in this project. */
+    private function taskState($projectID, $taskID)
+    {
+        $st = $this->db->prepare("SELECT satatus FROM project_task WHERE taskID = ? AND projectID = ?");
+        $st->execute([$taskID, $projectID]);
+        $row = $st->fetch(PDO::FETCH_ASSOC);
+        return $row ? self::taskColumn($row['satatus']) : null;
+    }
+
+    private $hasTaskAttachment = null;
+
+    /**
+     * project_task.attachment may not exist yet. Try to add it once; if the DB user
+     * is not allowed to ALTER, the page still works (without task attachments).
+     */
+    private function taskHasAttachment()
+    {
+        if ($this->hasTaskAttachment !== null) return $this->hasTaskAttachment;
+
+        $exists = function () {
+            return (bool)$this->db->query("SHOW COLUMNS FROM project_task LIKE 'attachment'")->fetch();
+        };
+
+        try {
+            $this->hasTaskAttachment = $exists();
+            if (!$this->hasTaskAttachment) {
+                $this->db->exec("ALTER TABLE project_task ADD COLUMN attachment VARCHAR(255) NULL");
+                $this->hasTaskAttachment = $exists();
+            }
+        } catch (Throwable $e) {
+            $this->hasTaskAttachment = false;
+        }
+        return $this->hasTaskAttachment;
+    }
+
+    private function startTask($projectID)
+    {
+        $taskID = (int)($_POST['task_id'] ?? 0);
+
+        if ($this->group !== 'student') {
+            $this->error = 'Only team members can start tasks.';
+            return;
+        }
+        if ($this->taskState($projectID, $taskID) !== 'todo') {
+            $this->error = 'That task can no longer be started.';
+            return;
+        }
+
+        $st = $this->db->prepare("UPDATE project_task SET satatus = 'progress' WHERE taskID = ? AND projectID = ?");
+        $st->execute([$taskID, $projectID]);
+
+        $this->flash('success', 'Task moved to In Progress.');
+        $this->redirect(['project' => $projectID]);
+    }
+
+    private function passTask($projectID)
+    {
+        $taskID = (int)($_POST['task_id'] ?? 0);
+
+        if ($this->group !== 'student') {
+            $this->error = 'Only team members can pass tasks for review.';
+            return;
+        }
+        if ($this->taskState($projectID, $taskID) !== 'progress') {
+            $this->error = 'Only tasks that are in progress can be passed for review.';
+            return;
+        }
+
+        if (!$this->taskHasAttachment()) {
+            $this->error = 'Task attachments are not set up yet. Run: ALTER TABLE project_task ADD COLUMN attachment VARCHAR(255) NULL;';
+            return;
+        }
+
+        $path = $this->saveUpload('attachment', 'tasks');
+        if ($path === null) {
+            $this->error = 'Attach a screenshot or file before passing the task.';
+            return;
+        }
+        if ($path === false) {
+            $this->error = 'That file type or size is not allowed (max 10 MB).';
+            return;
+        }
+
+        $st = $this->db->prepare(
+            "UPDATE project_task SET satatus = 'review', attachment = ? WHERE taskID = ? AND projectID = ?"
+        );
+        $st->execute([$path, $taskID, $projectID]);
+
+        $this->flash('success', 'Task passed to review.');
+        $this->redirect(['project' => $projectID]);
+    }
+
+    private function approveTask($projectID)
+    {
+        $taskID = (int)($_POST['task_id'] ?? 0);
+
+        if ($this->group !== 'faculty' || !$this->isInstructorOf($projectID)) {
+            $this->error = 'Only the instructor can approve tasks.';
+            return;
+        }
+        if ($this->taskState($projectID, $taskID) !== 'review') {
+            $this->error = 'Only tasks in review can be approved.';
+            return;
+        }
+
+        $st = $this->db->prepare("UPDATE project_task SET satatus = 'done' WHERE taskID = ? AND projectID = ?");
+        $st->execute([$taskID, $projectID]);
+
+        $this->flash('success', 'Task approved and marked as done.');
+        $this->redirect(['project' => $projectID]);
+    }
+
+    private function declineTask($projectID)
+    {
+        $taskID = (int)($_POST['task_id'] ?? 0);
+
+        if ($this->group !== 'faculty' || !$this->isInstructorOf($projectID)) {
+            $this->error = 'Only the instructor can decline tasks.';
+            return;
+        }
+        if ($this->taskState($projectID, $taskID) !== 'review') {
+            $this->error = 'Only tasks in review can be declined.';
+            return;
+        }
+
+        $st = $this->db->prepare("UPDATE project_task SET satatus = 'progress' WHERE taskID = ? AND projectID = ?");
+        $st->execute([$taskID, $projectID]);
+
+        $this->flash('success', 'Task sent back to In Progress for revision.');
+        $this->redirect(['project' => $projectID]);
+    }
+
+    /**
+     * Saves an uploaded file under uploads/<subdir>/.
+     * Returns the relative path, null when nothing was uploaded, false when rejected.
+     */
+    private function saveUpload($field, $subdir)
+    {
+        if (!isset($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) return null;
+        $f = $_FILES[$field];
+        if ($f['error'] !== UPLOAD_ERR_OK) return false;
+
+        $allowed = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'doc', 'docx', 'ppt', 'pptx', 'xls', 'xlsx', 'txt', 'zip'];
+        $ext = strtolower(pathinfo($f['name'], PATHINFO_EXTENSION));
+        if (!in_array($ext, $allowed, true) || $f['size'] > 10 * 1024 * 1024) return false;
+
+        $dir = __DIR__ . '/../uploads/' . $subdir . '/';
+        if (!is_dir($dir)) mkdir($dir, 0775, true);
+
+        $base   = preg_replace('/[^a-zA-Z0-9\-_]/', '_', pathinfo($f['name'], PATHINFO_FILENAME));
+        $unique = bin2hex(random_bytes(6)) . '_' . substr($base, 0, 60) . '.' . $ext;
+
+        if (!move_uploaded_file($f['tmp_name'], $dir . $unique)) return false;
+        return 'uploads/' . $subdir . '/' . $unique;
     }
 
     private function submitProject($projectID)
@@ -301,16 +446,16 @@ class ProjectsLogic
         $attachmentPath = null;
 
         if (isset($_FILES['attachment']) && $_FILES['attachment']['error'] === UPLOAD_ERR_OK) {
-            $uploadDir = __DIR__ . '/../uploads/projects/'; 
+            $uploadDir = __DIR__ . '/../uploads/projects/';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0777, true);
             }
-            
+
             $fileName = basename($_FILES['attachment']['name']);
             $fileName = preg_replace("/[^a-zA-Z0-9.\-_]/", "_", $fileName);
-            $uniqueName = time() . '_' . $fileName; 
+            $uniqueName = time() . '_' . $fileName;
             $targetFile = $uploadDir . $uniqueName;
-            
+
             if (move_uploaded_file($_FILES['attachment']['tmp_name'], $targetFile)) {
                 $attachmentPath = 'uploads/projects/' . $uniqueName;
             } else {
@@ -326,7 +471,6 @@ class ProjectsLogic
             }
         }
 
-        // BACKEND VALIDATION: Require a file if one doesn't exist yet
         if (empty($attachmentPath)) {
             $this->error = 'Please attach a file before submitting.';
             return;
@@ -347,43 +491,14 @@ class ProjectsLogic
         $st->execute([$projectID, $this->studentID, $file, $attachmentPath, $notes]);
 
         $this->flash('success', 'Project submitted to your professor.');
-        $this->redirect(); // CHANGED THIS TO PREVENT 404 ERROR
-    }
-
-    private function updateTask($projectID)
-    {
-        $taskID = (int)($_POST['task_id'] ?? 0);
-        $status = $_POST['status'] ?? '';
-        
-        $isAjax = $this->isAjaxRequest();
-
-        if (!in_array($status, ['todo', 'progress', 'done'], true)) {
-            if ($isAjax) $this->json(['success' => false, 'error' => 'Invalid task status']);
-            $this->error = 'Invalid task status.';
-            return;
-        }
-
-        try {
-            $st = $this->db->prepare(
-                "UPDATE project_task SET satatus = ? WHERE taskID = ? AND projectID = ?"
-            );
-            $st->execute([$status, $taskID, $projectID]);
-            
-            if ($isAjax) $this->json(['success' => true]);
-
-            $this->flash('success', 'Task updated.');
-            $this->redirect(['project' => $projectID]);
-
-        } catch (Throwable $e) {
-            if ($isAjax) $this->json(['success' => false, 'error' => $e->getMessage()]);
-            $this->error = 'Database error.';
-        }
+        $this->redirect();
     }
 
     private static function taskColumn($value)
     {
         $v = strtolower(trim((string)$value));
         if (in_array($v, ['done', 'completed', 'complete'], true)) return 'done';
+        if (in_array($v, ['review', 'in review', 'in_review'], true)) return 'review';
         if (in_array($v, ['progress', 'in progress', 'in_progress', 'ongoing'], true)) return 'progress';
         return 'todo';
     }
@@ -409,23 +524,23 @@ class ProjectsLogic
 
         $instructionPath = null;
         if (isset($_FILES['instruction_file']) && $_FILES['instruction_file']['error'] === UPLOAD_ERR_OK) {
-            $uploadDir = __DIR__ . '/../uploads/instructions/'; 
+            $uploadDir = __DIR__ . '/../uploads/instructions/';
             if (!is_dir($uploadDir)) {
                 mkdir($uploadDir, 0777, true);
             }
-            
+
             $fileName = basename($_FILES['instruction_file']['name']);
             $fileName = preg_replace("/[^a-zA-Z0-9.\-_]/", "_", $fileName);
-            $uniqueName = time() . '_' . $fileName; 
+            $uniqueName = time() . '_' . $fileName;
             $targetFile = $uploadDir . $uniqueName;
-            
+
             if (move_uploaded_file($_FILES['instruction_file']['tmp_name'], $targetFile)) {
                 $instructionPath = 'uploads/instructions/' . $uniqueName;
             }
         }
 
         $in = implode(',', array_fill(0, count($picked), '?'));
-        
+
         $st = $this->db->prepare(
             "SELECT es.enrolled_subjectID, es.studentID
                FROM enrolled_subjects es
@@ -436,13 +551,13 @@ class ProjectsLogic
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $found[(int)$r['enrolled_subjectID']] = (int)$r['studentID'];
         }
-        
+
         if (count($found) !== count($picked)) {
             $this->error = 'One of the selected students is invalid.';
             return;
         }
 
-        $leadEnrolled = $leader;           
+        $leadEnrolled = $leader;
         $leadStudent  = $found[$leadEnrolled];
 
         try {
@@ -477,7 +592,7 @@ class ProjectsLogic
     {
         if ($this->group === 'faculty') {
             $this->loadInstructor();
-            
+
             $projectID = (int)($_GET['project'] ?? 0);
             if ($projectID > 0) {
                 $this->loadDetail($projectID);
@@ -528,8 +643,8 @@ class ProjectsLogic
         $this->stats = ['total' => $total, 'submitted' => $submitted, 'pending' => $total - $submitted];
 
         $st = $this->db->prepare(
-            "SELECT MIN(es.enrolled_subjectID) AS enrolled_subjectID, 
-                    GROUP_CONCAT(DISTINCT es.subjectID SEPARATOR ', ') AS subjectID, 
+            "SELECT MIN(es.enrolled_subjectID) AS enrolled_subjectID,
+                    GROUP_CONCAT(DISTINCT es.subjectID SEPARATOR ', ') AS subjectID,
                     s.first_name, s.last_name
                FROM enrolled_subjects es
                JOIN students s ON s.studentID = es.studentID
@@ -618,7 +733,8 @@ class ProjectsLogic
         $this->team = $st->fetchAll(PDO::FETCH_ASSOC);
 
         $st = $this->db->prepare(
-            "SELECT taskID AS id, task_title AS title, satatus AS status, deadline
+            "SELECT taskID AS id, task_title AS title, satatus AS status, deadline, "
+            . ($this->taskHasAttachment() ? 'attachment' : 'NULL AS attachment') . "
                FROM project_task
               WHERE projectID = ?
            ORDER BY taskID"
