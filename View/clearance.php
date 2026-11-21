@@ -147,7 +147,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               </table>
             </div>              
           <?php elseif ($student_view === "SUBJECTS"): $subjects = getSubjectsClearance($acadyear,$search,$status)?>
-                    <?php var_dump($acadyear.$search.$status);var_dump(getSubjectsClearance($acadyear)) ?>
+                    <?php //var_dump($acadyear.$search.$status);var_dump(getSubjectsClearance($acadyear)) ?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">SUBJECTS</b>
               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
@@ -1351,7 +1351,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               </div>
             <?php elseif(isset($_GET['edit']) && ($_GET['edit'] == 1)): $students_for_clearance = (editStudentsForSubjectClearance($department,$_GET['subjectID'],$block,$year,$acadyear, $_GET['studentID']))[0]?>
                    
-                <?php var_dump($department.$_GET['subjectID'].$block.$year.$acadyear. $_GET['studentID']) ?>
+                <?php //var_dump($department.$_GET['subjectID'].$block.$year.$acadyear. $_GET['studentID']) ?>
                 <div class="row" style="justify-content: space-between; align-items:center">
                   <b class="view_title"><?= $_GET['subjectID'].' - '.$_GET['name'] ?>  </b>
                   <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
@@ -1360,6 +1360,9 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   <hr>
                 </div>
                 <div class="row" style="gap: 20px;"><?php $uploaded_files = getSubjectRequireMents($_GET['subjectID'],$acadyear,$students_for_clearance['studentID']); ?>
+
+
+                                    
                     <div class="column"  style="gap: 20px;">
                       <div class="student_clearance_panel">
                         <h3>STUDENT INFO:</h3>
@@ -1542,6 +1545,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   <hr>
                 </div>
                 <div class="row" style="gap: 20px;"><?php $uploaded_files = getFacultyRequirements($acadyear,$_SESSION['real_userID'],$_GET['studentID']); ?>
+                    <?php //var_dump($uploaded_files) ?>
                     <div class="column"  style="gap: 20px;">
                       <?php //var_dump($uploaded_files) ?>
                       <div class="student_clearance_panel">
