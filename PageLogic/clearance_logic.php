@@ -40,7 +40,7 @@ if (!in_array($student_view, $allowedViews, true)) {
 // var_dump($updates_record);
 
 if($_SESSION["role"] == "student"){
-    $updates_record = $clearanceDAO->executeQuery("getClearanceUpdates",[$userID,$userID,$userID]);
+    $updates_record = $clearanceDAO->executeQuery("getClearanceUpdates",[$userID,$userID,$userID,'ALL','ALL','ALL','ALL']);
     $data = $clearanceDAO->executeQuery("getPieChartData",[$userID,$userID,$userID]);
     $labels = json_encode(['Cleared', 'Rejected', 'Not yet cleared']);
     $values = json_encode([
@@ -49,6 +49,8 @@ if($_SESSION["role"] == "student"){
         (int) ($data[0]['not_yet_cleared'] ?? 0),
     ]);
 }
+
+
 
 // var_dump( isset($_GET["view"]));
 // if( in_array($student_view, ["SUBJECTS","FACULTY","OFFICE"])){
@@ -91,6 +93,21 @@ function statusClass(string $status): string{
     return  $class;
 }
 
+function getSubjectClearanceStatus($studentID,$categ,$acad_year){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getClearanceUpdates",[
+        $studentID,
+        $studentID,
+        $studentID,
+        $acad_year,
+        $acad_year,
+        $categ,
+        $categ
+    ]);
+
+    return $records;
+}
+
 function getSubjectsClearance($acad_year = 'ALL', $subjectID = 'ALL',$status = 'ALL'){
     global $clearanceDAO;
     
@@ -112,6 +129,8 @@ function getSubjectsClearance($acad_year = 'ALL', $subjectID = 'ALL',$status = '
     // var_dump($_SESSION["userID"]);
     // var_dump($records);
 }
+
+
 function getfacultyClearance($acad_year = 'ALL', $faculty_lastname = 'ALL',$status = 'ALL'){
     global $clearanceDAO;
     
@@ -171,12 +190,13 @@ function getFacultyRequireMents($acadyear,$facultyID,  $studentID = 'self'){
     return $records;
 }
 
-function getUploadedFacultyRequireMents($acadyear, $facultyID){
+function getUploadedFacultyRequireMents($acadyear, $facultyID,$studentID = 'self'){
     global $clearanceDAO;
+    if($studentID == 'self') $studentID = $_SESSION['userID'];
     $records = $clearanceDAO->executeQuery("getUploadedFacultyRequirements",[
         $_SESSION['userID'],
         $facultyID, 
-        $_SESSION['userID'], 
+        $studentID, 
         $acadyear,$acadyear
     ]);
 
@@ -282,7 +302,8 @@ function getStudentsForFacultyClearance($block = 'ALL',$acad_year = 'ALL', $stud
         $acad_year,$acad_year,
         $block,$block, 
         $studentID,$studentID,
-        $_SESSION['program']]);
+        $_SESSION['program'],
+        $_SESSION['department'],$_SESSION['department']]);
 
     return $records;
 }
@@ -321,15 +342,28 @@ function updateClearance($request){
 
     }elseif($request['clearance_categ'] === "OFFICE"){
         if($request['clearanceID'] == ''){
-            
-        }elseif($request['enrolled_subID']){
+            //$records = $clearanceDAO->executeQuery("addSubjectClearance",[$request['enrolled_subID'],$remarks,$status]);
+        }else{
+           //$records = $clearanceDAO->executeQuery("updateSubjectClearance",[$remarks,$status,$request['clearanceID']]);
 
         }
 
     }elseif($request['clearance_categ'] === "FACULTY"){
-        if($request['clearanceID'] == ''){
+        if($request['clearanceID'] == ''){var_dump($request['clearanceID'] == '');
+            $records = $clearanceDAO->executeQuery("addFacultyClearance",[
+                $_SESSION["real_userID"],
+                $request['studentID'],
+                $remarks,
+                $request['enrollmentID']
+            ]);
+
             
-        }elseif($request['enrolled_subID']){
+        }else{
+           $records = $clearanceDAO->executeQuery("updateFacultyClearance",[
+                $remarks,
+                $status,
+                $request['clearanceID']
+            ]);
 
         }
 
@@ -338,6 +372,23 @@ function updateClearance($request){
     ($records > 0)? $_SESSION["message"] = "RECORD SAVED"
     : $_SESSION["error"] = "CANT SAVE RECORD".($request['clearanceID'] === '');
 
+    if($request['clearanceID'] == '') return;
+
     header('Location: ' .$request['page_uploader']);
     exit;
+}
+
+function getFacultyClearanceID($request){
+    global $clearanceDAO;
+    // WHERE `enrollmentID` = ?
+    //     and `studentID` = ? 
+    //     and `facultyID` = ?;"
+
+    $records = $clearanceDAO->executeQuery("getFacultyClearanceID",[
+        $request['enrollmentID'],
+        $request['studentID'],
+        $_SESSION['real_userID']
+    ]);
+
+    return $records[0]['faculty_clearanceID'];
 }

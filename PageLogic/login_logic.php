@@ -106,6 +106,7 @@ function login($login_info) {
     $_SESSION['real_userID'] = $user['real_userID'] ?? null;
 
     $_SESSION['program'] = $user['program'] ?? null;
+    $_SESSION['department'] = $user['department'] ?? null;
 
     $_SESSION['message'] = 'Account verification successful';
 
