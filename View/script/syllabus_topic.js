@@ -59,7 +59,7 @@
   });
 
   /* =====================================================================
-     STUDENT: study-again countdown, mark finished, mini quiz / mock exam
+     STUDENT: study-again countdown, mark finished, checkpoints + practice
   ===================================================================== */
   function initStudent() {
     function reloadAfter(action, data) {
@@ -68,27 +68,90 @@
       }).catch(function (err) { toast(err.message, true); });
     }
 
-    // forced re-study banner: the retake unlocks after the study time
+    // after a failed checkpoint: a short wait, then the Retake button unlocks by itself
     var banner = document.getElementById('restudyBanner');
-    if (banner) {
-      var end = Date.now() + (parseInt(banner.dataset.seconds, 10) || 0) * 1000;
+    if (banner && (parseInt(banner.dataset.seconds, 10) || 0) > 0) {
+      var end = Date.now() + parseInt(banner.dataset.seconds, 10) * 1000;
       var timerEl = document.getElementById('restudyTimer');
-      var btn = document.getElementById('finishReviewBtn');
+      var waitEl = document.getElementById('restudyWait');
+      var retakeBtn = document.getElementById('retakeBtn');
       var pad = function (n) { return (n < 10 ? '0' : '') + n; };
       (function tick() {
         var left = Math.max(0, Math.round((end - Date.now()) / 1000));
         timerEl.textContent = pad(Math.floor(left / 60)) + ':' + pad(left % 60);
-        btn.disabled = left > 0;
-        if (left > 0) setTimeout(tick, 500);
+        if (left > 0) {
+          setTimeout(tick, 500);
+        } else {
+          if (waitEl) waitEl.style.display = 'none';
+          if (retakeBtn) retakeBtn.disabled = false;
+        }
       })();
     }
 
+    var MODE_NAMES = {
+      standard: 'Quiz', instant: 'Instant feedback', timed: 'Timed exam', confidence: 'Confidence marking',
+      adaptive: 'Adaptive', survival: 'Survival', study: 'Study mode', flash: 'Flashcards',
+      review: 'Review'
+    };
+    var openTimers = [];
+
+    function openOverlay() {
+      var overlay = el('div', 'quiz-overlay');
+      var box = el('div', 'quiz-box');
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+      box.closeOverlay = function () {
+        openTimers.forEach(function (t) { clearInterval(t); });
+        openTimers = [];
+        overlay.remove();
+      };
+      return box;
+    }
+
+    function hearts(n) {
+      var s = '';
+      for (var i = 0; i < n; i++) s += '\u2764';
+      return s || '\u2014';
+    }
+
+    function addActions(box, buttons) {
+      var actions = el('div', 'quiz-actions');
+      buttons.forEach(function (b) { actions.appendChild(b); });
+      box.appendChild(actions);
+      return actions;
+    }
+
+    function button(text, cls, handler) {
+      var b = el('button', 'quiz-btn' + (cls ? ' ' + cls : ''), text);
+      b.type = 'button';
+      if (handler) b.addEventListener('click', handler);
+      return b;
+    }
+
+    function radioChoice(name, value, label) {
+      var l = el('label');
+      var input = document.createElement('input');
+      input.type = 'radio';
+      input.name = name;
+      input.value = value;
+      l.appendChild(input);
+      l.appendChild(el('span', null, label));
+      return l;
+    }
+
+    /* ---------- result screens ---------- */
     function showResult(box, r) {
       box.innerHTML = '';
       var res = el('div', 'quiz-result ' + (r.passed ? 'pass' : 'fail'));
       res.appendChild(el('h2', null, r.passed ? 'You passed!' : 'Not yet'));
       res.appendChild(el('div', 'score', r.score + '%'));
       res.appendChild(el('div', 'sub', r.correct + ' of ' + r.total + ' correct. Pass mark: ' + r.pass_percent + '%'));
+
+      if (r.notes && r.notes.length) {
+        var nl = el('ul', 'quiz-notes');
+        r.notes.forEach(function (n) { nl.appendChild(el('li', null, n)); });
+        res.appendChild(nl);
+      }
 
       if (r.passed) {
         res.appendChild(el('p', null, r.completed
@@ -100,6 +163,7 @@
             var li = el('li');
             li.appendChild(el('div', null, it.prompt));
             li.appendChild(el('div', 'good', 'Correct answer: ' + it.correct));
+            if (it.explanation) li.appendChild(el('div', null, it.explanation));
             ul.appendChild(li);
           });
           res.appendChild(ul);
@@ -114,67 +178,209 @@
           res.appendChild(ul2);
         }
       }
-      var actions = el('div', 'quiz-actions');
-      var close = el('button', 'quiz-btn', 'Close');
-      close.type = 'button';
-      close.addEventListener('click', function () { window.location.reload(); });
-      actions.appendChild(close);
-      res.appendChild(actions);
+      addActions(res, [button('Close', '', function () { window.location.reload(); })]);
       box.appendChild(res);
     }
 
-    function showQuiz(quiz) {
-      var overlay = el('div', 'quiz-overlay');
-      var box = el('div', 'quiz-box');
-      overlay.appendChild(box);
-      box.appendChild(el('h2', null, quiz.title));
-      box.appendChild(el('div', 'sub', 'Pass mark: ' + quiz.pass_percent + '% \u00B7 ' + quiz.questions.length
-        + ' question' + (quiz.questions.length === 1 ? '' : 's') + '. Answer every question, then submit.'));
+    function showSummary(box, s) {
+      box.innerHTML = '';
+      var res = el('div', 'quiz-result ' + (s.correct === s.total ? 'pass' : 'fail'));
+      res.appendChild(el('h2', null, 'Practice complete'));
+      res.appendChild(el('div', 'score', s.correct + ' / ' + s.total));
+      res.appendChild(el('div', 'sub', s.correct === s.total
+        ? 'Perfect round!'
+        : 'Questions you missed go to Mistake review, and come back in Spaced review.'));
+      addActions(res, [button('Close', '', function () { window.location.reload(); })]);
+      box.appendChild(res);
+    }
+
+    /* ---------- whole-attempt modes: standard, timed, confidence ---------- */
+    function runBatch(r) {
+      var box = openOverlay();
+      box.appendChild(el('h2', null, r.title));
+      var sub = 'Pass mark: ' + r.pass_percent + '% \u00B7 ' + r.questions.length + ' question' + (r.questions.length === 1 ? '' : 's') + '.';
+      if (r.mode === 'timed') sub += ' Answers are locked until you submit.';
+      if (r.mode === 'confidence') sub += ' For every answer, say how sure you are. Sure and right earns more points; sure and wrong loses points.';
+      box.appendChild(el('div', 'sub', sub));
+
+      var timerBox = null;
+      var submitting = false;
+      if (r.mode === 'timed' && r.time_limit) {
+        timerBox = el('div', 'run-timer', '--:--');
+        box.appendChild(timerBox);
+      }
 
       var form = el('form');
-      quiz.questions.forEach(function (q, i) {
+      r.questions.forEach(function (q, i) {
         var qWrap = el('div', 'quiz-q');
         qWrap.appendChild(el('div', 'qtext', (i + 1) + '. ' + q.prompt));
-        q.choices.forEach(function (c) {
-          var label = el('label');
-          var input = document.createElement('input');
-          input.type = 'radio';
-          input.name = 'q' + q.id;
-          input.value = c.id;
-          label.appendChild(input);
-          label.appendChild(el('span', null, c.label));
-          qWrap.appendChild(label);
-        });
+        q.choices.forEach(function (c) { qWrap.appendChild(radioChoice('q' + q.id, c.id, c.label)); });
+        if (r.mode === 'confidence') {
+          var row = el('div', 'conf-row');
+          row.appendChild(el('span', null, 'How sure are you?'));
+          row.appendChild(radioChoice('c' + q.id, 'low', 'Not sure'));
+          row.appendChild(radioChoice('c' + q.id, 'med', 'Fairly sure'));
+          row.appendChild(radioChoice('c' + q.id, 'high', 'Very sure'));
+          qWrap.appendChild(row);
+        }
         form.appendChild(qWrap);
       });
 
-      var actions = el('div', 'quiz-actions');
-      var cancel = el('button', 'quiz-btn secondary', 'Cancel');
-      cancel.type = 'button';
-      cancel.addEventListener('click', function () { overlay.remove(); });
-      var submit = el('button', 'quiz-btn', 'Submit answers');
-      submit.type = 'submit';
-      actions.appendChild(cancel);
-      actions.appendChild(submit);
-      form.appendChild(actions);
+      var submitBtn = el('button', 'quiz-btn', 'Submit answers');
+      submitBtn.type = 'submit';
+      addActions(form, [button('Leave', 'secondary', function () { box.closeOverlay(); }), submitBtn]);
 
-      form.addEventListener('submit', function (e) {
-        e.preventDefault();
+      function submitAttempt(force) {
+        if (submitting) return;
         var answers = {};
+        var conf = {};
         var missing = false;
-        quiz.questions.forEach(function (q) {
+        r.questions.forEach(function (q) {
           var checked = form.querySelector('input[name="q' + q.id + '"]:checked');
-          if (!checked) missing = true; else answers[q.id] = parseInt(checked.value, 10);
+          if (!checked) { missing = true; return; }
+          answers[q.id] = parseInt(checked.value, 10);
+          if (r.mode === 'confidence') {
+            var c = form.querySelector('input[name="c' + q.id + '"]:checked');
+            if (c) conf[q.id] = c.value; else missing = true;
+          }
         });
-        if (missing) { toast('Answer every question first.', true); return; }
-        submit.disabled = true;
-        send('quiz_submit', { quizID: quiz.id, answers: JSON.stringify(answers) })
-          .then(function (r) { showResult(box, r); })
-          .catch(function (err) { toast(err.message, true); submit.disabled = false; });
-      });
+        if (!force && missing) {
+          toast(r.mode === 'confidence' ? 'Answer every question and rate how sure you are.' : 'Answer every question first.', true);
+          return;
+        }
+        submitting = true;
+        submitBtn.disabled = true;
+        send('run_submit', { run: r.run, answers: JSON.stringify(answers), conf: JSON.stringify(conf) })
+          .then(function (res) {
+            openTimers.forEach(function (t) { clearInterval(t); });
+            openTimers = [];
+            showResult(box, res);
+          })
+          .catch(function (err) { toast(err.message, true); submitting = false; submitBtn.disabled = false; });
+      }
 
+      form.addEventListener('submit', function (e) { e.preventDefault(); submitAttempt(false); });
       box.appendChild(form);
-      document.body.appendChild(overlay);
+
+      if (timerBox) {
+        var endAt = Date.now() + r.time_limit * 1000;
+        var id = setInterval(function () {
+          var left = Math.max(0, Math.round((endAt - Date.now()) / 1000));
+          var mm = Math.floor(left / 60), ss = left % 60;
+          timerBox.textContent = 'Time left: ' + (mm < 10 ? '0' : '') + mm + ':' + (ss < 10 ? '0' : '') + ss;
+          timerBox.classList.toggle('low', left <= 60);
+          if (left <= 0) {
+            clearInterval(id);
+            toast('Time is up. Submitting your answers...', true);
+            submitAttempt(true);
+          }
+        }, 500);
+        openTimers.push(id);
+      }
+    }
+
+    /* ---------- one question at a time: instant, adaptive, survival, practice ---------- */
+    function runSteps(r) {
+      var box = openOverlay();
+      var state = { lives: r.lives || 0, total: r.total };
+      var isFlash = (r.mode === 'flash');
+      var title = r.title || MODE_NAMES[r.mode] || 'Quiz';
+
+      function header(index) {
+        box.innerHTML = '';
+        box.appendChild(el('h2', null, title));
+        var bar = el('div', 'run-head');
+        bar.appendChild(el('span', null, 'Question ' + index + ' of ' + state.total));
+        if (r.mode === 'survival') bar.appendChild(el('span', 'hearts', hearts(state.lives)));
+        box.appendChild(bar);
+      }
+
+      function showQuestion(q, index) {
+        header(index);
+        var qWrap = el('div', 'quiz-q');
+        qWrap.appendChild(el('div', 'qtext', q.prompt));
+        var holder = el('div');
+        qWrap.appendChild(holder);
+        box.appendChild(qWrap);
+
+        var checkBtn = button('Check answer', '', null);
+        checkBtn.disabled = true;
+
+        function renderChoices() {
+          holder.innerHTML = '';
+          q.choices.forEach(function (c) {
+            var label = radioChoice('step', c.id, c.label);
+            label.querySelector('input').addEventListener('change', function () { checkBtn.disabled = false; });
+            holder.appendChild(label);
+          });
+        }
+
+        function answer(choiceId) {
+          checkBtn.disabled = true;
+          send('run_answer', { run: r.run, questionID: q.id, choiceID: choiceId })
+            .then(function (fb) { showFeedback(q, index, fb); })
+            .catch(function (err) { toast(err.message, true); checkBtn.disabled = false; });
+        }
+
+        if (isFlash) {
+          holder.appendChild(el('div', 'sub', 'Try to answer from memory first.'));
+          var flash = el('div', 'flash-actions');
+          flash.appendChild(button('Reveal the choices', '', function () { flash.remove(); renderChoices(); }));
+          flash.appendChild(button("I don't know. Show the answer", 'secondary', function () { answer(0); }));
+          holder.appendChild(flash);
+        } else {
+          renderChoices();
+        }
+
+        checkBtn.addEventListener('click', function () {
+          var picked = holder.querySelector('input[name="step"]:checked');
+          if (!picked) { toast('Pick an answer first.', true); return; }
+          answer(parseInt(picked.value, 10));
+        });
+        addActions(box, [button('Leave', 'secondary', function () { box.closeOverlay(); }), checkBtn]);
+      }
+
+      function showFeedback(q, index, fb) {
+        state.lives = fb.lives;
+        header(index);
+        var qWrap = el('div', 'quiz-q');
+        qWrap.appendChild(el('div', 'qtext', q.prompt));
+        var f = el('div', 'quiz-feedback ' + (fb.correct ? 'good' : 'bad'));
+        f.appendChild(el('strong', null, fb.correct ? 'Correct!' : 'Not quite.'));
+        if (fb.correct_label !== undefined) {
+          if (!fb.correct) f.appendChild(el('div', null, 'Correct answer: ' + fb.correct_label));
+          if (fb.explanation) f.appendChild(el('div', 'why', fb.explanation));
+        }
+        if (r.mode === 'survival' && !fb.correct) {
+          f.appendChild(el('div', null, state.lives > 0 ? 'You lost a life. Lives left: ' + hearts(state.lives) : 'You are out of lives.'));
+        }
+        if (r.mode === 'adaptive' && fb.next) {
+          var names = { 1: 'Easy', 2: 'Medium', 3: 'Hard' };
+          f.appendChild(el('div', null, 'Next question level: ' + (names[fb.level] || 'Medium')));
+        }
+        qWrap.appendChild(f);
+        box.appendChild(qWrap);
+
+        var last = !!(fb.result || fb.summary);
+        addActions(box, [button(last ? 'See results' : 'Next question', '', function () {
+          if (fb.result) showResult(box, fb.result);
+          else if (fb.summary) showSummary(box, fb.summary);
+          else showQuestion(fb.next, fb.index);
+        })]);
+      }
+
+      showQuestion(r.first, 1);
+    }
+
+    function beginRun(data, btn) {
+      if (btn) btn.disabled = true;
+      send('run_start', data).then(function (r) {
+        if (btn) btn.disabled = false;
+        if (r.batch) runBatch(r); else runSteps(r);
+      }).catch(function (err) {
+        if (btn) btn.disabled = false;
+        toast(err.message, true);
+      });
     }
 
     wrap.addEventListener('click', function (e) {
@@ -183,20 +389,15 @@
       var action = btn.dataset.action;
 
       if (action === 'start-quiz') {
-        btn.disabled = true;
-        send('quiz_start', { quizID: btn.dataset.quiz }).then(function (r) {
-          btn.disabled = false;
-          showQuiz(r.quiz);
-        }).catch(function (err) {
-          btn.disabled = false;
-          toast(err.message, true);
-        });
+        beginRun({ type: 'checkpoint', quizID: btn.dataset.quiz }, btn);
+
+      } else if (action === 'start-practice') {
+        var hide = document.getElementById('hideChoices');
+        var pm = (btn.dataset.mode === 'study' && hide && hide.checked) ? 'flash' : btn.dataset.mode;
+        beginRun({ type: 'practice', taskID: btn.dataset.task, mode: pm }, btn);
 
       } else if (action === 'mark-finished') {
         if (window.confirm('Mark this topic as finished?')) reloadAfter('mark_finished', { taskID: btn.dataset.task });
-
-      } else if (action === 'finish-review') {
-        reloadAfter('finish_review', { taskID: btn.dataset.task });
       }
     });
   }
@@ -364,11 +565,7 @@
     var ACCEPT = { pdf: '.pdf,application/pdf', video: '.mp4,.webm,video/mp4,video/webm' };
 
     function syncContentForm(form) {
-      var kind = form.elements.kind.value;
-      var isNote = kind === 'note';
-      form.querySelector('.cf-file').classList.toggle('is-hidden', isNote);
-      form.querySelector('.cf-note').classList.toggle('is-hidden', !isNote);
-      if (!isNote) form.elements.file.setAttribute('accept', ACCEPT[kind]);
+      form.elements.file.setAttribute('accept', ACCEPT[form.elements.kind.value] || '');
     }
 
     var contentForm = wrap.querySelector('.content-form');
@@ -391,14 +588,9 @@
         fd.append('title', title);
         fd.append('description', form.elements.description.value.trim());
 
-        if (kind === 'note') {
-          if (!form.elements.body.value.trim()) { toast('Write the note text first.', true); return; }
-          fd.append('body', form.elements.body.value);
-        } else {
-          var file = form.elements.file.files[0];
-          if (!file) { toast('Choose a file to upload.', true); return; }
-          fd.append('file', file);
-        }
+        var file = form.elements.file.files[0];
+        if (!file) { toast('Choose a file to upload.', true); return; }
+        fd.append('file', file);
 
         var btn   = form.querySelector('button[type="submit"]');
         var bar   = form.querySelector('.upload-progress');
@@ -445,19 +637,42 @@
       });
     }
 
-    /* ----- checkpoint builder: settings ----- */
+    /* ----- checkpoint builder: settings + mode picker ----- */
+    var MODE_HELP = {
+      standard: 'Students answer every question on one page, then submit. Results appear at the end.',
+      instant: 'One question at a time. Students see the right answer and your explanation straight after each question. Best for learning.',
+      timed: 'Like a real exam: a countdown runs, answers are locked until they submit, and nothing is shown until the end.',
+      confidence: 'Older mode: students rate how sure they are. Sure and right earns more; sure and wrong loses points.',
+      adaptive: 'Older mode: questions get harder after a correct answer and easier after a miss.',
+      survival: 'Older mode: students have limited lives and each wrong answer costs one.'
+    };
+
+    function syncMode(form) {
+      var mode = form.elements.mode.value;
+      form.querySelector('.mode-desc').textContent = MODE_HELP[mode] || '';
+      form.querySelectorAll('.mode-only').forEach(function (n) {
+        n.classList.toggle('is-hidden', !n.classList.contains('mode-' + mode));
+      });
+    }
+
     wrap.querySelectorAll('.quiz-settings').forEach(function (form) {
+      syncMode(form);
+      form.elements.mode.addEventListener('change', function () { syncMode(form); });
+
       form.addEventListener('submit', function (e) {
         e.preventDefault();
         var data = {
           taskID: form.dataset.task,
           kind: form.dataset.kind,
           title: form.elements.title.value.trim(),
+          mode: form.elements.mode.value,
           pass_percent: form.elements.pass_percent.value,
           cooldown_minutes: form.elements.cooldown_minutes.value,
+          draw_count: form.elements.draw_count.value,
+          time_limit_minutes: form.elements.time_limit_minutes.value,
+          allow_practice: form.elements.allow_practice.checked ? '1' : '0',
           published: form.elements.published.checked ? '1' : '0'
         };
-        if (form.elements.draw_count) data.draw_count = form.elements.draw_count.value;
         run('save_quiz', data);
       });
     });
@@ -517,10 +732,145 @@
           questionID: form.elements.questionID.value,
           prompt: prompt,
           choices: JSON.stringify(choices),
-          correct: correct
+          correct: correct,
+          explanation: form.elements.explanation.value.trim(),
+          difficulty: form.elements.difficulty.value
         });
       });
     });
+
+    /* ----- bulk question import (paste or CSV) ----- */
+    function stripNumbering(line) {
+      return line.replace(/^\s*(?:Q\s*)?\d+\s*[\.\):\-]\s*/i, '').replace(/^\s*Q\s*[:.]\s*/i, '');
+    }
+
+    // blocks separated by a blank line: question, choices (A) ...), * marks the correct one, optional "Explanation:"
+    function parseBlocks(text) {
+      var items = [];
+      var errors = [];
+      var blocks = text.replace(/\r\n/g, '\n').split(/\n\s*\n/);
+      var n = 0;
+      blocks.forEach(function (raw) {
+        var lines = raw.split('\n').map(function (l) { return l.trim(); }).filter(function (l) { return l !== ''; });
+        if (!lines.length) return;
+        n++;
+        var promptLines = [];
+        var choices = [];
+        var stars = [];
+        var explanation = [];
+        var inExplain = false;
+        var answerLetter = '';
+
+        lines.forEach(function (line) {
+          var ex = /^(?:explanation|why|reason)\s*:\s*(.*)$/i.exec(line);
+          var an = /^(?:answer|correct)\s*:\s*([A-Fa-f])\b/i.exec(line);
+          var ch = /^([A-Fa-f])[\)\.]\s+(.*)$/.exec(line);
+          if (ex) { inExplain = true; explanation.push(ex[1]); }
+          else if (inExplain) { explanation.push(line); }
+          else if (an) { answerLetter = an[1].toUpperCase(); }
+          else if (ch) {
+            var text = ch[2];
+            var star = false;
+            if (/\s*\*\s*$/.test(text)) { star = true; text = text.replace(/\s*\*\s*$/, ''); }
+            else if (/\(correct\)\s*$/i.test(text)) { star = true; text = text.replace(/\s*\(correct\)\s*$/i, ''); }
+            choices.push(text.trim());
+            if (star) stars.push(choices.length - 1);
+          }
+          else if (!choices.length) { promptLines.push(line); }
+          else { choices[choices.length - 1] += ' ' + line; }
+        });
+
+        var prompt = stripNumbering(promptLines.join(' ')).trim();
+        var correct = stars.length === 1 ? stars[0] : -1;
+        if (answerLetter && !stars.length) correct = answerLetter.charCodeAt(0) - 65;
+
+        if (!prompt) { errors.push('Question ' + n + ': the question text is missing.'); return; }
+        if (choices.length < 2 || choices.length > 6) { errors.push('Question ' + n + ': it needs between 2 and 6 choices (A) B) C) ...).'); return; }
+        if (stars.length > 1) { errors.push('Question ' + n + ': only one choice can have a *.'); return; }
+        if (correct < 0 || correct >= choices.length) { errors.push('Question ' + n + ': mark the correct choice with a * (or add a line like "Answer: B").'); return; }
+        items.push({ prompt: prompt, choices: choices, correct: correct, explanation: explanation.join(' ').trim() });
+      });
+      return { items: items, errors: errors };
+    }
+
+    function parseCsvRows(text) {
+      var rows = [], row = [], field = '', inQ = false;
+      for (var i = 0; i < text.length; i++) {
+        var c = text.charAt(i);
+        if (inQ) {
+          if (c === '"') { if (text.charAt(i + 1) === '"') { field += '"'; i++; } else { inQ = false; } }
+          else field += c;
+        } else if (c === '"') { inQ = true; }
+        else if (c === ',') { row.push(field); field = ''; }
+        else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+        else if (c !== '\r') { field += c; }
+      }
+      if (field !== '' || row.length) { row.push(field); rows.push(row); }
+      return rows;
+    }
+
+    // columns: question, choice A..F, correct (A-F or 1-6), explanation
+    function parseCsvQuestions(text) {
+      var rows = parseCsvRows(text.replace(/^\uFEFF/, '')).filter(function (r) { return r.join('').trim() !== ''; });
+      var items = [];
+      var errors = [];
+      rows.forEach(function (r, idx) {
+        if (idx === 0 && /^question$/i.test((r[0] || '').trim())) return;     // header row
+        var n = items.length + errors.length + 1;
+        var prompt = (r[0] || '').trim();
+        var choices = [];
+        var position = {};                                                    // original column -> index after skipping blanks
+        for (var j = 1; j <= 6; j++) {
+          var cell = (r[j] || '').trim();
+          if (cell !== '') { position[j - 1] = choices.length; choices.push(cell); }
+        }
+        var raw = (r[7] || '').trim().toUpperCase();
+        var col = /^[A-F]$/.test(raw) ? raw.charCodeAt(0) - 65 : (/^[1-6]$/.test(raw) ? parseInt(raw, 10) - 1 : -1);
+        if (!prompt) { errors.push('Row ' + n + ': the question text is missing.'); return; }
+        if (choices.length < 2) { errors.push('Row ' + n + ': it needs at least 2 choices.'); return; }
+        if (col < 0 || position[col] === undefined) { errors.push('Row ' + n + ': the "correct" column must be A-F and point to a filled-in choice.'); return; }
+        items.push({ prompt: prompt, choices: choices, correct: position[col], explanation: (r[8] || '').trim() });
+      });
+      return { items: items, errors: errors };
+    }
+
+    function runImport(box) {
+      var paste = box.querySelector('[name="paste"]').value.trim();
+      var file  = box.querySelector('[name="csv"]').files[0];
+
+      function finish(res) {
+        if (res.errors.length) {
+          toast(res.errors[0] + (res.errors.length > 1 ? ' (and ' + (res.errors.length - 1) + ' more)' : ''), true);
+          return;
+        }
+        if (!res.items.length) { toast('No questions were found.', true); return; }
+        if (!window.confirm('Import ' + res.items.length + ' question' + (res.items.length === 1 ? '' : 's') + '?')) return;
+        run('import_questions', { quizID: box.dataset.quiz, questions: JSON.stringify(res.items) });
+      }
+
+      if (file) {
+        var reader = new FileReader();
+        reader.onload = function () { finish(parseCsvQuestions(String(reader.result))); };
+        reader.onerror = function () { toast('Could not read that file.', true); };
+        reader.readAsText(file);
+      } else if (paste) {
+        finish(parseBlocks(paste));
+      } else {
+        toast('Paste your questions or choose a CSV file first.', true);
+      }
+    }
+
+    function downloadCsvTemplate() {
+      var text = 'question,choice A,choice B,choice C,choice D,choice E,choice F,correct,explanation\r\n'
+        + 'What is 2 + 2?,3,4,5,6,,,B,Basic addition.\r\n';
+      var blob = new Blob([text], { type: 'text/csv' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'questions_template.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
 
     /* ----- material + builder buttons (event delegation) ----- */
     wrap.addEventListener('click', function (e) {
@@ -576,6 +926,9 @@
         try { q = JSON.parse(qItem.dataset.q); } catch (err) { return; }
         qForm.elements.questionID.value = q.id;
         qForm.elements.prompt.value = q.prompt;
+        qForm.elements.explanation.value = q.explanation || '';
+        qForm.elements.difficulty.value = String(q.difficulty || 2);
+        if ((q.explanation || '') !== '' || (q.difficulty || 2) !== 2) qForm.querySelector('.more-opts').open = true;
         setChoiceRows(qForm, q.choices, q.correct);
         qForm.querySelector('.qf-title').textContent = 'Edit question';
         qForm.querySelector('[data-action="cancel-question"]').classList.remove('is-hidden');
@@ -586,6 +939,20 @@
 
       } else if (action === 'delete-question') {
         if (window.confirm('Delete this question?')) run('delete_question', { questionID: btn.dataset.question });
+
+      } else if (action === 'duplicate-question') {
+        run('duplicate_question', { questionID: btn.dataset.question });
+
+      } else if (action === 'import-questions') {
+        runImport(btn.closest('.import-box'));
+
+      } else if (action === 'csv-template') {
+        downloadCsvTemplate();
+
+      } else if (action === 'show-exam') {
+        var examCard = document.getElementById('card-exam');
+        if (examCard) { examCard.classList.remove('is-hidden'); examCard.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+        btn.remove();
       }
     });
   }
