@@ -23,17 +23,20 @@ $users = "SELECT
       F.`facultyID` AS real_userID,
       F.`first_name` AS `first_name`,
       F.`middle_name` AS `middle_name`,
-      F.`department` AS `department`,
       F.`last_name` AS `last_name`,
       F.`program` AS `program`,
+      F.`department` AS `department`,
       F.`password` AS `password`,
       F.`folderID` AS `folderID`,
+      O.`officeID` AS `officeID`,
       F.`role` AS `role`,
       F.`status` AS `status`
   FROM
       `faculty` as F
       left join programs as P
-    ON P.program = F.program
+        ON P.program = F.program
+        left join office as O
+        ON O.facultyID = F.facultyID
   UNION
   SELECT
       CONCAT(
@@ -48,6 +51,7 @@ $users = "SELECT
       P.`department` AS `department`,
       S.`password` AS `password`,
       S.`folderID` AS `folderID`,
+      null AS `officeID`,
       'student' AS `role`,
       S.`status` AS `status`
   FROM
@@ -552,27 +556,6 @@ $userDAO->prepareStatement("updateStudentProfileFull",
     );
 
 
-    // $clearanceDAO->prepareStatement("getFacultyClearance","SELECT DISTINCT
-    //         F.role,
-    //         FC.facultyID AS facultyID,
-    //         FC.date_cleared AS date_cleared,
-    //         FC.remarks AS remarks,
-    //         FC.status AS status,
-    //         CONCAT(F.last_name, ', ', F.first_name) AS prof_name
-    //     FROM faculty_clearance AS FC
-    //         INNER JOIN students AS ST
-    //             ON ST.studentID = FC.studentID
-    //         LEFT JOIN faculty AS F
-    //             ON F.facultyID = FC.facultyID
-    //     WHERE EXISTS (
-    //             SELECT 1
-    //             FROM faculty_clearance_requirements AS FCR
-    //             WHERE FCR.faculty_clearanceID = FC.faculty_clearanceID
-    //         )
-    //         AND ('ALL' = ? OR F.last_name = ?)
-    //         AND CONCAT(YEAR(ST.date_created), LPAD(FC.studentID, 5, 0)) = ?
-    //         AND ('ALL' = ? OR FC.status = ?);
-    // ");
 
     $clearanceDAO->prepareStatement("getFacultyClearance","SELECT DISTINCT
             F.role,
@@ -606,37 +589,6 @@ $userDAO->prepareStatement("updateStudentProfileFull",
         `faculty_clearance_requirements` ( `faculty_clearanceID`, `fileID`, `file_name`,mime_type, `file_size`,  `uploaded_by`) 
         VALUES (?, ?,?,?, ?,?)"
     );
-    // $clearanceDAO->prepareStatement("getFacultyRequirements","SELECT
-        //         FC.faculty_clearanceID ,
-        //         FC.date_cleared AS date_cleared,
-        //         FC.remarks AS remarks,
-        //         FC.status AS status,
-        //         CONCAT(F.last_name, ', ', F.first_name) AS prof_name,
-        //         F.role,
-        //         FCR.ID,
-        //         FCR.fileID,
-        //         FCR.file_name,
-        //         FCR.mime_type,
-        //         IF(
-        //             COALESCE(FCR.file_size, 0) < 1000000,
-        //             CONCAT(ROUND(COALESCE(FCR.file_size, 0) / 1024, 1), ' KB'),
-        //             CONCAT(ROUND(COALESCE(FCR.file_size, 0) / 1048576, 2), ' MB')
-        //         ) AS file_size,
-        //         FCR.uploaded_at
-        //     FROM
-        //         faculty_clearance AS FC
-        //     INNER JOIN students AS ST
-        //     ON ST.studentID = FC.studentID
-        //     inner JOIN faculty AS F
-        //     ON  F.facultyID = FC.facultyID
-        //     inner JOIN faculty_clearance_requirements AS FCR
-        //     ON 	FCR.faculty_clearanceID = FC.faculty_clearanceID
-
-        //     WHERE
-        //         FC.facultyID = ? and concat(year(ST.date_created),lpad(ST.studentID,5,0)) = ?
-        //         ANd not FCR.uploaded_by = ?;
-
-        // "); 
 
     $clearanceDAO->prepareStatement("getFacultyRequirements","SELECT
             FC.faculty_clearanceID,
@@ -921,6 +873,41 @@ $userDAO->prepareStatement("updateStudentProfileFull",
             AND ('ALL' = ? OR CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ?)
         ORDER BY EP.acad_year DESC, EP.sem DESC, OCR.uploaded_at DESC;
     ");
+
+
+    $clearanceDAO->prepareStatement("getStudentsForOfficeClearance","SELECT
+            OC.office_clearanceID AS office_clearanceID,
+            CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) AS studentID,
+            ST.studentID AS real_studentID,
+            CONCAT(ST.last_name, ', ', ST.first_name,
+                IFNULL(CONCAT(' ', ST.middle_name), '')) AS student_name,
+            ST.program,
+            ST.block,
+            EP.enrollmentID,
+            OC.remarks,
+            CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem,
+            IFNULL(CAST(OC.date_cleared AS CHAR), 'not yet cleared') AS date_cleared,
+            IFNULL(OC.`status`, 'not yet cleared') AS status
+        FROM students AS ST
+            INNER JOIN enrolled_subjects AS ES
+                ON ES.studentID = ST.studentID
+            INNER JOIN enrollment_period AS EP
+                ON EP.enrollmentID = ES.enrollmentID
+            LEFT JOIN office_clearance AS OC
+                ON OC.studentID = ST.studentID
+                AND OC.officeID = ?
+                AND OC.enrollmentID = EP.enrollmentID
+        WHERE (CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ? OR 'ALL' = ?)
+            AND (ST.block = ? OR 'ALL' = ?)
+            AND (CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ? OR 'ALL' = ?)
+        GROUP BY ST.studentID, ST.date_created, ST.last_name, ST.first_name,
+            ST.middle_name, ST.program, ST.block, EP.acad_year, EP.sem, EP.enrollmentID,
+            OC.office_clearanceID, OC.remarks, OC.date_cleared, OC.`status`
+        ORDER BY EP.acad_year DESC, EP.sem DESC, student_name, ST.studentID,
+            OC.date_cleared;
+    ");
+
+
 
     $clearanceDAO->prepareStatement("findClearanceDocument","SELECT
             CF.ID,
@@ -1444,7 +1431,11 @@ $userDAO->prepareStatement("updateStudentProfileFull",
 
     ");
 
-    $clearanceDAO->prepareStatement("updateOfficeClearance","
+    $clearanceDAO->prepareStatement("updateOfficeClearance","UPDATE `office_clearance` 
+        SET 
+            `remarks` = ?,
+            `status` = ?
+        WHERE `office_clearanceID` = ?;
 
     ");
 
@@ -1464,7 +1455,12 @@ $userDAO->prepareStatement("updateStudentProfileFull",
         ) VALUES (?,?,? );
     ");
 
-    $clearanceDAO->prepareStatement("addOfficeClearance","
+    $clearanceDAO->prepareStatement("addOfficeClearance","INSERT INTO `office_clearance` (
+            `officeID`, 
+            `studentID`, 
+            `remarks`, 
+            `enrollmentID`
+        ) VALUES (?, ?, ?, ?);
 
     ");
 
@@ -1486,5 +1482,11 @@ $userDAO->prepareStatement("updateStudentProfileFull",
         and `facultyID` = ?;"
     );
 
-
+    $clearanceDAO->prepareStatement("getOfficeClearanceID","SELECT 
+            `office_clearanceID` 
+        FROM `office_clearance` 
+        WHERE `enrollmentID` = ?
+        and `studentID` = ? 
+        and `officeID` = ?;"
+    );
 }

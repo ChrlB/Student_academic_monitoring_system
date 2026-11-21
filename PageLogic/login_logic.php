@@ -108,6 +108,8 @@ function login($login_info) {
     $_SESSION['program'] = $user['program'] ?? null;
     $_SESSION['department'] = $user['department'] ?? null;
 
+    $_SESSION['officeID'] = $user['officeID'] ?? null;
+
     $_SESSION['message'] = 'Account verification successful';
 
     unset($_SESSION['csrf_token'], $_SESSION['error'], $_SESSION['login_errors'], $_SESSION['login_old'], $_SESSION['login_fails']);
