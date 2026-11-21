@@ -1,6 +1,5 @@
 <?php
-require_once __DIR__ . '/../PageLogic/registration_logic.php';   // registrar check, $regAccounts, $regDepartments, e()
-
+require_once __DIR__ . '/../PageLogic/registration_logic.php';  
 $filters = [
     'all'                 => 'All Accounts',
     'student'             => 'Students',
@@ -37,9 +36,16 @@ $total = count($regAccounts);
       <main class="account registration scrollbar" id="reg"
             data-add-url="<?= e(BASE_PATH . '/registration-add') ?>"
             data-restrict-url="<?= e(BASE_PATH . '/registration-restrict') ?>"
+            data-update-url="<?= e(BASE_PATH . '/registration-update') ?>"
+            data-delete-url="<?= e(BASE_PATH . '/registration-delete') ?>"
+            data-assign-url="<?= e(BASE_PATH . '/registration-assign') ?>"
+            data-unassign-url="<?= e(BASE_PATH . '/registration-unassign') ?>"
+            data-asg-ready="<?= $regAsgReady ? '1' : '0' ?>"
             data-csrf="<?= e(csrfToken()) ?>"
             data-default-dept="<?= e($defaultDept) ?>">
+
         <?php if ($regLoadError): ?><p class="reg-warning" role="alert"><?= e($regLoadError) ?></p><?php endif; ?>
+        <?php if (!$regAsgReady): ?><p class="reg-warning" role="status">Assigning professors needs a one-time database update: run <b>assignment_migration.sql</b> in phpMyAdmin, then reload.</p><?php endif; ?>
 
         <div class="reg-tools">
           <form class="reg-search" role="search" id="reg-search-form">
@@ -51,6 +57,9 @@ $total = count($regAccounts);
             <button type="submit" class="reg-btn reg-btn-light">Search</button>
           </form>
           <div class="reg-actions">
+            <button type="button" class="reg-btn reg-btn-light" data-action="open-assign">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9.5" cy="8" r="3.6"/><path d="M3 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 11.5l2 2 3.5-4"/></svg>Assign Prof
+            </button>
             <button type="button" class="reg-btn reg-btn-light" data-action="open-restrict">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2.2"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5"/></svg>Restrict
             </button>
@@ -82,7 +91,9 @@ $total = count($regAccounts);
                   <th scope="col">Department</th>
                   <th scope="col">Program / Block</th>
                   <th scope="col">Roles:</th>
+                  <th scope="col">Assigned Professors</th>
                   <th scope="col">Account Status</th>
+                  <th scope="col">Actions</th>
                 </tr>
               </thead>
               <tbody id="reg-body">
@@ -95,7 +106,16 @@ $total = count($regAccounts);
                   <td><?= e($a['dept'] ?: '—') ?></td>
                   <td><?= e($a['programBlock']) ?></td>
                   <td><span class="role-name"><?= e($a['roleLabel']) ?></span><?php if ($a['kind'] === 'faculty'): ?> <span class="tag">Faculty</span><?php endif; ?></td>
+                  <td class="reg-asg"></td><?php /* drawn by registration.js (fillRow) so the page and later updates share one renderer */ ?>
                   <td><span class="status status-<?= e($a['status']) ?>"><?= $a['status'] === 'restricted' ? 'Restricted' : 'Active' ?></span></td>
+                  <td class="reg-row-actions">
+                    <button type="button" class="row-btn row-btn-edit" data-row-action="edit"<?= $a['locked'] ? ' disabled title="This account cannot be edited here"' : '' ?> aria-label="Edit <?= e($a['name']) ?>">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13 7l4 4"/></svg>Edit
+                    </button>
+                    <button type="button" class="row-btn row-btn-delete" data-row-action="delete"<?= $a['locked'] ? ' disabled title="This account cannot be deleted here"' : '' ?> aria-label="Delete <?= e($a['name']) ?>">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10.5 11v5M13.5 11v5"/></svg>Delete
+                    </button>
+                  </td>
                 </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -107,7 +127,6 @@ $total = count($regAccounts);
     </div>
   </div>
 
-  <!-- Register Student / Faculty -->
   <dialog id="add-dialog" class="dlg dlg-light reg-dlg" aria-labelledby="add-title">
     <form id="add-form" novalidate autocomplete="off">
       <div class="reg-dlg-head">
@@ -191,6 +210,130 @@ $total = count($regAccounts);
       <div class="dlg-actions">
         <button type="button" class="pill pill-grey" data-close>Cancel</button>
         <button type="submit" class="pill" id="restrict-submit">Restrict</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Assign professors to a student -->
+  <dialog id="assign-dialog" class="dlg dlg-light reg-dlg" aria-labelledby="assign-title">
+    <form id="assign-form" novalidate autocomplete="off">
+      <div class="reg-dlg-head">
+        <h2 id="assign-title">
+          <svg class="reg-h2-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9.5" cy="8" r="3.6"/><path d="M3 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 11.5l2 2 3.5-4"/></svg>
+          Assign Professors to Student
+        </h2>
+        <button type="button" class="reg-x" data-close aria-label="Close">&times;</button>
+      </div>
+
+      <label class="rf">
+        <span>Select Student</span>
+        <select name="school_id" required aria-describedby="assign-school_id-err"></select>
+        <em class="rf-err" id="assign-school_id-err" data-err="school_id" hidden></em>
+      </label>
+      <p class="asg-info" id="assign-info" aria-live="polite"></p>
+
+      <div class="asg-listhead">
+        <span id="assign-list-title">Currently Assigned Professors</span>
+        <b id="assign-count" class="asg-count"></b>
+      </div>
+      <ul class="asg-list" id="assign-list" aria-labelledby="assign-list-title"></ul>
+
+      <p class="asg-sub">+ Add Another Professor</p>
+      <label class="rf">
+        <span>Select Professor / Faculty</span>
+        <select name="faculty_id" required aria-describedby="assign-faculty_id-err"></select>
+        <em class="rf-err" id="assign-faculty_id-err" data-err="faculty_id" hidden></em>
+      </label>
+      <label class="rf">
+        <span>Assignment Type</span>
+        <select name="type" aria-describedby="assign-type-err">
+          <option value="subject">Subject professor (teaches a subject)</option>
+          <option value="adviser">Academic adviser (reviews enrollment)</option>
+        </select>
+        <em class="rf-err" id="assign-type-err" data-err="type" hidden></em>
+      </label>
+      <label class="rf">
+        <span>Course / Subject or Advising Role</span>
+        <input type="text" name="assignment" maxlength="100" placeholder="e.g. CS 202 — Object-Oriented Programming" aria-describedby="assign-assignment-err">
+        <em class="rf-err" id="assign-assignment-err" data-err="assignment" hidden></em>
+      </label>
+      <p class="rf-hint" id="assign-hint"></p>
+      <p class="rf-err rf-formerr" id="assign-formerr" role="alert" hidden></p>
+      <div class="dlg-actions">
+        <button type="button" class="pill pill-grey" data-close>Done</button>
+        <button type="submit" class="pill" id="assign-submit">+ Add Assignment</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Edit account -->
+  <dialog id="edit-dialog" class="dlg dlg-light reg-dlg" aria-labelledby="edit-title">
+    <form id="edit-form" novalidate autocomplete="off">
+      <div class="reg-dlg-head">
+        <h2 id="edit-title">Edit Student / Faculty</h2>
+        <button type="button" class="reg-x" data-close aria-label="Close">&times;</button>
+      </div>
+      <label class="rf">
+        <span>School / Employee ID <small>(cannot be changed)</small></span>
+        <input type="text" name="school_id" readonly tabindex="-1">
+      </label>
+      <label class="rf">
+        <span>Full Name</span>
+        <input type="text" name="full_name" placeholder="First Name, Middle Initial, Last Name" maxlength="150" required aria-describedby="edit-full_name-err">
+        <em class="rf-err" id="edit-full_name-err" data-err="full_name" hidden></em>
+      </label>
+      <div class="rf-row">
+        <label class="rf">
+          <span>Department</span>
+          <select name="department" required aria-describedby="edit-department-err">
+            <?php foreach ($regDepartments as $d): ?>
+              <option value="<?= e($d['department']) ?>"><?= e($d['department']) ?></option>
+            <?php endforeach; ?>
+          </select>
+          <em class="rf-err" id="edit-department-err" data-err="department" hidden></em>
+        </label>
+        <label class="rf">
+          <span>Program / Block</span>
+          <input type="text" name="program_block" placeholder="e.g. BSCS 2C" maxlength="20" aria-describedby="edit-program_block-err">
+          <em class="rf-err" id="edit-program_block-err" data-err="program_block" hidden></em>
+        </label>
+      </div>
+      <label class="rf">
+        <span>Roles</span>
+        <select name="role" required aria-describedby="edit-role-err">
+          <option>Students</option>
+          <option>Dean</option>
+          <option>Program Coordinator</option>
+          <option>Professor</option>
+        </select>
+        <em class="rf-err" id="edit-role-err" data-err="role" hidden></em>
+      </label>
+      <p class="rf-hint" id="edit-hint"></p>
+      <p class="rf-err rf-formerr" id="edit-formerr" role="alert" hidden></p>
+      <div class="dlg-actions">
+        <button type="button" class="pill pill-grey" data-close>Cancel</button>
+        <button type="submit" class="pill" id="edit-submit">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Delete account -->
+  <dialog id="delete-dialog" class="dlg dlg-light reg-dlg" aria-labelledby="delete-title">
+    <form id="delete-form" novalidate>
+      <div class="reg-dlg-head">
+        <h2 id="delete-title">Delete Account</h2>
+        <button type="button" class="reg-x" data-close aria-label="Close">&times;</button>
+      </div>
+      <p class="reg-confirm" id="delete-text"></p>
+      <dl class="reg-cred">
+        <div><dt>Name</dt><dd id="delete-name"></dd></div>
+        <div><dt>School / Employee ID</dt><dd id="delete-id" class="mono"></dd></div>
+      </dl>
+      <p class="rf-hint">This cannot be undone. An account that already has records (enrollment, attendance, clearance) cannot be deleted: restrict it instead.</p>
+      <p class="rf-err rf-formerr" id="delete-formerr" role="alert" hidden></p>
+      <div class="dlg-actions">
+        <button type="button" class="pill pill-grey" data-close>Cancel</button>
+        <button type="submit" class="pill pill-danger" id="delete-submit">Delete</button>
       </div>
     </form>
   </dialog>

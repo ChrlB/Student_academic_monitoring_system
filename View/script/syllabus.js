@@ -125,16 +125,12 @@
         moduleID: form.dataset.module,
         title: title,
         week_no: form.elements.week_no.value,
+        available_from: form.elements.available_from.value,
         due_date: form.elements.due_date.value
       });
     });
   });
 
-  wrap.querySelectorAll('.status-select').forEach(function (sel) {
-    sel.addEventListener('change', function () {
-      run('set_status', { taskID: sel.dataset.task, status: sel.value });
-    });
-  });
 
   wrap.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-action]');
@@ -168,6 +164,7 @@
         taskID: btn.dataset.task,
         title: title,
         week_no: row.querySelector('[name="week_no"]').value,
+        available_from: row.querySelector('[name="available_from"]').value,
         due_date: row.querySelector('[name="due_date"]').value
       });
 
@@ -176,8 +173,6 @@
         run('delete_task', { taskID: btn.dataset.task });
       }
 
-    } else if (action === 'mark-done') {
-      run('set_status', { taskID: btn.dataset.task, status: 'completed' });
     }
   });
 })();

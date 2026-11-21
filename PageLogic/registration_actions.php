@@ -1,5 +1,4 @@
 <?php
-
 require_once __DIR__ . '/../Services/csrf.php';
 
 const REG_ROLES = [
@@ -17,7 +16,6 @@ function regJson(array $payload, int $status = 200): void {
     exit;
 }
 
-/** Logged in as a registrar with a valid CSRF token, or answers with a JSON error. */
 function regGuard(array $post): void {
     if (empty($_SESSION['userID'])) regJson(['ok' => false, 'message' => 'Please log in again.'], 401);
     if (strtolower((string)($_SESSION['role'] ?? '')) !== 'registrar') {
@@ -33,13 +31,10 @@ function regPdo(): PDO {
     return $db_connection;
 }
 
-/* ---------------------------------------------------------------- helpers */
-
 function regTitle(string $s): string {
     return mb_convert_case(mb_strtolower($s, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
 }
 
-/** "ID" shown to people: students YYYY + 5 digits, faculty F + YYYY + 5 digits (same as the `users` view). */
 function regUserId(string $kind, int $num, string $dateCreated): string {
     $year = substr($dateCreated, 0, 4);
     return ($kind === 'faculty' ? 'F' : '') . $year . str_pad((string)$num, 5, '0', STR_PAD_LEFT);
@@ -51,15 +46,20 @@ function regRoleLabel(string $role): string {
     return $role === 'registrar' ? 'Registrar' : regTitle($role);
 }
 
-/** One row of the directory, in the shape registration.js draws. */
-function regAccount(string $kind, array $r, array $reasons = []): array {
-    $num  = (int)($kind === 'student' ? $r['studentID'] : $r['facultyID']);
-    $id   = regUserId($kind === 'student' ? 'student' : 'faculty', $num, (string)$r['date_created']);
+function regDisplayName(array $r): string {
     $mid  = trim((string)$r['middle_name']);
     $name = trim(regTitle(trim((string)$r['first_name'])) . ' '
           . ($mid !== '' ? mb_strtoupper(mb_substr($mid, 0, 1)) . '.' : '') . ' '
           . regTitle(trim((string)$r['last_name'])));
-    $name = preg_replace('/\s+/', ' ', $name);
+    return preg_replace('/\s+/', ' ', $name);
+}
+
+
+function regAccount(string $kind, array $r, array $reasons = [], ?array $asg = null): array {
+    $num  = (int)($kind === 'student' ? $r['studentID'] : $r['facultyID']);
+    $id   = regUserId($kind === 'student' ? 'student' : 'faculty', $num, (string)$r['date_created']);
+    $name = regDisplayName($r);
+    if ($asg === null) $asg = regAssignmentIndex();
 
     if ($kind === 'student') {
         $role = 'student';
@@ -76,7 +76,71 @@ function regAccount(string $kind, array $r, array $reasons = []): array {
         'id' => $id, 'kind' => $kind, 'role' => $role, 'roleLabel' => regRoleLabel($role),
         'name' => $name, 'dept' => $dept, 'programBlock' => $pb,
         'status' => $status, 'reason' => $status === 'restricted' ? ($reasons[$id] ?? '') : '',
+        // your own account and registrar accounts cannot be edited, deleted or restricted from this page
+        'locked' => $role === 'registrar' || strtoupper($id) === strtoupper((string)($_SESSION['userID'] ?? '')),
+        // students: the professors assigned to them (one entry per subject / advising role); faculty: how many students
+        'assignments'   => $kind === 'student' ? ($asg['student'][$num] ?? []) : [],
+        'assignedCount' => $kind === 'faculty' ? (int)($asg['faculty'][$num] ?? 0) : 0,
     ];
+}
+
+/* ------------------------------------------------------ assignments */
+
+function regAssignmentsReady(): bool {
+    try {
+        regPdo()->query('SELECT assignment_type, assignment FROM professor_student LIMIT 0');
+        return true;
+    } catch (Throwable $e) {
+        return false;
+    }
+}
+
+function regAssignmentIndex(): array {
+    $pdo = regPdo();
+    $cols = regAssignmentsReady() ? 'aa.assignment_type, aa.assignment' : "'professor' AS assignment_type, 'Academic professor' AS assignment";
+    $out = ['student' => [], 'faculty' => []];
+    try {
+        $rows = $pdo->query(
+            "SELECT aa.id, aa.studentID, aa.facultyID, $cols,
+                    f.first_name, f.middle_name, f.last_name, f.role, f.date_created
+               FROM professor_student aa JOIN faculty f ON f.facultyID = aa.facultyID
+              ORDER BY aa.id"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('registration assignments failed: ' . $e->getMessage());
+        return $out;
+    }
+    $seen = [];
+    foreach ($rows as $r) {
+        $sNum = (int)$r['studentID']; $fNum = (int)$r['facultyID'];
+        $out['student'][$sNum][] = [
+            'id'        => (int)$r['id'],
+            'facultyId' => regUserId('faculty', $fNum, (string)$r['date_created']),
+            'name'      => regDisplayName($r),
+            'roleLabel' => regRoleLabel((string)$r['role']),
+            'type'      => $r['assignment_type'] === 'subject' ? 'subject' : 'professor',
+            'label'     => (string)$r['assignment'],
+        ];
+        if (!isset($seen[$fNum][$sNum])) {
+            $seen[$fNum][$sNum] = true;
+            $out['faculty'][$fNum] = ($out['faculty'][$fNum] ?? 0) + 1;
+        }
+    }
+    return $out;
+}
+
+/** A fresh directory entry for one account (used to refresh a row after a change). */
+function regLoadAccount(PDO $pdo, string $kind, int $num): ?array {
+    if ($kind === 'student') {
+        $st = $pdo->prepare("SELECT s.studentID, s.first_name, s.middle_name, s.last_name, s.program, s.block, s.date_created, s.status, p.department
+                            FROM students s LEFT JOIN programs p ON p.program = s.program WHERE s.studentID = ?");
+    } else {
+        $st = $pdo->prepare("SELECT facultyID, first_name, middle_name, last_name, role, department, program, date_created, status
+                            FROM faculty WHERE facultyID = ?");
+    }
+    $st->execute([$num]);
+    $r = $st->fetch(PDO::FETCH_ASSOC);
+    return $r ? regAccount($kind, $r, regReasons(), regAssignmentIndex()) : null;
 }
 
 /** Latest restriction reason per account ID. Silently empty if the log table was not created yet. */
@@ -97,24 +161,24 @@ function regReasons(): array {
 function regDirectory(): array {
     $pdo = regPdo();
     $reasons = regReasons();
+    $asg = regAssignmentIndex();
     $out = [];
     $students = $pdo->query(
         "SELECT s.studentID, s.first_name, s.middle_name, s.last_name, s.program, s.block, s.date_created,
                 s.status, p.department
-           FROM students s LEFT JOIN programs p ON p.program = s.program
-          ORDER BY s.date_created, s.studentID"
+        FROM students s LEFT JOIN programs p ON p.program = s.program
+        ORDER BY s.date_created, s.studentID"
     )->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($students as $r) $out[] = regAccount('student', $r, $reasons);
+    foreach ($students as $r) $out[] = regAccount('student', $r, $reasons, $asg);
 
     $faculty = $pdo->query(
         "SELECT facultyID, first_name, middle_name, last_name, role, department, program, date_created, status
-           FROM faculty ORDER BY date_created, facultyID"
+        FROM faculty ORDER BY date_created, facultyID"
     )->fetchAll(PDO::FETCH_ASSOC);
-    foreach ($faculty as $r) $out[] = regAccount('faculty', $r, $reasons);
+    foreach ($faculty as $r) $out[] = regAccount('faculty', $r, $reasons, $asg);
     return $out;
 }
 
-/** [first, middle, last] or an error string. Accepts "First, M, Last" or "First M Last". */
 function regParseName(string $raw): array {
     $raw = trim(preg_replace('/\s+/u', ' ', $raw));
     if ($raw === '') return [null, 'Enter the full name.'];
@@ -150,29 +214,12 @@ function regTempPassword(): string {
     return $pw;
 }
 
-function registrationAdd($post) {
-    regGuard($post);
-    $pdo = regPdo();
-    $errors = [];
-
-    [$parts, $nameErr] = regParseName((string)($post['full_name'] ?? ''));
-    if ($nameErr) $errors['full_name'] = $nameErr;
-
-    $roleLabel = (string)($post['role'] ?? '');
-    if (!isset(REG_ROLES[$roleLabel])) {
-        $errors['role'] = 'Choose a role.';
-        $kind = 'student'; $roleValue = 'student';
-    } else {
-        [$kind, $roleValue] = REG_ROLES[$roleLabel];
-    }
-
-    // department must exist
+function regCheckAssignment(PDO $pdo, string $kind, string $roleValue, array $post, array &$errors): array {
     $dept = strtoupper(trim((string)($post['department'] ?? '')));
     $st = $pdo->prepare('SELECT 1 FROM departments WHERE department = ?');
     $st->execute([$dept]);
     if ($dept === '' || !$st->fetchColumn()) $errors['department'] = 'Choose a valid department.';
 
-    // program / block
     $pbRaw = strtoupper(trim(preg_replace('/\s+/', ' ', (string)($post['program_block'] ?? ''))));
     $program = null; $yearLevel = 0; $block = '';
     if ($kind === 'student') {
@@ -193,6 +240,26 @@ function registrationAdd($post) {
         $st->execute([$program, $dept]);
         if (!$st->fetchColumn()) $errors['program_block'] = "$program is not a program of $dept.";
     }
+    return [$dept, $program, $yearLevel, $block];
+}
+
+function registrationAdd($post) {
+    regGuard($post);
+    $pdo = regPdo();
+    $errors = [];
+
+    [$parts, $nameErr] = regParseName((string)($post['full_name'] ?? ''));
+    if ($nameErr) $errors['full_name'] = $nameErr;
+
+    $roleLabel = (string)($post['role'] ?? '');
+    if (!isset(REG_ROLES[$roleLabel])) {
+        $errors['role'] = 'Choose a role.';
+        $kind = 'student'; $roleValue = 'student';
+    } else {
+        [$kind, $roleValue] = REG_ROLES[$roleLabel];
+    }
+
+    [$dept, $program, $yearLevel, $block] = regCheckAssignment($pdo, $kind, $roleValue, $post, $errors);
 
     // optional typed ID, otherwise the database numbers it
     $idRaw = strtoupper(trim((string)($post['school_id'] ?? '')));
@@ -323,4 +390,208 @@ function registrationRestrict($post) {
         'ok' => true, 'id' => $id, 'status' => $lift ? 'active' : 'restricted', 'reason' => $lift ? '' : $reason,
         'message' => $lift ? "Restriction lifted for $id." : "$id is now restricted.",
     ]);
+}
+
+function regFindAccount(PDO $pdo, $rawId): array {
+    $id = strtoupper(trim((string)$rawId));
+    if (!preg_match('/^(F?)(\d{4})(\d{5})$/', $id, $m)) {
+        regJson(['ok' => false, 'message' => 'That account ID is not valid.'], 422);
+    }
+    $kind  = $m[1] === 'F' ? 'faculty' : 'student';
+    $year  = (int)$m[2]; $num = (int)$m[3];
+    $table = $kind === 'faculty' ? 'faculty' : 'students';
+    $col   = $kind === 'faculty' ? 'facultyID' : 'studentID';
+    $st = $pdo->prepare("SELECT * FROM $table WHERE $col = ?");
+    $st->execute([$num]);
+    $row = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$row || (int)substr((string)$row['date_created'], 0, 4) !== $year) {
+        regJson(['ok' => false, 'message' => 'No account has this ID. It may have been deleted already.'], 404);
+    }
+    if ($id === strtoupper((string)$_SESSION['userID'])) {
+        regJson(['ok' => false, 'message' => 'You cannot change your own account here. Use the Account page.'], 422);
+    }
+    if ($kind === 'faculty' && strtolower((string)$row['role']) === 'registrar') {
+        regJson(['ok' => false, 'message' => 'Registrar accounts cannot be changed here.'], 422);
+    }
+    return [$id, $kind, $num, $table, $col, $row];
+}
+
+function registrationUpdate($post) {
+    regGuard($post);
+    $pdo = regPdo();
+    [$id, $kind, $num, $table, $col, $row] = regFindAccount($pdo, $post['school_id'] ?? '');
+    $errors = [];
+
+    [$parts, $nameErr] = regParseName((string)($post['full_name'] ?? ''));
+    if ($nameErr) $errors['full_name'] = $nameErr;
+
+    if ($kind === 'student') {
+        $roleValue = 'student';   // a student stays a student
+    } else {
+        $label = (string)($post['role'] ?? '');
+        if (!isset(REG_ROLES[$label]) || REG_ROLES[$label][0] !== 'faculty') {
+            $errors['role'] = 'Choose Dean, Program Coordinator or Professor.';
+            $roleValue = strtolower((string)$row['role']);
+        } else {
+            $roleValue = REG_ROLES[$label][1];
+        }
+    }
+
+    [$dept, $program, $yearLevel, $block] = regCheckAssignment($pdo, $kind, $roleValue, $post, $errors);
+    if ($errors) {
+        regJson(['ok' => false, 'errors' => $errors, 'message' => reset($errors)], 422);
+    }
+
+    [$first, $mid, $last] = $parts;
+    try {
+        if ($kind === 'student') {
+            $pdo->prepare('UPDATE students SET first_name=?, middle_name=?, last_name=?, program=?, year_level=?, block=? WHERE studentID=?')
+                ->execute([$first, $mid, $last, $program, $yearLevel, $block, $num]);
+            $st = $pdo->prepare("SELECT s.studentID, s.first_name, s.middle_name, s.last_name, s.program, s.block, s.date_created, s.status, p.department
+                                   FROM students s LEFT JOIN programs p ON p.program = s.program WHERE s.studentID = ?");
+        } else {
+            $pdo->prepare('UPDATE faculty SET first_name=?, middle_name=?, last_name=?, role=?, department=?, program=? WHERE facultyID=?')
+                ->execute([$first, $mid, $last, $roleValue, $dept, $program, $num]);
+            $st = $pdo->prepare("SELECT facultyID, first_name, middle_name, last_name, role, department, program, date_created, status
+                                   FROM faculty WHERE facultyID = ?");
+        }
+        $st->execute([$num]);
+        $fresh = $st->fetch(PDO::FETCH_ASSOC);
+    } catch (Throwable $e) {
+        error_log('registration update failed: ' . $e->getMessage());
+        regJson(['ok' => false, 'message' => 'Could not save the changes. Please try again.'], 500);
+    }
+
+    $acct = regAccount($kind, $fresh, regReasons());
+    regJson(['ok' => true, 'account' => $acct, 'message' => $acct['name'] . ' (' . $acct['id'] . ') was updated.']);
+}
+
+function registrationDelete($post) {
+    regGuard($post);
+    $pdo = regPdo();
+    [$id, $kind, $num, $table, $col] = regFindAccount($pdo, $post['school_id'] ?? '');
+
+    if ($kind === 'faculty') {   // do not silently drop a professor's student assignments
+        $n = 0;
+        try {
+            $st = $pdo->prepare('SELECT COUNT(DISTINCT studentID) FROM professor_student WHERE facultyID = ?');
+            $st->execute([$num]);
+            $n = (int)$st->fetchColumn();
+        } catch (Throwable $e) { /* no professor_student table yet: nothing is assigned */ }
+        if ($n > 0) {
+            regJson(['ok' => false, 'message' => "$id is assigned to $n student" . ($n === 1 ? '' : 's') . '. Remove those assignments first, then delete the account.'], 409);
+        }
+    }
+
+    try {
+        $pdo->prepare("DELETE FROM $table WHERE $col = ?")->execute([$num]);
+    } catch (PDOException $e) {
+        if ($e->getCode() === '23000') {   // foreign key: enrollments, attendance, clearance... still point to this account
+            regJson(['ok' => false, 'message' => "$id has records (enrollment, attendance, clearance or schedules) and cannot be deleted. Restrict the account instead."], 409);
+        }
+        error_log('registration delete failed: ' . $e->getMessage());
+        regJson(['ok' => false, 'message' => 'Could not delete this account. Please try again.'], 500);
+    } catch (Throwable $e) {
+        error_log('registration delete failed: ' . $e->getMessage());
+        regJson(['ok' => false, 'message' => 'Could not delete this account. Please try again.'], 500);
+    }
+
+    try {   // the restriction log for a deleted account is no longer needed (best effort)
+        $pdo->prepare('DELETE FROM account_restrictions WHERE account_id = ?')->execute([$id]);
+    } catch (Throwable $e) { /* table may not exist */ }
+
+    regJson(['ok' => true, 'id' => $id, 'message' => "$id was deleted."]);
+}
+
+function regNeedMigration(): void {
+    if (!regAssignmentsReady()) {
+        regJson(['ok' => false, 'message' => 'Assignments need a one-time database update, then try again.'], 409);
+    }
+}
+
+/** Both rows an assignment change touches, for the page to redraw. */
+function regAssignmentReply(PDO $pdo, int $studentNum, int $facultyNum, string $message): void {
+    $accounts = array_values(array_filter([
+        regLoadAccount($pdo, 'student', $studentNum),
+        regLoadAccount($pdo, 'faculty', $facultyNum),
+    ]));
+    regJson(['ok' => true, 'message' => $message, 'accounts' => $accounts]);
+}
+
+function registrationAssign($post) {
+    regGuard($post);
+    regNeedMigration();
+    $pdo = regPdo();
+
+    [$sid, $sKind, $sNum] = regFindAccount($pdo, $post['school_id'] ?? '');
+    if ($sKind !== 'student') regJson(['ok' => false, 'message' => 'Choose a student.'], 422);
+
+    $errors = [];
+    $fRaw = strtoupper(trim((string)($post['faculty_id'] ?? '')));
+    $fNum = 0; $fRow = null;
+    if ($fRaw === '' || !preg_match('/^F\d{9}$/', $fRaw)) {
+        $errors['faculty_id'] = 'Choose a professor.';
+    } else {
+        [, , $fNum, , , $fRow] = regFindAccount($pdo, $fRaw);   // answers 404 / 422 itself for unknown, registrar
+    }
+
+    $type = (string)($post['type'] ?? '');
+    if (!in_array($type, ['subject', 'professor'], true)) $errors['type'] = 'Choose the assignment type.';
+
+    $label = trim(preg_replace('/\s+/u', ' ', (string)($post['assignment'] ?? '')));
+    if ($type === 'professor' && $label === '') $label = 'Academic professor';
+    if ($type === 'subject' && $label === '') $errors['assignment'] = 'Enter the course or subject, e.g. CS 202.';
+    if (mb_strlen($label) > 100) $errors['assignment'] = 'Keep this under 100 characters.';
+
+    if (!$errors) {
+        // the same professor may teach several subjects of one student, but not the same one twice;
+        // and only one professor link per professor and student (enrollment treats any professor link as the professor)
+        $st = $pdo->prepare('SELECT 1 FROM professor_student WHERE facultyID = ? AND studentID = ? AND assignment_type = ?'
+                          . ($type === 'subject' ? ' AND LOWER(assignment) = LOWER(?)' : ''));
+        $st->execute($type === 'subject' ? [$fNum, $sNum, $type, $label] : [$fNum, $sNum, $type]);
+        if ($st->fetchColumn()) {
+            $errors[$type === 'subject' ? 'assignment' : 'faculty_id'] = $type === 'subject'
+                ? 'This professor is already assigned to that subject for this student.'
+                : 'This professor is already this student\'s academic professor.';
+        }
+    }
+    if ($errors) regJson(['ok' => false, 'errors' => $errors, 'message' => reset($errors)], 422);
+
+    try {
+        $pdo->prepare('INSERT INTO professor_student (facultyID, studentID, assignment_type, assignment) VALUES (?, ?, ?, ?)')
+            ->execute([$fNum, $sNum, $type, $label]);
+    } catch (PDOException $e) {
+        if ($e->getCode() === '23000') {
+            regJson(['ok' => false, 'errors' => ['assignment' => 'That assignment already exists.'], 'message' => 'That assignment already exists.'], 422);
+        }
+        error_log('registration assign failed: ' . $e->getMessage());
+        regJson(['ok' => false, 'message' => 'Could not save the assignment. Please try again.'], 500);
+    } catch (Throwable $e) {
+        error_log('registration assign failed: ' . $e->getMessage());
+        regJson(['ok' => false, 'message' => 'Could not save the assignment. Please try again.'], 500);
+    }
+
+    regAssignmentReply($pdo, $sNum, $fNum, regDisplayName($fRow) . ' was assigned (' . $label . ').');
+}
+
+function registrationUnassign($post) {
+    regGuard($post);
+    $pdo = regPdo();
+    [$sid, $sKind, $sNum] = regFindAccount($pdo, $post['school_id'] ?? '');
+    if ($sKind !== 'student') regJson(['ok' => false, 'message' => 'Choose a student.'], 422);
+
+    $aid = (int)($post['assignment_id'] ?? 0);
+    $st = $pdo->prepare('SELECT facultyID FROM professor_student WHERE id = ? AND studentID = ?');
+    $st->execute([$aid, $sNum]);
+    $fNum = $st->fetchColumn();
+    if ($fNum === false) {
+        regJson(['ok' => false, 'message' => 'That assignment no longer exists. Reload the page.'], 404);
+    }
+    try {
+        $pdo->prepare('DELETE FROM professor_student WHERE id = ? AND studentID = ?')->execute([$aid, $sNum]);
+    } catch (Throwable $e) {
+        error_log('registration unassign failed: ' . $e->getMessage());
+        regJson(['ok' => false, 'message' => 'Could not remove the assignment. Please try again.'], 500);
+    }
+    regAssignmentReply($pdo, $sNum, (int)$fNum, 'Assignment removed.');
 }

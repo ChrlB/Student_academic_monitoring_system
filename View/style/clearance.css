@@ -187,13 +187,22 @@
     background-color: #282828;
     border: 1px solid white;
     overflow: hidden;
+    height: 50px;
 
     .searchbar {
+      height: 50px;
       width: 100%;
       background-color: #282828;
       padding: 0px 20px;
       border: 0px;
       font-size: 20px;
+    }
+    button{
+      padding: 10px;
+    }
+    .search_icon{
+      padding: 0px;
+      height: 20px;
     }
   }
 
@@ -331,7 +340,7 @@
 }
 
 *{
-
+  
 
   button {
       padding: 10px 25px;
@@ -347,6 +356,9 @@
     padding: 20px;
     border-radius: 30px;
      background: rgba(40, 40, 40, 0.3);
+  }
+  .search_icon{
+    height: 20px;
   }
 
 

@@ -1,12 +1,10 @@
 <?php
-
 require_once __DIR__ . '/../Services/session.php';
 require_once __DIR__ . '/../Services/csrf.php';
 
 const LOGIN_MAX_FAILS    = 5;    
 const LOGIN_LOCK_MINUTES = 5;   
 
-// The ID exactly as typed (trimmed, max 20 characters) so the form can show it again. Never used for a lookup.
 function loginTypedId($raw): string {
     return mb_substr(trim((string)$raw), 0, 20);
 }
@@ -95,6 +93,9 @@ function login($login_info) {
         $_SESSION['login_fails'][] = time();
         loginFieldFail(['password' => 'Incorrect password.'], $typedId);
     }
+    if (strtolower(trim((string)($user['status'] ?? ''))) === 'restricted') {
+        loginFieldFail(['username' => 'This account is restricted. Please contact the registrar.'], $typedId);
+    }
     session_regenerate_id(true);
 
     $_SESSION['userID'] = $user['userID'] ?? $userID;
@@ -103,6 +104,8 @@ function login($login_info) {
 
     $_SESSION['folderID'] = $user['folderID'] ?? null;
     $_SESSION['real_userID'] = $user['real_userID'] ?? null;
+
+    $_SESSION['program'] = $user['program'] ?? null;
 
     $_SESSION['message'] = 'Account verification successful';
 

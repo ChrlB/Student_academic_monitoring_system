@@ -179,7 +179,7 @@
 }
 .reg-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 1040px;
   border-collapse: collapse;
   font-size: 0.82rem;
 }
@@ -218,6 +218,9 @@
 .reg-table td:last-child,
 .reg-table th:last-child {
   text-align: right;
+}
+.reg-table th:last-child {
+  padding-right: 18px;
 }
 .tag {
   display: inline-block;
@@ -458,4 +461,303 @@
   .rf-row {
     grid-template-columns: 1fr;
   }
+}
+
+/* ---------- row buttons: Edit / Delete ---------- */
+.reg-row-actions {
+  white-space: nowrap;
+}
+.row-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  margin-left: 6px;
+  padding: 0 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(214, 196, 255, 0.55);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.row-btn svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.row-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+.row-btn-delete {
+  border-color: rgba(255, 138, 160, 0.7);
+  background: rgba(214, 60, 100, 0.32);
+  color: #ffd9e0;
+}
+.row-btn-delete:hover {
+  background: rgba(214, 60, 100, 0.5);
+}
+.row-btn:focus-visible {
+  outline: 2px solid #c58bff;
+  outline-offset: 2px;
+}
+.row-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.row-btn:disabled:hover {
+  background: inherit;
+}
+
+/* ---------- delete dialog ---------- */
+.reg-confirm {
+  margin: 8px 0 12px;
+  color: #1a1030;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.dlg-light .pill.pill-danger {
+  background: #c30f1b;
+  color: #fff;
+}
+.dlg-light .pill.pill-danger:hover {
+  background: #a50c17;
+}
+.dlg-light .pill.pill-danger:disabled {
+  opacity: 0.6;
+}
+
+/* ---------- assigned professors (table cell) ---------- */
+.reg-asg {
+  min-width: 190px;
+  max-width: 240px;
+}
+.asg-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  border-radius: 9px;
+  border: 1px solid rgba(214, 196, 255, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+}
+.asg-chip-ic {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  fill: none;
+  stroke: var(--ok);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.asg-chip-txt {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.asg-chip-txt b {
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+.asg-chip-txt small {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #d9ccf5;
+}
+.asg-x {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.asg-x:hover {
+  background: rgba(255, 138, 160, 0.4);
+}
+.asg-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px dashed rgba(214, 196, 255, 0.7);
+  background: transparent;
+  color: #e9defd;
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.asg-add svg {
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.asg-add:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.asg-x:focus-visible,
+.asg-add:focus-visible,
+.asg-remove:focus-visible {
+  outline: 2px solid #c58bff;
+  outline-offset: 2px;
+}
+.asg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 196, 255, 0.4);
+  background: rgba(255, 255, 255, 0.1);
+  color: #e3d8fa;
+  font-size: 0.68rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.asg-pill svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.asg-none {
+  color: #bfaee6;
+}
+
+/* ---------- assign dialog ---------- */
+.reg-h2-ic {
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+  vertical-align: -3px;
+  fill: none;
+  stroke: #7b2cbf;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.asg-info {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid #ecdcfb;
+  background: #faf5ff;
+  color: #5b3d8f;
+  font-size: 0.78rem;
+}
+.asg-info b {
+  color: #2a1160;
+}
+.asg-listhead {
+  margin-top: 4px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+  color: #3a3350;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+.asg-count {
+  color: #8e24aa;
+  font-size: 0.74rem;
+}
+.asg-list {
+  max-height: 170px;
+  overflow-y: auto;
+  margin: 0 0 12px;
+  padding: 8px;
+  list-style: none;
+  border-radius: 10px;
+  border: 1px solid #e1dbed;
+  background: #f6f3fb;
+}
+.asg-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #ece7f4;
+}
+.asg-item:last-child {
+  margin-bottom: 0;
+}
+.asg-item-txt {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.asg-item-txt b {
+  color: #1a1030;
+  font-size: 0.8rem;
+}
+.asg-item-txt small {
+  color: #6b6480;
+  font-size: 0.72rem;
+}
+.asg-remove {
+  flex: none;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: #ffe3ea;
+  color: #c30f43;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.asg-remove:hover {
+  background: #ffccd8;
+}
+.asg-remove:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+.asg-empty {
+  padding: 8px 4px;
+  color: #6b6480;
+  font-size: 0.8rem;
+  text-align: center;
+}
+.asg-sub {
+  margin: 0 0 12px;
+  padding-top: 10px;
+  border-top: 1px solid #e6e1ee;
+  color: #1a1030;
+  font-size: 0.78rem;
+  font-weight: 800;
 }
