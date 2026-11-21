@@ -190,7 +190,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <?php endforeach ?>
             </div> 
 
-          <?php elseif ($student_view === "SUBJECT-REQUIREMENTS"): $subject_info = getSubjectRequireMents($search,$_GET['acadyear']); ?>
+          <?php elseif ($student_view === "SUBJECT-REQUIREMENTS"):$acadyear = $_GET['acadyear']; $subject_info = getSubjectRequireMents($search,$acadyear); ?>
                 <?php echo ( $search.$acadyear) ?>
           
                 <div class="row" style="justify-content: space-between; align-items:center">
@@ -260,10 +260,10 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   
                 </div>
                 <div class="row fileupload_buttom">
-                  <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>&upload=1">
+                  <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>&upload=1&acadyear=<?= $_GET['acadyear']?>">
                     <button type="button">UPLOAD FILE</button>
                   </a>
-                  <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>&uploaded=1">
+                  <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>&uploaded=1&acadyear=<?= $_GET['acadyear']?>">
                     <button type="button">VIEW UPLOADS</button>
                   </a>
 
@@ -272,7 +272,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <form class="uploads_container upload_container" method="POST" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
                       <div class="row upload_header">
                         <b>YOUR FILES</b>
-                        <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>">
+                        <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>&acadyear=<?= $_GET['acadyear']?>">
                           <img src="<?= BASE_PATH ?>/View/resources/Close.png" alt="Close" class="back_buttons">
                         </a>
                       </div>
@@ -297,14 +297,15 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                       </div>
                       <input type="hidden" name="docs_for" value="addSubjectRequirement">
                       <input type="hidden" name="ID" value="<?= $subject_info[0]['subjectID'] ?>">
+                      <input type="hidden" name="enrollmentID" value="<?= $subject_info[0]['enrollmentID'] ?>">
                       <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
                     </form>
 
-                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedSubjectRequireMents($search);?>
+                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedSubjectRequireMents($acadyear,$search);?>
                     <div class="uploads_container uploaded_container">
                         <div class="row"  style="justify-content: space-between;">
                             <b>UPLOADED FILES</b>
-                            <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>">
+                            <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT-REQUIREMENTS&search=<?= $search ?>&acadyear=<?= $_GET['acadyear']?>">
                               <img src="<?= BASE_PATH?>/View/resources/Close.png" alt="" class="back_buttons"></a>
                         </div>
                         <hr>
@@ -347,7 +348,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
                 
 
-          <?php elseif ($student_view === "FACULTY"): $faculties = getFacultyClearance($search,$status);?>
+          <?php elseif ($student_view === "FACULTY"): $faculties = getFacultyClearance($acadyear,$search,$status); ?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">FACULTY</b>
               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
@@ -367,6 +368,15 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   <option  value="<?= $faculty["status"] ?>" <?php if($status == $faculty["status"]) echo 'selected'?>><?= $faculty["status"] ?></option>
                 <?php endif; endforeach ?>
               </select>
+
+              <div  class="row" style="gap:20px; align-items:center; ">
+                <b>ACAD-YEAR:</b>
+                <select name="acadyearfilter" class="filter" onchange="this.form.submit()">
+                  <?php $options = []; foreach( getFacultyClearance() as $subject): if(!in_array($subject["acad_year_sem"],$options)): $options[] = $subject["acad_year_sem"];?>
+                    <option  value="<?= $subject["acad_year_sem"] ?>" <?php if($acadyear == $subject["acad_year_sem"]) echo 'selected'?>><?= $subject["acad_year_sem"] ?></option>
+                  <?php endif; endforeach ?>
+                </select>
+              </div>
             </form>
             <div class="column" style="gap: 20px;">
               <?php foreach( $faculties as $faculty):?>
@@ -382,12 +392,13 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     </button>
                     <input type="hidden" name="view" value="FACULTY-REQUIREMENTS">
                     <input type="hidden" name="search" value="<?php echo $faculty["facultyID"] ?>">
+                    <input type="hidden" name="acadyear" value="<?php echo $acadyear ?>">
                   </div>
                 </form>
               <?php endforeach ?>
             </div> 
 
-          <?php elseif ($student_view === "FACULTY-REQUIREMENTS"): $faculty_info = getFacultyRequireMents($search); ?>
+          <?php elseif ($student_view === "FACULTY-REQUIREMENTS"): $acadyear = $_GET['acadyear'];  $faculty_info = getFacultyRequireMents($acadyear,$search); ?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">FACULTY</b>
               <a href="<?= BASE_PATH ?>/clearance?view=FACULTY" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
@@ -450,10 +461,10 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               
             </div>
             <div class="row fileupload_buttom">
-                  <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>&upload=1">
+                  <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>&upload=1&acadyear=<?= $_GET['acadyear'] ?>">
                     <button type="button">UPLOAD FILE</button>
                   </a>
-                  <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>&uploaded=1">
+                  <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>&uploaded=1&acadyear=<?= $_GET['acadyear'] ?>">
                     <button type="button">VIEW UPLOADS</button>
                   </a>
 
@@ -462,7 +473,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <form class="uploads_container upload_container" method="POST" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
                       <div class="row upload_header">
                         <b>YOUR FILES</b>
-                        <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>">
+                        <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>&acadyear=<?= $_GET['acadyear'] ?>">
                           <img src="<?= BASE_PATH ?>/View/resources/Close.png" alt="Close" class="back_buttons">
                         </a>
                       </div>
@@ -490,11 +501,11 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                       <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
                     </form>
 
-                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedFacultyRequireMents($search);?>
+                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedFacultyRequireMents($acadyear,$search);?>
                     <div class="uploads_container uploaded_container">
                         <div class="row"  style="justify-content: space-between;">
                             <b>UPLOADED FILES</b>
-                            <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>">
+                            <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>&acadyear=<?= $_GET['acadyear'] ?>">
                               <img src="<?= BASE_PATH?>/View/resources/Close.png" alt="" class="back_buttons"></a>
                         </div>
                         <hr>
@@ -513,7 +524,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                               </div> -->
                               <div class="row" style="align-items:center;">
                                 <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
-                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S" target="_blank">
+                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=F" target="_blank">
                                     <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
                                   </a>
                                 <?php endif ?>
@@ -535,7 +546,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   <?php endif ?>
                 </div>
             
-          <?php elseif ($student_view === "OFFICE"): $offices = getOfficeClearance($search,$status);?>
+          <?php elseif ($student_view === "OFFICE"): $offices = getOfficeClearance($acadyear,$search,$status);?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">OFFICE</b>
               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
@@ -555,6 +566,15 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   <option  value="<?= $faculty["status"] ?>" <?php if($status == $faculty["status"]) echo 'selected'?>><?= $faculty["status"] ?></option>
                 <?php endif; endforeach ?>
               </select>
+
+              <div  class="row" style="gap:20px; align-items:center; ">
+                <b>ACAD-YEAR:</b>
+                <select name="acadyearfilter" class="filter" onchange="this.form.submit()">
+                  <?php $options = []; foreach( getOfficeClearance() as $subject): if(!in_array($subject["acad_year_sem"],$options)): $options[] = $subject["acad_year_sem"];?>
+                    <option  value="<?= $subject["acad_year_sem"] ?>" <?php if($acadyear == $subject["acad_year_sem"]) echo 'selected'?>><?= $subject["acad_year_sem"] ?></option>
+                  <?php endif; endforeach ?>
+                </select>
+              </div>
             </form>
             <div class="column" style="gap: 20px;">
               <?php foreach( $offices as $office):?>
@@ -570,25 +590,26 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     </button>
                     <input type="hidden" name="view" value="OFFICE-REQUIREMENTS">
                     <input type="hidden" name="search" value="<?php echo $office["officeID"] ?>">
+                    <input type="hidden" name="acadyear" value="<?php echo $acadyear ?>">
                   </div>
                 </form>
               <?php endforeach ?>
             </div> 
           
           
-          <?php elseif ($student_view === "OFFICE-REQUIREMENTS"): $office_info = getOfficeRequireMents($search); ?>
+          <?php elseif ($student_view === "OFFICE-REQUIREMENTS"): $acadyear = $_GET['acadyear']; $office_info = getOfficeRequireMents($acadyear,$search); ?>
             <div class="row" style="justify-content: space-between; align-items:center">
-              <b class="view_title">OFFICE</b>
+              <b class="view_title"><?= strtoupper($office_info[0]["role"])." " ?>OFFICE</b>
                <a href="<?= BASE_PATH ?>/clearance?view=OFFICE" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
-            <div class="row subject_container">
+            <!-- <div class="row subject_container">
               <div class="column">
-                <b>NAME: <?= $office_info[0]["role"] ?></b>
+                <b>NAME: <?= strtoupper($office_info[0]["role"])." " ?></b>
                 <b>ROLE: <?= $office_info[0]["name"]?></b>
                 
                 
               </div>
-            </div>
+            </div> -->
 
             <div class="requirement_container">
               <div class="clearance_instructions" style="font-size:20px">
@@ -639,10 +660,10 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               
             </div>
             <div class="row fileupload_buttom">
-                  <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>&upload=1">
+                  <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>&upload=1&acadyear=<?= $_GET['acadyear'] ?>">
                     <button type="button">UPLOAD FILE</button>
                   </a>
-                  <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>&uploaded=1">
+                  <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>&uploaded=1&acadyear=<?= $_GET['acadyear'] ?>">
                     <button type="button">VIEW UPLOADS</button>
                   </a>
 
@@ -651,7 +672,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <form class="uploads_container upload_container" method="POST" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
                       <div class="row upload_header">
                         <b>YOUR FILES</b>
-                        <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>">
+                        <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>&acadyear=<?= $_GET['acadyear'] ?>">
                           <img src="<?= BASE_PATH ?>/View/resources/Close.png" alt="Close" class="back_buttons">
                         </a>
                       </div>
@@ -679,11 +700,11 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                       <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
                     </form>
 
-                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedOfficeRequireMents($search);?>
+                  <?php  elseif(isset($_GET['uploaded']) && ($_GET['uploaded']  == 1)): $uploaded_files = getUploadedOfficeRequireMents($acadyear,$search);?>
                     <div class="uploads_container uploaded_container">
                         <div class="row"  style="justify-content: space-between;">
                             <b>UPLOADED FILES</b>
-                            <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>">
+                            <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>&acadyear=<?= $_GET['acadyear'] ?>">
                               <img src="<?= BASE_PATH?>/View/resources/Close.png" alt="" class="back_buttons"></a>
                         </div>
                         <hr>
@@ -702,7 +723,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                               </div> -->
                               <div class="row" style="align-items:center;">
                                 <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
-                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=S" target="_blank">
+                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearance&amp;categ=O" target="_blank">
                                     <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
                                   </a>
                                 <?php endif ?>
@@ -1235,7 +1256,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 <div>
                   <hr>
                 </div>
-                <div class="row" style="gap: 20px;"><?php $uploaded_files = getFacultyRequirements($_SESSION['userID'],$_GET['studentID']); ?>
+                <div class="row" style="gap: 20px;"><?php $uploaded_files = getFacultyRequirements($acadyear,$_SESSION['userID'],$_GET['studentID']); ?>
                     <div class="column"  style="gap: 20px;">
                       <div class="student_clearance_panel">
                         <h3>STUDENT INFO:</h3>
