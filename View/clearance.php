@@ -100,6 +100,15 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           <?php elseif ($student_view == "UPDATES"): ?>
             <div class="row" style="justify-content: space-between; align-items:center">
               <b class="view_title">CLEARANCE UPDATES</b>
+              <form  class="row" style="gap:20px; align-items:center; " method="get" action="<?= BASE_PATH ?>/clearance">
+                <b>ACAD-YEAR:</b>
+                <select name="acadyearfilter" class="filter" onchange="this.form.submit()">
+                  <?php $options = []; foreach( getClearanceUpdates() as $subject): if(!in_array($subject["acad_year_sem"],$options)): $options[] = $subject["acad_year_sem"];?>
+                    <option  value="<?= $subject["acad_year_sem"] ?>" <?php if($acadyear == $subject["acad_year_sem"]) echo 'selected'?>><?= $subject["acad_year_sem"] ?></option>
+                  <?php endif; endforeach ?>
+                </select>
+                <input type="hidden" name="view" value="UPDATES">
+              </form>
               <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
             </div>
             <div class="updates_frame2  ">
@@ -113,7 +122,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   </tr>
                 </thead>
                 <tbody class="updates_records">
-                  <?php foreach ($updates_record as $row): ?>
+                  <?php foreach (getClearanceUpdates($acadyear) as $row): ?>
                     <tr onclick="toggleRemark(this)" class="update_record">
                       <td title="<?= htmlspecialchars($row['category']) ?>">
                         <?= htmlspecialchars($row['category']) ?>

@@ -40,7 +40,7 @@ if (!in_array($student_view, $allowedViews, true)) {
 // var_dump($updates_record);
 
 if($_SESSION["role"] == "student"){
-    $updates_record = $clearanceDAO->executeQuery("getClearanceUpdates",[$userID,$userID,$userID,'ALL','ALL','ALL','ALL']);
+    $updates_record = $clearanceDAO->executeQuery("getClearanceUpdates",[$userID,$userID,$userID,$acadyear,$acadyear,'ALL','ALL']);
     $data = $clearanceDAO->executeQuery("getPieChartData",[$userID,$userID,$userID]);
     $labels = json_encode(['Cleared', 'Rejected', 'Not yet cleared']);
     $values = json_encode([
@@ -95,6 +95,22 @@ function statusClass(string $status): string{
 
 function getSubjectClearanceStatus($studentID,$categ,$acad_year){
     global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getClearanceUpdates",[
+        $studentID,
+        $studentID,
+        $studentID,
+        $acad_year,
+        $acad_year,
+        $categ,
+        $categ
+    ]);
+
+    return $records;
+}
+
+function getClearanceUpdates($acad_year='ALL',$studentID='self',$categ = 'ALL'){
+    global $clearanceDAO;
+    if($studentID === 'self') $studentID=$_SESSION['userID'];
     $records = $clearanceDAO->executeQuery("getClearanceUpdates",[
         $studentID,
         $studentID,
