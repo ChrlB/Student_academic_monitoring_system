@@ -1453,7 +1453,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                         </div>                    
                       </div>  
                       <div class="student_clearance_panel">
-                        <h3>PROJECTS:</h3><?php $projects = getProjectsStatus($_SESSION['real_userID'],$Facadyear) ?>
+                        <h3>PROJECTS:</h3><?php $projects = getProjectsStatus($_SESSION['real_userID'],$acadyear); //var_dump($_SESSION['real_userID'].$acadyear) ?>
                         <div>
                           <hr>
                         </div>
@@ -1464,8 +1464,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                               <?= $subject['project_name'] ?>
                             </b>
                             <b style="<?php 
-                              if(strtoupper($subject['submission_status']) == 'submitted') echo 'color : green';
-                              elseif(strtoupper($subject['submission_status']) == 'overdue') echo 'color : red';
+                              if(strtolower($subject['submission_status']) == 'submitted') echo 'color : green';
+                              elseif(strtolower($subject['submission_status']) == 'overdue') echo 'color : red';
                               else  echo 'color : yellow'?>"
                             >
                               <?= $subject['submission_status'] ?>

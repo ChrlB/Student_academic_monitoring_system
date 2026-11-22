@@ -330,7 +330,8 @@ $userDAO->prepareStatement("updateStudentProfileFull",
         COALESCE(SUM(UPPER(status) = 'CLEARED'), 0)  AS cleared,
         COALESCE(SUM(UPPER(status) = 'REJECT'), 0) AS rejected,
         COALESCE(SUM(UPPER(status) in ( 'PENDING','NOT YET CLEARED')), 0) AS not_yet_cleared
-        FROM ($cleranceUpdate) AS updates;
+        FROM ($cleranceUpdate) AS updates
+        WHERE ('ALL' = ? OR acad_year_sem = ?);
     "
     );
 
@@ -1526,5 +1527,153 @@ $userDAO->prepareStatement("updateStudentProfileFull",
         GROUP BY P.projectID, P.name, P.deadline, P.status, S.subjectID,
             SS.block, EP.acad_year, EP.sem
         ORDER BY P.deadline DESC;
+    ");
+
+    $clearanceDAO->prepareStatement("getAllProjectStatus","SELECT
+            P.projectID,
+            CONCAT(ES.subjectID,' - ',UPPER(P.name)) AS project_name,
+            ES.subjectID,
+            P.deadline,
+            P.status AS project_status,
+            S.subjectID AS subjectID,
+            SS.block AS block,
+            CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem,
+            COUNT(PS.id) AS submissions,
+            MAX(PS.submitted_at) AS last_submitted_at,
+            CASE
+                WHEN COUNT(PS.id) > 0 THEN 'submitted'
+                WHEN P.deadline < NOW() THEN 'overdue'
+                ELSE 'waiting'
+            END AS submission_status
+        FROM projects AS P
+            INNER JOIN enrolled_subjects AS ES
+                ON ES.enrolled_subjectID = P.enrolled_subjectID
+            INNER JOIN students AS ST
+                ON ST.studentID = ES.studentID
+            
+            INNER JOIN subjects AS S
+                ON S.subjectID = ES.subjectID
+            INNER JOIN enrollment_period AS EP
+                ON EP.enrollmentID = ES.enrollmentID
+            INNER JOIN subject_schedules AS SS
+                ON SS.enrollmentID = ES.enrollmentID
+                AND SS.subjectID = ES.subjectID
+                AND SS.block = ST.block
+            INNER JOIN faculty AS F
+                ON F.facultyID = SS.facultyID
+            LEFT JOIN project_submission AS PS
+                ON PS.projectID = P.projectID
+        WHERE  (CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ?)
+            AND (CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ? OR CONCAT('F',YEAR(F.date_created), LPAD(F.facultyID, 5, '0')) = ?)
+        GROUP BY P.projectID, P.name, P.deadline, P.status, S.subjectID,
+            SS.block, EP.acad_year, EP.sem,ES.subjectID
+        ORDER BY P.deadline DESC;
+    ");
+
+    $clearanceDAO->prepareStatement("getStudentSchedule", "SELECT
+            S.subjectID AS subjectID,
+            S.name AS name,
+            SS.day AS day,
+            SS.time_start AS time_start,
+            SS.time_end AS time_end,
+            SS.roomID AS roomID,
+            CONCAT(F.last_name, ', ', F.first_name) AS prof_name,
+            CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem
+        FROM enrolled_subjects AS ES
+            INNER JOIN students AS ST
+                ON ST.studentID = ES.studentID
+            INNER JOIN subjects AS S
+                ON S.subjectID = ES.subjectID
+            INNER JOIN enrollment_period AS EP
+                ON EP.enrollmentID = ES.enrollmentID
+            INNER JOIN subject_schedules AS SS
+                ON SS.enrollmentID = ES.enrollmentID
+                AND SS.subjectID = ES.subjectID
+                AND SS.block = ST.block
+            LEFT JOIN faculty AS F
+                ON F.facultyID = SS.facultyID
+        WHERE CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ?
+            AND (CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ? OR 'ALL' = ?)
+            AND ES.status = 'approved'
+        ORDER BY EP.acad_year DESC, EP.sem DESC, SS.time_start;"
+    );
+
+
+    $clearanceDAO->prepareStatement("getOpenEnrollments", "SELECT
+            EP.enrollmentID,
+            EP.acad_year,
+            EP.sem,
+            CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem,
+            EP.open_date,
+            EP.close_date,
+            EXISTS (
+                SELECT 1
+                FROM enrolled_subjects AS ES
+                WHERE ES.enrollmentID = EP.enrollmentID
+                    AND ES.studentID = ST.studentID
+            ) AS already_enrolled
+        FROM enrollment_period AS EP
+            INNER JOIN students AS ST
+                ON ST.program = EP.program
+        WHERE ST.studentID = ?
+            AND EP.status = 'open'
+            AND EP.student_window_open = 1
+            AND NOW() BETWEEN EP.open_date AND EP.close_date
+        ORDER BY EP.acad_year DESC, EP.sem DESC;"
+    );
+
+    $clearanceDAO->prepareStatement("getStudentEvents", "SELECT
+            E.eventID,
+            E.eventName,
+            E.datetime_Start,
+            E.datetime_End,
+            E.status,
+            CONCAT(F.last_name, ', ', F.first_name) AS coordinator_name,
+            EXISTS (
+                SELECT 1
+                FROM attendance AS A
+                WHERE A.eventID = E.eventID
+                    AND A.studentID = ST.studentID
+            ) AS attended
+        FROM events AS E
+            INNER JOIN students AS ST
+                ON ST.studentID = ?
+            LEFT JOIN programs AS P
+                ON P.program = ST.program
+            LEFT JOIN faculty AS F
+                ON F.facultyID = E.eventCoordinator
+        WHERE E.status <> 'FINISHED'
+            AND (
+                E.program = ST.program
+                OR E.department = P.department
+                OR (E.program IS NULL AND E.department IS NULL)
+            )
+        ORDER BY E.datetime_Start;
+    ");
+    $clearanceDAO->prepareStatement("getFacultyEvents", "SELECT
+            E.eventID,
+            E.eventName,
+            E.datetime_Start,
+            E.datetime_End,
+            E.status,
+            CONCAT(F.last_name, ', ', F.first_name) AS coordinator_name,
+            COUNT(DISTINCT A.studentID) AS attendees
+        FROM events AS E
+            INNER JOIN faculty AS FA
+                ON FA.facultyID = ?
+            LEFT JOIN faculty AS F
+                ON F.facultyID = E.eventCoordinator
+            LEFT JOIN attendance AS A
+                ON A.eventID = E.eventID
+        WHERE E.status <> 'FINISHED'
+            AND (
+                E.eventCoordinator = FA.facultyID
+                OR E.program = FA.program
+                OR E.department = FA.department
+                OR (E.program IS NULL AND E.department IS NULL)
+            )
+        GROUP BY E.eventID, E.eventName, E.datetime_Start, E.datetime_End,
+            E.status, F.last_name, F.first_name
+        ORDER BY E.datetime_Start;
     ");
 }
