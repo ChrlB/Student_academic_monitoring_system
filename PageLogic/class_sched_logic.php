@@ -457,7 +457,11 @@ class ScheduleLogic
     public function save($id, array $in)
     {
         $errors = [];
-
+        if ($id) {
+        $current = $this->find($id);
+        if (!$current) return ['ok' => false, 'errors' => ['Schedule not found.']];
+        $in['instructor'] = $current['facultyID'];
+    }
         $blockParts = explode('|', (string)($in['block'] ?? ''), 2);
         $program    = $blockParts[0] ?? '';
         $block      = $blockParts[1] ?? '';

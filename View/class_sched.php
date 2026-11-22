@@ -37,7 +37,7 @@ function sched_url($q)
 }
 
 // Fields shared by the Add modal and Edit page.
-function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v)
+function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v, $lockInstructor = false)
 {
     $times = [];
     for ($m = 6 * 60; $m <= 22 * 60; $m += 30) {
@@ -101,7 +101,10 @@ function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v)
 
     <div class="sp-field">
       <label for="<?= $uid ?>-instructor">Instructor <span class="sp-req">*</span></label>
-      <select id="<?= $uid ?>-instructor" name="instructor" required>
+      <?php if ($lockInstructor): ?>
+  <input type="hidden" name="instructor" value="<?= (int)($v['instructor'] ?? 0) ?>">
+<?php endif; ?>
+<select id="<?= $uid ?>-instructor" <?= $lockInstructor ? 'disabled title="The instructor cannot be changed here"' : 'name="instructor" required' ?>>
         <option value="">Select instructor</option>
         <?php foreach ($instructors as $i): ?>
           <option value="<?= (int)$i['facultyID'] ?>" <?= (int)($v['instructor'] ?? 0) === (int)$i['facultyID'] ? 'selected' : '' ?>>
@@ -425,7 +428,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
                 <?php endforeach; ?>
               </select>
             </div>
-            <?= sched_form_fields('edit', $blocks, $subjects, $instructors, $rooms, $vals) ?>
+            <?= sched_form_fields('edit', $blocks, $subjects, $instructors, $rooms, $vals, true) ?>
             <div class="sp-form__actions">
               <button type="button" class="sp-btn sp-btn--danger" data-open-delete><?= sched_icon('trash') ?> Delete</button>
               <a class="sp-btn" href="<?= sched_e(sched_url(['view' => 'class', 'id' => $sched['schedID']])) ?>">Cancel</a>
