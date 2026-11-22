@@ -1,4 +1,3 @@
-
 <?php
 require_once __DIR__ . "/../PageLogic/enrollment_logic.php";
 
@@ -213,7 +212,7 @@ $csrf = $logic->csrf();
                             </div>
 
 
-                            <div class="enroll-card ">
+                            <div class="enroll-card">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                                     <h2 style="margin: 0;">Your Selection</h2>
 
@@ -223,7 +222,7 @@ $csrf = $logic->csrf();
                                 </div>
 
                                 <div class="table-responsive">
-                                    <table class="enroll-table"> 
+                                    <table class="enroll-table">
                                         <thead>
                                             <tr>
                                                 <th>CODE</th>
@@ -312,7 +311,7 @@ $csrf = $logic->csrf();
                 <?php endif; ?>
 
 
-                <?php if ($group === 'faculty'): ?>
+                <?php if ($group === 'coordinator'): ?>
 
                     <?php if ($logic->selectedStudent):
 
@@ -441,14 +440,14 @@ $csrf = $logic->csrf();
                     <?php else: ?>
 
                         <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: normal;">
-                            My Advisees
+                            Pending Approvals
                         </h1>
 
                         <div class="enroll-card" style="margin-top: 20px;">
                             <h2>My Advisees</h2>
 
                             <p style="color: rgba(255,255,255,0.7); font-size: 13px; margin-top: -15px; margin-bottom: 20px;">
-                                All students assigned to you as their Adviser
+                                All students assigned to you as their program coordinator.
                             </p>
 
                             <div class="table-responsive">
@@ -514,7 +513,7 @@ $csrf = $logic->csrf();
                 <?php endif; ?>
 
 
-                <?php if ($group === 'manager'): ?>
+                <?php if ($group === 'registrar'): ?>
 
                     <h1 id="periods-section" style="margin: 0; color: #ffffff; font-size: 32px; font-weight: normal; margin-bottom: 20px;">
                         Enrollment Periods
@@ -837,21 +836,50 @@ $csrf = $logic->csrf();
                         var prereqSelected = document.getElementById('prereq-selected');
 
                         function updatePrereqSummary() {
-                            var chosen = prereqChecks.filter(function (c) { return c.checked; }).map(function (c) { return c.parentElement.querySelector('span').textContent; });
-                            prereqSelected.textContent = chosen.length ? chosen.join(', ') : 'No prerequisites selected';
+                            var chosen = prereqChecks.filter(function (c) {
+                                return c.checked;
+                            }).map(function (c) {
+                                return c.parentElement.querySelector('span').textContent;
+                            });
+
+                            prereqSelected.textContent = chosen.length
+                                ? chosen.join(', ')
+                                : 'No prerequisites selected';
                         }
 
-                        prereqChecks.forEach(function (c) { c.addEventListener('change', updatePrereqSummary); });
-                        prereqSearch.addEventListener('focus', function () { document.getElementById('prereq-picker').classList.add('open'); });
-                        prereqSearch.addEventListener('click', function () { document.getElementById('prereq-picker').classList.add('open'); });
-                        document.addEventListener('click', function (event) { if (!document.getElementById('prereq-picker').contains(event.target)) document.getElementById('prereq-picker').classList.remove('open'); });
+                        prereqChecks.forEach(function (c) {
+                            c.addEventListener('change', updatePrereqSummary);
+                        });
+
+                        prereqSearch.addEventListener('focus', function () {
+                            document.getElementById('prereq-picker').classList.add('open');
+                        });
+
+                        prereqSearch.addEventListener('click', function () {
+                            document.getElementById('prereq-picker').classList.add('open');
+                        });
+
+                        document.addEventListener('click', function (event) {
+                            if (!document.getElementById('prereq-picker').contains(event.target)) {
+                                document.getElementById('prereq-picker').classList.remove('open');
+                            }
+                        });
+
                         prereqSearch.addEventListener('input', function () {
                             var q = prereqSearch.value.toLowerCase().trim();
-                            document.querySelectorAll('.prereq-option').forEach(function (item) { item.style.display = item.dataset.search.indexOf(q) !== -1 ? 'flex' : 'none'; });
+
+                            document.querySelectorAll('.prereq-option').forEach(function (item) {
+                                item.style.display = item.dataset.search.indexOf(q) !== -1
+                                    ? 'flex'
+                                    : 'none';
+                            });
                         });
 
                         function setPrerequisites(values) {
-                            prereqChecks.forEach(function (c) { c.checked = values.indexOf(c.value) !== -1; });
+                            prereqChecks.forEach(function (c) {
+                                c.checked = values.indexOf(c.value) !== -1;
+                            });
+
                             updatePrereqSummary();
                         }
 
@@ -888,8 +916,13 @@ $csrf = $logic->csrf();
                                 el.unit.value = d.unit;
                                 el.year.value = d.year;
                                 el.sem.value = d.sem;
+
                                 var selectedPrereqs = [];
-                                try { selectedPrereqs = JSON.parse(d.prereqs || '[]'); } catch (e) {}
+
+                                try {
+                                    selectedPrereqs = JSON.parse(d.prereqs || '[]');
+                                } catch (e) {}
+
                                 setPrerequisites(selectedPrereqs);
                                 el.submit.textContent = 'Update Subject';
                                 el.cancel.style.display = 'block';
@@ -922,10 +955,17 @@ $csrf = $logic->csrf();
 
                 <?php endif; ?>
 
+                <?php if ($group === 'instructor'): ?>
+                    <div class="enroll-card" style="margin-top: 20px;">
+                        <p style="color: rgba(255,255,255,0.8); margin: 0;">
+                            You do not have permission to access enrollment management.
+                        </p>
+                    </div>
+                <?php endif; ?>
+
             </main>
         </div>
     </div>
 
 </body>
 </html>
-                                            
