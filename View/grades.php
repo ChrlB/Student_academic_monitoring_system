@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../PageLogic/grades_logic.php";
 
 $accountRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
-if (!in_array($accountRole, ['student', 'prof', 'program coordinator'], true)) {
+if (!in_array($accountRole, ['student', 'prof', 'program coordinator', 'dean'], true)) {
     $_SESSION['error'] = 'Grades are not available for this account.';
     header('Location: ' . BASE_PATH . '/dashboard');
     exit;
@@ -15,7 +15,7 @@ function grades_e($value)
 
 $gradesLogic = new GradesLogic();
 $isStudentAccount = $accountRole === 'student';
-$isFacultyAccount = in_array($accountRole, ['prof', 'program coordinator'], true);
+$isFacultyAccount = in_array($accountRole, ['prof', 'program coordinator', 'dean'], true);
 $semesters = $isStudentAccount
     ? $gradesLogic->studentSemesters()
     : ($isFacultyAccount ? $gradesLogic->semesters() : []);
@@ -881,6 +881,9 @@ $csrf = $gradesLogic->csrfToken();
   <div class="row main_box">
     <?php require_once __DIR__ . "/components/navigation.php"; ?>
     <div class="column" style="flex: 1; min-width: 0;">
+      <?php if ($isStudentAccount): ?>
+        <?php require_once __DIR__ . "/components/header.php"; ?>
+      <?php endif; ?>
       <main class="column scrollbar<?= $isStudentAccount ? ' student-grades-main' : '' ?>">
       <?php if ($_SESSION['role'] === 'student'): ?>
         <section class="student-grades" aria-labelledby="student-grades-title">
@@ -1005,7 +1008,7 @@ $csrf = $gradesLogic->csrfToken();
             </section>
           </div>
         </section>
-      <?php elseif (in_array($accountRole, ['prof', 'program coordinator'], true)): ?>
+      <?php elseif (in_array($accountRole, ['prof', 'program coordinator', 'dean'], true)): ?>
       <div class="grades-add-shell faculty-grades">
           <div class="grades-add-panel">
             <div class="grades-toolbar faculty-grades__heading-panel">

@@ -46,7 +46,7 @@ class GradesLogic
     public function currentUserID()
     {
         $role = strtolower(trim((string)($_SESSION['role'] ?? '')));
-        if (preg_match('/student/', $role) || !preg_match('/prof|faculty|instructor|teacher|coordinator/', $role)) {
+        if (preg_match('/student/', $role) || !preg_match('/prof|faculty|instructor|teacher|coordinator|dean/', $role)) {
             return 0;
         }
 

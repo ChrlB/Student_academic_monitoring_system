@@ -24,9 +24,11 @@ $page = $_SESSION["page"] ?? "";
         <input type="button" value="SCHEDULE"></a>
     <?php endif ?>
 
-    <a class="nav_buttons row GRADES" href="<?= BASE_PATH?>/grades">
-      <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Grades.png" alt="" class="nav_button_icons"></div>
-      <input type="button" value="GRADES"></a>
+    <?php if(in_array($_SESSION["role"], ["student","prof","program coordinator","dean"])): ?>
+      <a class="nav_buttons row GRADES" href="<?= BASE_PATH?>/grades">
+        <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Grades.png" alt="" class="nav_button_icons"></div>
+        <input type="button" value="GRADES"></a>
+    <?php endif ?>
     
     <?php if(in_array($_SESSION["role"], ["program coordinator","dean","prof","student"])): ?>
       <a class="nav_buttons row ATTENDANCE"  href="<?= BASE_PATH?>/attendance">
