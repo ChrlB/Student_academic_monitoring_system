@@ -174,7 +174,22 @@ if ($view === 'day' && ($group === 'manager' || !in_array($dayName, ScheduleLogi
 }
 
 $search = trim((string)($_GET['q'] ?? ''));
-$rows   = ($view === 'list' || $view === 'day') ? $logic->schedules($semKey, $search) : [];
+$isDean = $logic->isDean();
+$departments = $programs = [];
+$deptSel = $progSel = '';
+if ($isDean) {
+    $departments = $logic->departments();
+    $programs    = $logic->programs();
+    $deptSel = array_key_exists('dept', $_GET) ? trim((string)$_GET['dept']) : $logic->ownDepartment();
+    if (!in_array($deptSel, array_column($departments, 'department'), true)) $deptSel = '';
+    $progSel = trim((string)($_GET['prog'] ?? ''));
+    $okProg  = false;
+    foreach ($programs as $pr) {
+        if ($pr['program'] === $progSel && ($deptSel === '' || $pr['department'] === $deptSel)) $okProg = true;
+    }
+    if (!$okProg) $progSel = '';
+}
+$rows = ($view === 'list' || $view === 'day') ? $logic->schedules($semKey, $search, $deptSel, $progSel) : [];
 $week   = $logic->week($rows);
 
 $needForm = $canManage && ($view === 'list' || $view === 'edit');
@@ -234,6 +249,20 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
 
           <form class="sched-search" method="get" action="<?= sched_e($self) ?>" role="search">
             <input type="hidden" name="sem" value="<?= sched_e($semKey) ?>">
+            <?php if ($isDean): ?>
+  <select name="dept" aria-label="Department" data-filter-dept>
+    <option value="">All departments</option>
+    <?php foreach ($departments as $d): ?>
+      <option value="<?= sched_e($d['department']) ?>" <?= $d['department'] === $deptSel ? 'selected' : '' ?>><?= sched_e($d['department']) ?> — <?= sched_e($d['name']) ?></option>
+    <?php endforeach; ?>
+  </select>
+  <select name="prog" aria-label="Program" data-filter-prog>
+    <option value="">All programs</option>
+    <?php foreach ($programs as $pr): ?>
+      <option value="<?= sched_e($pr['program']) ?>" data-dept="<?= sched_e($pr['department']) ?>" <?= $pr['program'] === $progSel ? 'selected' : '' ?>><?= sched_e($pr['program']) ?></option>
+    <?php endforeach; ?>
+  </select>
+<?php endif; ?>
             <label class="sched-search__box">
               <?= sched_icon('search') ?>
               <input type="search" name="q" value="<?= sched_e($search) ?>" placeholder="Search block (e.g., BSCS 1A)" aria-label="Search block">
@@ -444,6 +473,8 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             <h2 class="sched-title">My Schedule</h2>
             <form class="sched-sem" method="get" action="<?= sched_e($self) ?>">
               <?php if ($search !== ''): ?><input type="hidden" name="q" value="<?= sched_e($search) ?>"><?php endif; ?>
+              <?php if ($isDean): ?><input type="hidden" name="dept" value="<?= sched_e($deptSel) ?>">
+              <input type="hidden" name="prog" value="<?= sched_e($progSel) ?>"><?php endif; ?>
               <select name="sem" aria-label="Semester" onchange="this.form.submit()">
                 <?php foreach ($semesters as $s): ?>
                   <option value="<?= sched_e($s['key']) ?>" <?= $s['key'] === $semKey ? 'selected' : '' ?>><?= sched_e($s['label']) ?></option>
@@ -589,7 +620,22 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
     form.querySelectorAll('input[name="class_type"], input[name="subject_kind"]').forEach(function (r) { r.addEventListener('change', apply); });
     apply();
   });
-
+  
+  var deptSel = document.querySelector('[data-filter-dept]');
+var progSel = document.querySelector('[data-filter-prog]');
+if (deptSel && progSel) {
+  function filterPrograms() {
+    Array.prototype.forEach.call(progSel.options, function (o) {
+      if (!o.value) return;
+      var hide = deptSel.value !== '' && o.dataset.dept !== deptSel.value;
+      o.hidden = hide; o.disabled = hide;
+      if (hide && o.selected) progSel.value = '';
+    });
+  }
+  filterPrograms();
+  deptSel.addEventListener('change', function () { progSel.value = ''; deptSel.form.submit(); });
+  progSel.addEventListener('change', function () { progSel.form.submit(); });
+}
   var alertDlg = document.getElementById('conflict-alert');
   var dlg = document.getElementById('add-schedule');
   function showConflict() {
