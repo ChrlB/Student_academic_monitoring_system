@@ -1730,7 +1730,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                               </div> -->
                               <div class="row" style="align-items:center;">
                                 <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
-                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearanceSigning&amp;categ=S&amp;studentID=<?= $students_for_clearance['studentID'] ?>" target="_blank">
+                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearanceSigning&amp;categ=F&amp;studentID=<?= $students_for_clearance['studentID'] ?>" target="_blank">
                                     <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
                                   </a>
                                 <?php endif ?>
