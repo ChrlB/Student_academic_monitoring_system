@@ -46,7 +46,7 @@ if (!in_array($student_view, $allowedViews, true)) {
 
 if($_SESSION["role"] == "student"){
     $updates_record = $clearanceDAO->executeQuery("getClearanceUpdates",[$userID,$userID,$userID,$acadyear,$acadyear,'ALL','ALL']);
-    $data = $clearanceDAO->executeQuery("getPieChartData",[$userID,$userID,$userID]);
+    $data = $clearanceDAO->executeQuery("getPieChartData",[$userID,$userID,$userID,$currentAY,$currentAY]);
     $labels = json_encode(['Cleared', 'Rejected', 'Not yet cleared']);
     $values = json_encode([
         (int) ($data[0]['cleared'] ?? 0),

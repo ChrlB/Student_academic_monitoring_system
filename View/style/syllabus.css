@@ -642,3 +642,16 @@ a.syl-btn { text-decoration: none; }
 
 /* every card in the right column lines up the same way */
 .right-column .syl-widget { box-sizing: border-box; width: 100%; }
+
+/* ---------- tighter lesson editor (less empty white space) ---------- */
+/* the page grows with the text instead of starting as a huge empty sheet */
+#editor { min-height: 0; }
+#editor .ql-editor { min-height: 260px; padding: 18px 24px; line-height: 1.55; }
+#toolbar.ql-toolbar.ql-snow { padding: 6px 8px; }
+#toolbar .ql-formats { margin-right: 10px; }
+.doc-statusbar { padding: 6px 12px; }
+.lesson-body { padding: 20px 24px; }
+.doc-card .doc-empty { padding: 20px; }
+@media (max-width: 700px) {
+    #editor .ql-editor, .lesson-body { padding: 14px 14px; }
+}

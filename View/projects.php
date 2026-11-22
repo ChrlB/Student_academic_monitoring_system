@@ -20,6 +20,20 @@ if (!function_exists('proj_badge')) {
     }
 }
 
+// A project counts as completed when it has been submitted OR every task is Done
+if (!function_exists('proj_is_done')) {
+    function proj_is_done($p) {
+        return (int)($p['submitted'] ?? 0) === 1
+            || ((int)($p['task_total'] ?? 0) > 0 && (int)($p['task_open'] ?? 0) === 0);
+    }
+}
+if (!function_exists('proj_tasks_done')) {
+    function proj_tasks_done($tasks) {
+        $total = count($tasks['todo']) + count($tasks['progress']) + count($tasks['review']) + count($tasks['done']);
+        return $total > 0 && !$tasks['todo'] && !$tasks['progress'] && !$tasks['review'];
+    }
+}
+
 $formAction = proj_e(ProjectsLogic::url());
 $group      = $logic->group;
 $error      = $logic->error;
@@ -269,7 +283,7 @@ a.pj-file:hover { background: #2a1d38; }
                             <?php if (empty($logic->projects)): ?>
                                 <tr><td colspan="6" class="pj-empty">No projects have been assigned to you yet.</td></tr>
                             <?php endif; ?>
-                            <?php foreach ($logic->projects as $p): $done = (int)$p['submitted'] === 1; ?>
+                            <?php foreach ($logic->projects as $p): $done = proj_is_done($p); ?>
                                 <tr>
                                     <td><?= proj_e($p['code']) ?></td>
                                     <td><?= proj_e($p['name']) ?></td>
@@ -303,7 +317,7 @@ a.pj-file:hover { background: #2a1d38; }
 
             <?php else: ?>
             <?php /* ---------- DETAIL / KANBAN PAGE ---------- */
-                $submitted = $logic->submission !== null;
+                $submitted = $logic->submission !== null || proj_tasks_done($logic->tasks);
                 $isLead    = $logic->isLead;
             ?>
 
@@ -477,7 +491,7 @@ a.pj-file:hover { background: #2a1d38; }
                             <?php if (empty($logic->projects)): ?>
                                 <tr><td colspan="6" class="pj-empty">You haven't assigned any projects yet.</td></tr>
                             <?php endif; ?>
-                            <?php foreach ($logic->projects as $p): $done = (int)$p['submitted'] === 1; ?>
+                            <?php foreach ($logic->projects as $p): $done = proj_is_done($p); ?>
                                 <tr>
                                     <td><?= proj_e($p['code']) ?></td>
                                     <td><?= proj_e($p['name']) ?></td>
@@ -653,7 +667,7 @@ a.pj-file:hover { background: #2a1d38; }
                     <div style="font-size: 13px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                         <span><?= proj_e($selected['code']) ?> · Assigned by <?= proj_e($selected['assigned_by']) ?></span>
                         <span>Due <?= proj_e(proj_date($selected['deadline'])) ?></span>
-                        <?= proj_badge($sub !== null) ?>
+                        <?= proj_badge($sub !== null || proj_tasks_done($logic->tasks)) ?>
                     </div>
                 </div>
                 <div class="pj-banner-tools">
