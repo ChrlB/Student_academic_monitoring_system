@@ -23,19 +23,17 @@ $page = $_SESSION["page"] ?? "";
         <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Calendar.png" alt="" class="nav_button_icons"> </div>
         <input type="button" value="SCHEDULE"></a>
     <?php endif ?>
-
-    <?php if(in_array($_SESSION["role"], ["student","prof","program coordinator","dean"])): ?>
-      <a class="nav_buttons row GRADES" href="<?= BASE_PATH?>/grades">
-        <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Grades.png" alt="" class="nav_button_icons"></div>
-        <input type="button" value="GRADES"></a>
-    <?php endif ?>
     
     <?php if(in_array($_SESSION["role"], ["program coordinator","dean","prof","student"])): ?>
+    <a class="nav_buttons row GRADES" href="<?= BASE_PATH?>/grades">
+      <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Grades.png" alt="" class="nav_button_icons"></div>
+      <input type="button" value="GRADES"></a>
+      
       <a class="nav_buttons row ATTENDANCE"  href="<?= BASE_PATH?>/attendance">
         <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Attendance.png" alt="" class="nav_button_icons"></div>
         <input type="button" value="ATTENDANCE"></a>
     <?php endif ?>
-    
+
     <a class="nav_buttons row ENROLLMENT" href="<?= BASE_PATH?>/enrollment">
       <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/enrollment.png" alt="" class="nav_button_icons"></div>
       <input type="button" value="ENROLLMENT"></a>
