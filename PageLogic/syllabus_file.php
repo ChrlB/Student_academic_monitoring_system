@@ -31,11 +31,6 @@ if (!preg_match('/^[a-f0-9]{32}\.(pdf|mp4|webm|png|jpe?g|gif|webp)$/', $row['sto
 $path = SyllabusLogic::storageDir() . '/' . $row['stored_name'];
 if (!is_file($path)) syllabusFileNotFound('The file is missing on the server.');
 
-// A student opening a PDF/video again after a failed quiz counts as "studying again".
-if ($imgId <= 0 && isset($row['taskID'])) {
-    $sl->noteMaterialOpened((int)$row['taskID']);
-}
-
 // Let other requests use the session while a long video streams.
 session_write_close();
 

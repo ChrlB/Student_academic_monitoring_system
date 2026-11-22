@@ -111,7 +111,13 @@ $router->post('/faculty-contact', fn() => saveFacultyContact($_POST));
 $router->post('/upload-profile', fn() => uploadProfile());
 $router->get('/get-profile', fn() => getProfilePic());
 
-$router->post('/upload-document', fn($request) => uploadDocument($request));
+$router->post('/upload-document', function ($request) { 
+    require_once __DIR__ . '/../PageLogic/clearance_logic.php';
+    if($request['ID'] === 'none') updateClearance($request);
+    if($request['ID'] === 'none' && $request['clearance_categ'] === 'FACULTY') $request['ID'] =  getFacultyClearanceID($request);
+    if($request['ID'] === 'none' && $request['clearance_categ'] === 'OFFICE') $request['ID'] =  getOfficeClearanceID($request);
+    uploadDocument($request);
+});
 $router->post('/delete-document', fn($request) => deleteDocument($request));
 $router->get('/download-document', fn() => downloadDocument());
 $router->get('/view-document', fn() => require __DIR__ . '/../View/document.php');
