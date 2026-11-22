@@ -619,7 +619,10 @@ class ProjectsLogic
                     CONCAT('PRJ-', LPAD(p.projectID, 3, '0')) AS code,
                     p.name, p.deadline,
                     sub.file_url, sub.attachment, sub.notes,
-                    (sub.id IS NOT NULL) AS submitted
+                    (sub.id IS NOT NULL) AS submitted,
+                    (SELECT COUNT(*) FROM project_task t WHERE t.projectID = p.projectID) AS task_total,
+                    (SELECT COUNT(*) FROM project_task t WHERE t.projectID = p.projectID
+                        AND LOWER(TRIM(t.satatus)) NOT IN ('done', 'completed', 'complete')) AS task_open
                FROM projects p
                JOIN enrolled_subjects es ON es.enrolled_subjectID = p.enrolled_subjectID
           LEFT JOIN project_submission sub ON sub.projectID = p.projectID
@@ -666,7 +669,10 @@ class ProjectsLogic
                     p.name, p.deadline,
                     " . self::profSql() . " AS assigned_by,
                     sub.file_url, sub.attachment, sub.notes,
-                    (sub.id IS NOT NULL) AS submitted
+                    (sub.id IS NOT NULL) AS submitted,
+                    (SELECT COUNT(*) FROM project_task t WHERE t.projectID = p.projectID) AS task_total,
+                    (SELECT COUNT(*) FROM project_task t WHERE t.projectID = p.projectID
+                        AND LOWER(TRIM(t.satatus)) NOT IN ('done', 'completed', 'complete')) AS task_open
                FROM projects p
                JOIN enrolled_subjects es ON es.enrolled_subjectID = p.enrolled_subjectID
           LEFT JOIN project_submission sub ON sub.projectID = p.projectID
