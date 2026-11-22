@@ -29,7 +29,7 @@
     <div class="column" style="flex: 1; min-width: 0;">
       <?php require_once __DIR__."/components/header.php"; ?>
       <main class="column scrollbar att-main">
-<div class="att<?= $attGroup === 'student' ? ' student' : '' ?>" id="att" data-qr="<?= e(BASE_PATH) ?>/attendance-qr" data-qr-icon="<?= BASE_PATH ?>/View/resources/qr.png" data-can-qr="<?= ($attGroup === 'student' || $attCanScan) ? '1' : '0' ?>">
+<div class="att<?= $attGroup === 'student' ? ' student' : '' ?>" id="att" data-qr="<?= e(BASE_PATH) ?>/attendance-qr" data-qr-icon="<?= BASE_PATH ?>/View/resources/qr.png" data-can-qr="<?= ($attGroup === 'student' || $attCanScan) ? '1' : '0' ?>"<?= !$attCanList ? ' data-back="' . e(BASE_PATH) . '/dashboard"' : '' ?><?= in_array($attPos, ['faculty', 'coordinator'], true) ? ' data-no-back="1"' : '' ?>>
 <?php if ($evpage): /* =============== EVENTS PAGE =============== */ ?>
   <!-- Events management toolbar and list view -->
   <section class="view">
@@ -161,8 +161,10 @@
   <!-- Faculty student directory list/grid view with filters and search -->
   <section class="view">
     <div class="toolbar">
-      <?php att_dropdown('Department', 'All departments', array_keys($ATT_DEPT_COURSES), $dept, 'dept'); ?>
-      <?php att_dropdown('Course', 'All courses', $dept ? $ATT_DEPT_COURSES[$dept] : $allCourses, $course, 'course'); ?>
+      <?php if (!$attScoped): /* coordinator is limited to one program, so no department / course filter */ ?>
+        <?php att_dropdown('Department', 'All departments', array_keys($ATT_DEPT_COURSES), $dept, 'dept'); ?>
+        <?php att_dropdown('Course', 'All courses', $dept ? $ATT_DEPT_COURSES[$dept] : $allCourses, $course, 'course'); ?>
+      <?php endif; ?>
       <form class="search" method="get" action="">
         <?php foreach (['dept' => $dept, 'course' => $course, 'view' => $view === 'list' ? 'list' : null] as $k => $v): if ($v): ?>
           <input type="hidden" name="<?= e($k) ?>" value="<?= e($v) ?>">

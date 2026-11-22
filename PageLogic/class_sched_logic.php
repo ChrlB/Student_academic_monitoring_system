@@ -95,7 +95,26 @@ class ScheduleLogic
     {
         return (bool)preg_match('/coordinator|dean/', $this->role);
     }
+    public function isDean()
+   {
+    return strpos($this->role, 'dean') !== false;
+   }
 
+    public function departments()
+   {
+    return $this->all("SELECT department, name FROM departments ORDER BY name");
+   }
+
+    public function programs()
+   {
+    return $this->all("SELECT program, name, department FROM programs ORDER BY program");
+   }
+
+   public function ownDepartment()
+   {
+    $r = $this->all("SELECT department FROM faculty WHERE facultyID = :id", [':id' => $this->userID]);
+    return $r ? (string)$r[0]['department'] : '';
+   }
     // Day codes / formatting helpers
 
     // Day codes or names to a list of weekdays.
@@ -311,7 +330,7 @@ class ScheduleLogic
     }
 
     // Schedules for one semester, filtered by role.
-    public function schedules($semKey, $search = '')
+    public function schedules($semKey, $search = '', $dept = '', $program = '')
     {
         list($acad, $sem) = self::splitSemester($semKey);
         $sql    = self::BASE_SELECT . " WHERE ep.acad_year = :ay AND ep.sem = :sem";
@@ -337,7 +356,15 @@ class ScheduleLogic
                 $params[':q'] = '%' . str_replace(['%', '_'], '', $search) . '%';
             }
         }
-
+        if ($this->group === 'manager') {
+       if ($program !== '') {
+        $sql .= " AND ep.program = :fprog";
+        $params[':fprog'] = $program;
+       } elseif ($dept !== '') {
+        $sql .= " AND ep.program IN (SELECT program FROM programs WHERE department = :fdept)";
+        $params[':fdept'] = $dept;
+       }
+       } 
         $sql .= " ORDER BY ss.time_start, ss.schedID";
         return array_map([$this, 'decorate'], $this->all($sql, $params));
     }
@@ -430,7 +457,11 @@ class ScheduleLogic
     public function save($id, array $in)
     {
         $errors = [];
-
+        if ($id) {
+        $current = $this->find($id);
+        if (!$current) return ['ok' => false, 'errors' => ['Schedule not found.']];
+        $in['instructor'] = $current['facultyID'];
+    }
         $blockParts = explode('|', (string)($in['block'] ?? ''), 2);
         $program    = $blockParts[0] ?? '';
         $block      = $blockParts[1] ?? '';

@@ -1,5 +1,4 @@
 <?php
-
 require_once __DIR__ . '/session.php';
 require_once __DIR__ . '/csrf.php';
 
@@ -144,8 +143,28 @@ function uploadProfile(){
       profileUploadDone('error', 'Could not save the picture. Please try again.');
   }
 
-  if ($rows_affected > 0) {
+  // MySQL reports 0 changed rows when the new bytes equal the stored ones (and a too-small image column can
+  // silently cut the picture off), so do not trust $rows_affected alone: read the picture back and compare.
+  $read_back = ($_SESSION['role'] ?? '') === 'student' ? 'getStudentProfile' : 'getFacultyProfile';
+  try {
+      $stored = $userDAO->executeQuery($read_back, [$loggedInUserId]);
+  } catch (Throwable $e) {
+      error_log('Profile picture read-back failed: ' . $e->getMessage());
+      $stored = [];
+  }
+  if (empty($stored)) {
+      profileUploadDone('error', 'Your account record could not be found, so the picture was not saved.');
+  }
+  $storedData = $stored[0]['image_data'] ?? null;
+  if (is_resource($storedData)) {
+      $storedData = stream_get_contents($storedData);
+  }
+  if ($storedData === $imageBinaryData) {
       profileUploadDone('message', 'Profile picture saved!');
+  }
+  if (is_string($storedData) && $storedData !== '' && strlen($storedData) < strlen($imageBinaryData)) {
+      error_log('Profile picture was cut off: stored ' . strlen($storedData) . ' of ' . strlen($imageBinaryData) . ' bytes. Make image_data a MEDIUMBLOB.');
+      profileUploadDone('error', 'The picture is too large for the database column (image_data must be MEDIUMBLOB). Ask the admin to update it.');
   }
   profileUploadDone('error', 'The picture was not saved. Please try again.');
 }

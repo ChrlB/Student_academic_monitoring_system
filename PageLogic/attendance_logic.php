@@ -32,8 +32,6 @@ require_once __DIR__.'/../Services/auth.php';
 require_once __DIR__.'/../PDAO/DAO.php';
 global $db_connection;
 
-$_SESSION["page"] = "ATTENDANCE | Faculty";
-
 function att_role_group(string $role): string {
   $r = strtolower(trim($role));
   if (preg_match('/coordinator|dean|registrar|admin/', $r)) return 'manager';
@@ -53,8 +51,6 @@ $attFacultyID  = ($attGroup !== 'student') ? (int)($_SESSION['real_userID'] ?? s
 
 # CONSISTENT FORMAT: YYYYXXXXX (No hyphen)
 $attStudentKey = ($attGroup === 'student' && preg_match('/^(\d{4})(\d{5})$/', $attUserRaw, $attM)) ? $attUserRaw : null;  
-
-$_SESSION["page"] = ($attGroup === 'student') ? "ATTENDANCE | Student" : "ATTENDANCE | Faculty";
 
 $attPos = 'student';
 if ($attGroup !== 'student') {
@@ -88,9 +84,19 @@ if ($attGroup !== 'student' && !$isAuthorizedDepartment) {
 }
 
 $attIsDean    = ($attPos === 'dean');   # only the dean approves / rejects events
-$attScoped    = false;
+$attScoped    = ($attPos === 'coordinator');   # coordinator only sees students (and records) of the program he is assigned to
 $evpage       = ($attGroup !== 'student' && (!empty($_GET['events']) || !empty($_POST['events'])));
 if ($evpage) $_SESSION["page"] = "EVENTS | " . $attLabel;
+
+# Only these roles may open the student list / student attendance records (faculty, prof and registrar may not)
+$attCanList = ($attGroup === 'student') || in_array($attPos, ['dean', 'coordinator', 'admin'], true);
+
+# Everyone else is limited to the events page; send them there instead of the student list
+if (!$attCanList && !$evpage && $_SERVER['REQUEST_METHOD'] === 'GET'
+    && !isset($_GET['att_qr'])) {
+  header('Location: ' . BASE_PATH . '/attendance?events=1');
+  exit;
+}
 
 $GLOBALS['attPos'] = $attPos; $GLOBALS['attCanEdit'] = $attCanEdit; $GLOBALS['attScoped'] = $attScoped;
 $GLOBALS['attMyProgram'] = $attMyProgram; $GLOBALS['attMyDept'] = $attMyDept; $GLOBALS['evpage'] = $evpage;
@@ -125,15 +131,9 @@ if ($attGroup === 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
 }
 
 # Handle bulk deletion of attendance records
-if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['att_action'] ?? '') === 'delete') {
-  if (session_status() !== PHP_SESSION_ACTIVE) session_start();
-  
-  # Re-verify department authorization dynamically
-  $facCheck = $db_connection->prepare("SELECT department FROM faculty WHERE facultyID = ?");
-  $facCheck->execute([$attFacultyID]);
-  $facultyDept = strtoupper(trim($facCheck->fetchColumn() ?: ''));
-
-  if (!$attCanEdit || !in_array($facultyDept, $validDepartments, true)) {
+if ($attGroup !== 'student' && $attCanList && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['att_action'] ?? '') === 'delete') {
+  # Department authorization was already resolved above ($isAuthorizedDepartment)
+  if (!$attCanEdit || !$isAuthorizedDepartment) {
     $_SESSION['error'] = 'Access restricted: Unauthorized department for record deletion.';
     header('Location: '.($_SERVER['REQUEST_URI'] ?? ''));
     exit;
@@ -179,12 +179,8 @@ if ($attGroup !== 'student' && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST[
     exit;
   };
 
-  # Validate scanner permissions and dynamic department authorization
-  $facCheck = $db_connection->prepare("SELECT department FROM faculty WHERE facultyID = ?");
-  $facCheck->execute([$attFacultyID]);
-  $facultyDept = strtoupper(trim($facCheck->fetchColumn() ?: ''));
-
-  if (!$attCanScan || !in_array($facultyDept, $validDepartments, true)) {
+  # Validate scanner permissions and department authorization
+  if (!$attCanScan || !$isAuthorizedDepartment) {
     $respond('error', 'Access restricted: Your department is not authorized to record attendance.');
   }
 
@@ -265,7 +261,9 @@ $progStmt = $db_connection->query("SELECT program, department FROM programs");
 $allProgs = $progStmt->fetchAll();
 $ATT_DEPT_COURSES = [];
 foreach ($allProgs as $p) {
-  $ATT_DEPT_COURSES[$p['department']][] = $p['program'];
+  if (!in_array($p['program'], $ATT_DEPT_COURSES[$p['department']] ?? [], true)) {
+    $ATT_DEPT_COURSES[$p['department']][] = $p['program'];
+  }
 }
 
 if ($attScoped) {
@@ -469,17 +467,17 @@ function att_find_faculty(string $typed): ?int {
 
 function att_program_options(): array {
   global $db_connection, $attMyDept;
-  $sql = "SELECT program FROM programs";
+  $sql = "SELECT DISTINCT program FROM programs";
   $args = [];
   if ($attMyDept) { $sql .= " WHERE department = ?"; $args[] = $attMyDept; }
   $st = $db_connection->prepare($sql . " ORDER BY program");
   $st->execute($args);
-  return array_values(array_filter($st->fetchAll(PDO::FETCH_COLUMN)));
+  return array_values(array_unique(array_filter($st->fetchAll(PDO::FETCH_COLUMN))));
 }
 
 # Fetch and format events list with permissions and scope details
 function att_events(): array {
-  global $db_connection, $attCanEdit, $attScoped, $attMyProgram, $attMyDept, $attIsDean, $attFacultyID;
+  global $db_connection, $attCanEdit, $attScoped, $attMyProgram, $attMyDept, $attIsDean, $attFacultyID, $attPos;
   $sql = "SELECT e.eventID, e.eventName, e.program, e.department, e.datetime_Start, e.datetime_End, e.eventCoordinator, e.status,
                  TRIM(CONCAT(f.first_name, ' ', f.middle_name, ' ', f.last_name)) AS coord_name,
                  (SELECT COUNT(*) FROM attendance a WHERE a.eventID = e.eventID) AS att_count
@@ -492,6 +490,9 @@ function att_events(): array {
   if (!$attIsDean) {  
     $where[] = "(e.status <> 'PENDING' OR e.eventCoordinator = ?)";
     $args[] = $attFacultyID;
+  }
+  if ($attPos === 'registrar') {   # registrar sees only events happening right now
+    $where[] = "(e.status = 'ACTIVE' AND e.datetime_Start <= NOW() AND (e.datetime_End IS NULL OR e.datetime_End >= NOW()))";
   }
   if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
   $sql .= " ORDER BY e.datetime_Start DESC, e.eventID DESC";
@@ -528,11 +529,7 @@ function att_events(): array {
 function att_handle_event_action(PDO $db, string $act): void {
   global $attCanEdit, $attScoped, $attMyProgram, $attIsDean, $attFacultyID, $attMyDept, $validDepartments;
   
-  $facCheck = $db->prepare("SELECT department FROM faculty WHERE facultyID = ?");
-  $facCheck->execute([$attFacultyID]);
-  $facultyDept = strtoupper(trim($facCheck->fetchColumn() ?: ''));
-
-  if (!in_array($facultyDept, $validDepartments, true)) {
+  if (!in_array($attMyDept, $validDepartments, true)) {
     $_SESSION['error'] = 'Access restricted: Unauthorized department for event management.';
     return;
   }
@@ -687,4 +684,3 @@ $GLOBALS['q'] = $q; $GLOBALS['dept'] = $dept; $GLOBALS['course'] = $course; $GLO
 $GLOBALS['stu'] = $stu; $GLOBALS['event'] = $event; $GLOBALS['year'] = $year;
 $GLOBALS['currentActiveEvent'] = $currentActiveEvent ?? null;
 $GLOBALS['ATT_OPEN_EVENTS'] = $ATT_OPEN_EVENTS ?? [];
-$GLOBALS['evpage'] = $evpage;

@@ -235,7 +235,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   /* Inject back arrow into header on events page to return to student list */
   const evTitle = header && [...header.querySelectorAll('*')].find(el => !el.children.length && /^\s*EVENTS/i.test(el.textContent));
-  if (evTitle && !header.querySelector('.att-back')) {
+  if (evTitle && !header.querySelector('.att-back') && !(att && att.dataset.noBack === '1')) {
     const evNode = [...evTitle.childNodes].find(x => x.nodeType === 3 && /EVENTS/i.test(x.nodeValue));
     if (evNode) {
       const back = new URL(window.location.href);

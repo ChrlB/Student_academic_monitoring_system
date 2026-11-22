@@ -694,18 +694,31 @@
       input.maxLength = 500;
       input.placeholder = 'Answer choice ' + LETTERS.charAt(index);
       input.value = text || '';
+      var remove = el('button', 'icon-btn choice-remove', '\u2715');
+      remove.type = 'button';
+      remove.title = 'Remove this choice';
+      remove.setAttribute('aria-label', 'Remove this choice');
+      remove.dataset.action = 'remove-choice';
       label.appendChild(radio);
       label.appendChild(input);
+      label.appendChild(remove);
       return label;
     }
 
     function setChoiceRows(form, labels, correctIdx) {
       var holder = form.querySelector('.choice-rows');
       holder.innerHTML = '';
-      var count = Math.max(4, labels.length);
+      var count = Math.max(2, labels.length);
       for (var i = 0; i < count; i++) {
         holder.appendChild(choiceRow(i, labels[i] || '', i === correctIdx));
       }
+    }
+
+    function reindexChoices(form) {
+      form.querySelectorAll('.choice-row').forEach(function (row, i) {
+        row.querySelector('input[type="radio"]').value = i;
+        row.querySelector('input[type="text"]').placeholder = 'Answer choice ' + LETTERS.charAt(i);
+      });
     }
 
     wrap.querySelectorAll('.question-form').forEach(function (form) {
@@ -917,6 +930,18 @@
         var rows = addForm.querySelectorAll('.choice-row');
         if (rows.length >= 6) { toast('A question can have up to 6 choices.', true); return; }
         addForm.querySelector('.choice-rows').appendChild(choiceRow(rows.length, '', false));
+
+      } else if (action === 'remove-choice') {
+        var rmForm = btn.closest('.question-form');
+        if (rmForm.querySelectorAll('.choice-row').length <= 2) { toast('A question needs at least 2 choices.', true); return; }
+        var rmRow = btn.closest('.choice-row');
+        var wasCorrect = rmRow.querySelector('input[type="radio"]').checked;
+        rmRow.remove();
+        if (wasCorrect) rmForm.querySelector('.choice-row input[type="radio"]').checked = true;
+        reindexChoices(rmForm);
+
+      } else if (action === 'true-false') {
+        setChoiceRows(btn.closest('.question-form'), ['True', 'False'], 0);
 
       } else if (action === 'edit-question') {
         var qItem = btn.closest('.q-item');

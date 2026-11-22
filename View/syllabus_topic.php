@@ -573,16 +573,17 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             <textarea class="syl-input" name="prompt" maxlength="2000" placeholder="Question"></textarea>
                             <div class="choice-rows">
                                 <?php for ($i = 0; $i < 4; $i++): ?>
-                                <label class="choice-row"><input type="radio" name="correct" value="<?= $i ?>"<?= $i === 0 ? ' checked' : '' ?>><input class="syl-input grow" type="text" name="choice" maxlength="500" placeholder="Answer choice <?= chr(65 + $i) ?>"></label>
+                                <label class="choice-row"><input type="radio" name="correct" value="<?= $i ?>"<?= $i === 0 ? ' checked' : '' ?>><input class="syl-input grow" type="text" name="choice" maxlength="500" placeholder="Answer choice <?= chr(65 + $i) ?>"><button type="button" class="icon-btn choice-remove" data-action="remove-choice" title="Remove this choice" aria-label="Remove this choice">&#10005;</button></label>
                                 <?php endfor; ?>
                             </div>
-                            <div class="hint">Select the circle next to the correct answer. Empty choices are ignored (minimum 2).</div>
+                            <div class="hint">Select the circle next to the correct answer. Use &#10005; to remove a choice (minimum 2) or + Add choice (up to 6).</div>
                             <details class="more-opts">
                                 <summary>Add an explanation (optional)</summary>
                                 <textarea class="syl-input" name="explanation" maxlength="1500" placeholder="Shown to students after they answer. It helps them learn from a wrong answer."></textarea>
                             </details>
                             <div class="cf-row">
                                 <button type="button" class="icon-btn" data-action="add-choice">+ Add choice</button>
+                                <button type="button" class="icon-btn" data-action="true-false" title="Replace the choices with True / False">True / False</button>
                                 <button type="submit" class="syl-btn inline">Save question</button>
                                 <button type="button" class="syl-btn inline is-hidden" data-action="cancel-question">Cancel edit</button>
                             </div>
