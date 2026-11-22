@@ -1537,7 +1537,6 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-<<<<<<< HEAD
 
 
 /* Registration */
@@ -1572,5 +1571,36 @@ INSERT INTO departments (department, name) VALUES
  ('CBA',  'College of Business and Accountancy'),
  ('CHTM', 'College of Hospitality and Tourism Management'),
  ('CEAS', 'College of Education, Arts and Sciences');
-=======
->>>>>>> 8bf2ad1d55056458bb980a56261f818f38b572d9
+
+-- Departments and programs for CBA, CEAS and CHTM (CCS already exists).
+-- Run in phpMyAdmin -> database ams_db -> SQL tab. Safe to run again: INSERT IGNORE skips rows that already exist.
+--
+-- EDIT THIS LIST to match the programs your school really offers (delete a row you do not offer, add ones that are missing).
+-- Program codes are letters only (no hyphens or digits) so a student's Program/Block can be typed as e.g. "BSBA 2A".
+
+INSERT IGNORE INTO departments (department, name) VALUES
+ ('CBA',  'College of Business and Accountancy'),
+ ('CEAS', 'College of Education, Arts and Sciences'),
+ ('CHTM', 'College of Hospitality and Tourism Management');
+
+INSERT IGNORE INTO programs (program, name, department) VALUES
+ -- College of Business and Accountancy
+ ('BSA',      'Bachelor of Science in Accountancy',                'CBA'),
+ ('BSBA',     'Bachelor of Science in Business Administration',    'CBA'),
+ ('BSMA',     'Bachelor of Science in Management Accounting',      'CBA'),
+ ('BSAIS',    'Bachelor of Science in Accounting Information System', 'CBA'),
+ ('BSENTREP', 'Bachelor of Science in Entrepreneurship',           'CBA'),
+ -- College of Education, Arts and Sciences
+ ('BEED',     'Bachelor of Elementary Education',                  'CEAS'),
+ ('BSED',     'Bachelor of Secondary Education',                   'CEAS'),
+ ('BECED',    'Bachelor of Early Childhood Education',             'CEAS'),
+ ('BPED',     'Bachelor of Physical Education',                    'CEAS'),
+ ('BSPSY',    'Bachelor of Science in Psychology',                 'CEAS'),
+ ('ABCOMM',   'Bachelor of Arts in Communication',                 'CEAS'),
+ ('ABPOLSCI', 'Bachelor of Arts in Political Science',             'CEAS'),
+ -- College of Hospitality and Tourism Management
+ ('BSHM',     'Bachelor of Science in Hospitality Management',     'CHTM'),
+ ('BSTM',     'Bachelor of Science in Tourism Management',         'CHTM');
+
+-- check the result:
+-- SELECT department, program, name FROM programs ORDER BY department, program;

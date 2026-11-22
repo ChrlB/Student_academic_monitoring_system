@@ -1,4 +1,5 @@
 <?php
+
 require_once __DIR__ . '/session.php';
 require_once __DIR__ . '/csrf.php';
 
@@ -143,8 +144,7 @@ function uploadProfile(){
       profileUploadDone('error', 'Could not save the picture. Please try again.');
   }
 
-  // MySQL reports 0 changed rows when the new bytes equal the stored ones (and a too-small image column can
-  // silently cut the picture off), so do not trust $rows_affected alone: read the picture back and compare.
+ 
   $read_back = ($_SESSION['role'] ?? '') === 'student' ? 'getStudentProfile' : 'getFacultyProfile';
   try {
       $stored = $userDAO->executeQuery($read_back, [$loggedInUserId]);
@@ -188,6 +188,11 @@ function getProfilePic(){
         $imageBinaryData = stream_get_contents($imageBinaryData);
     }
       
+    ini_set('display_errors', '0');
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+
     header('Cache-Control: private, no-cache');
 
     if ($imageBinaryData === null || $imageBinaryData === '' || $storedMimeType === null) {
@@ -204,7 +209,7 @@ function getProfilePic(){
         exit;
     }
 
-    $imageEtag = '"' . md5($imageBinaryData) . '"';
+    $imageEtag = '"' . md5($imageBinaryData) . '-2"';
     header('ETag: ' . $imageEtag);
 
     if (($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $imageEtag) {
