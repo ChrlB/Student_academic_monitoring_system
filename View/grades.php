@@ -1,15 +1,21 @@
 <?php
 require_once __DIR__ . "/../PageLogic/grades_logic.php";
 
+$accountRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
+if (!in_array($accountRole, ['student', 'prof', 'program coordinator'], true)) {
+    $_SESSION['error'] = 'Grades are not available for this account.';
+    header('Location: ' . BASE_PATH . '/dashboard');
+    exit;
+}
+
 function grades_e($value)
 {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
 
 $gradesLogic = new GradesLogic();
-$accountRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
 $isStudentAccount = $accountRole === 'student';
-$isFacultyAccount = in_array($accountRole, ['prof', 'dean', 'program coordinator', 'registrar'], true);
+$isFacultyAccount = in_array($accountRole, ['prof', 'program coordinator'], true);
 $semesters = $isStudentAccount
     ? $gradesLogic->studentSemesters()
     : ($isFacultyAccount ? $gradesLogic->semesters() : []);
@@ -380,7 +386,7 @@ $csrf = $gradesLogic->csrfToken();
       max-width: 100%;
       min-height: 42px;
       padding: 10px 12px;
-      margin-top: 20px;
+      margin-top: 15px;
       background: rgba(60,52,65,0.75);
       text-transform: uppercase;
       font-size: 0.9rem;
@@ -407,6 +413,19 @@ $csrf = $gradesLogic->csrfToken();
       min-width: 0;
       overflow-x: auto;
       overflow-y: hidden;
+    }
+
+    .class-preview-panel {
+      width: 100%;
+      min-width: 0;
+      padding: 7px 14px;
+      border: 1px solid rgba(255,255,255,0.7);
+      border-radius: 14px;
+      background: rgba(74, 43, 79, 0.72);
+    }
+
+    .faculty-grades .class-preview-panel {
+      margin-top: -40px;
     }
 
     .class-card {
@@ -986,7 +1005,7 @@ $csrf = $gradesLogic->csrfToken();
             </section>
           </div>
         </section>
-      <?php elseif (in_array($_SESSION['role'], ['prof', 'dean', 'program coordinator', 'registrar'], true)): ?>
+      <?php elseif (in_array($accountRole, ['prof', 'program coordinator'], true)): ?>
       <div class="grades-add-shell faculty-grades">
           <div class="grades-add-panel">
             <div class="grades-toolbar faculty-grades__heading-panel">
@@ -1160,23 +1179,25 @@ $csrf = $gradesLogic->csrfToken();
                 <?php elseif (empty($classPreview)): ?>
                   <div class="empty-state">No assigned class schedule found for this account.</div>
                 <?php else: ?>
-                  <div class="class-grid">
-                    <?php foreach ($classPreview as $class): ?>
-                      <a class="class-card-link" href="<?= BASE_PATH ?>/grades?<?= http_build_query([
-                          'view' => 'gradebook',
-                          'class' => (int)$class['schedID'],
-                          'sem' => $semesterKey,
-                      ]) ?>">
-                        <article class="class-card">
-                          <h3><?= grades_e($class['subject_code']) ?> - <?= grades_e($class['program'] . $class['block']) ?></h3>
-                          <ul class="class-meta">
-                            <li><span class="stat-label">Total Students:</span> <?= (int)$class['total_students'] ?></li>
-                            <li><span class="stat-label">Grades Submitted:</span> <?= (int)$class['grades_submitted'] ?></li>
-                            <li><span class="stat-label">Missing Grades:</span> <?= (int)$class['missing_grades'] ?></li>
-                          </ul>
-                        </article>
-                      </a>
-                    <?php endforeach; ?>
+                  <div class="class-preview-panel">
+                    <div class="class-grid">
+                      <?php foreach ($classPreview as $class): ?>
+                        <a class="class-card-link" href="<?= BASE_PATH ?>/grades?<?= http_build_query([
+                            'view' => 'gradebook',
+                            'class' => (int)$class['schedID'],
+                            'sem' => $semesterKey,
+                        ]) ?>">
+                          <article class="class-card">
+                            <h3><?= grades_e($class['subject_code']) ?> - <?= grades_e($class['program'] . $class['block']) ?></h3>
+                            <ul class="class-meta">
+                              <li><span class="stat-label">Total Students:</span> <?= (int)$class['total_students'] ?></li>
+                              <li><span class="stat-label">Grades Submitted:</span> <?= (int)$class['grades_submitted'] ?></li>
+                              <li><span class="stat-label">Missing Grades:</span> <?= (int)$class['missing_grades'] ?></li>
+                            </ul>
+                          </article>
+                        </a>
+                      <?php endforeach; ?>
+                    </div>
                   </div>
                 <?php endif; ?>
               </section>
