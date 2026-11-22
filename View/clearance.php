@@ -808,7 +808,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
             <?php endif ?>
 
-            <?php if(!in_array($_SESSION["role"],["student"]) && (count($offices) < 0)): ?>
+            <?php if(in_array($_SESSION["role"],["dean","program coordinator"]) ): ?>
               <div>
                 <hr>
               </div>
