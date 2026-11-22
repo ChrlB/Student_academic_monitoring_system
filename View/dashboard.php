@@ -187,6 +187,7 @@ require_once __DIR__ . "/../PageLogic/dashboard_logic.php";
         <?php else: ?>
           <div class="row" style="gap:20px">
             <div style="gap:20px" class="column">
+              <?php if(!in_array($_SESSION['role'],['registrar'])): ?>
               <div class="column drop_shadow" style="padding:30px; border-radius:30px; width:500px; max-height:400px; overflow-y:auto; background: rgba(40,40,40,0.3);">
                 <div class="row" style="align-items:center; justify-content:space-between">
                   <b style="font-size:30px; font-weight:bold;">TODAY'S CLASSES</b>
@@ -214,7 +215,7 @@ require_once __DIR__ . "/../PageLogic/dashboard_logic.php";
                 <?php endforeach; endif ?>
               </div>
 
-              <?php $events = getFacultyEvents(); ?>
+              <?php endif; $events = getFacultyEvents(); ?>
 
               <div class="column drop_shadow" style="padding: 30px; border-radius:30px; width:500px; max-height:400px; overflow-y:auto; background: rgba(40, 40, 40, 0.3);">
                 <div class="row" style="align-items:center; justify-content:space-between">
