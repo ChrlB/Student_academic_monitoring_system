@@ -1,3 +1,4 @@
+
 <?php
 require_once __DIR__ . '/../Services/auth.php';
 
@@ -16,7 +17,6 @@ class EnrollmentLogic
     public $userID;
     public $numericID = null;
 
-    // Student
     public $studentProgram = '';
     public $studentYear = '';
     public $term = null;
@@ -25,14 +25,12 @@ class EnrollmentLogic
     public $available = [];
     public $totalUnits = 0;
 
-    // Adviser
     public $facultyID = null;
     public $pendingStudents = [];
     public $selectedStudent = null;
     public $studentSubjects = [];
     public $isWindowOpen = true;
 
-    // Registrar
     public $allPeriods = [];
     public $allSubjects = [];
     public $prerequisiteOptions = [];
@@ -42,12 +40,7 @@ class EnrollmentLogic
 
     public const UNIT_LIMIT = 21;
 
-    // Timezone used when comparing "now" with the period open/close dates.
     private const TIMEZONE = 'Asia/Manila';
-
-    // Query-string keys that belong to this module only. Everything else in
-    // the URL (for example the router's own "page=..." parameter) is kept
-    // when redirecting, so the router can still find the page.
     private const MODULE_PARAMS = ['tab', 'edit_subject', 'review_student', 'enroll_id'];
 
     public function __construct()
@@ -76,7 +69,7 @@ class EnrollmentLogic
         if ($this->group === 'student') {
             $this->resolveStudentID();
             $this->loadStudentProfile();
-        } elseif ($this->group === 'faculty') {
+        } elseif ($this->group === 'coordinator') {
             $this->resolveFacultyID();
         }
     }
@@ -85,12 +78,16 @@ class EnrollmentLogic
     {
         $r = strtolower(trim((string)$role));
 
-        if (preg_match('/coordinator|dean|registrar|admin/', $r)) {
-            return 'manager';
+        if (preg_match('/registrar|admin/', $r)) {
+            return 'registrar';
         }
 
-        if (preg_match('/prof|faculty|instructor|teacher|adviser|advisor/', $r)) {
-            return 'faculty';
+        if (preg_match('/coordinator|adviser|advisor/', $r)) {
+            return 'coordinator';
+        }
+
+        if (preg_match('/instructor|teacher|professor|prof/', $r)) {
+            return 'instructor';
         }
 
         return 'student';
@@ -99,24 +96,26 @@ class EnrollmentLogic
     public static function ordinal($number)
     {
         $n = (int)$number;
-        if ($n % 100 >= 11 && $n % 100 <= 13) return $n . 'th';
+
+        if ($n % 100 >= 11 && $n % 100 <= 13) {
+            return $n . 'th';
+        }
+
         switch ($n % 10) {
-            case 1:  return $n . 'st';
-            case 2:  return $n . 'nd';
-            case 3:  return $n . 'rd';
-            default: return $n . 'th';
+            case 1:
+                return $n . 'st';
+            case 2:
+                return $n . 'nd';
+            case 3:
+                return $n . 'rd';
+            default:
+                return $n . 'th';
         }
     }
 
-    /**
-     * Builds a URL for the current page. It keeps the current path AND any
-     * query parameters used by the router, drops this module's own
-     * parameters, then adds the ones passed in.
-     */
     public static function url(array $query = [], $fragment = '')
     {
         $path = strtok($_SERVER['REQUEST_URI'] ?? '', '?');
-
         $keep = array_diff_key($_GET, array_flip(self::MODULE_PARAMS));
 
         $query = array_filter($query, function ($v) {
@@ -207,18 +206,30 @@ class EnrollmentLogic
 
     private function studentYearNumber()
     {
-        return (int)filter_var($this->studentYear, FILTER_SANITIZE_NUMBER_INT);
+        return (int)filter_var(
+            $this->studentYear,
+            FILTER_SANITIZE_NUMBER_INT
+        );
     }
 
     public function loadData()
     {
         if ($this->group === 'student') {
             $this->loadStudentData();
-        } elseif ($this->group === 'manager') {
-            $this->loadRegistrarData();
-        } else {
-            $this->loadAdviserData();
+            return;
         }
+
+        if ($this->group === 'registrar') {
+            $this->loadRegistrarData();
+            return;
+        }
+
+        if ($this->group === 'coordinator') {
+            $this->loadAdviserData();
+            return;
+        }
+
+        $this->error = 'You do not have permission to access Enrollment management.';
     }
 
     private function loadStudentData()
@@ -244,7 +255,6 @@ class EnrollmentLogic
 
         $enrollmentID = (int)$this->term['enrollmentID'];
 
-        // Individual student window defaults to open if no control row exists.
         $stmt = $this->pdo->prepare("
             SELECT window_open
             FROM student_enrollment_control
@@ -260,8 +270,10 @@ class EnrollmentLogic
             $individualWindow = 1;
         }
 
-        $now = (new DateTime('now', new DateTimeZone(self::TIMEZONE)))
-            ->format('Y-m-d H:i:s');
+        $now = (new DateTime(
+            'now',
+            new DateTimeZone(self::TIMEZONE)
+        ))->format('Y-m-d H:i:s');
 
         $dateOpen =
             $now >= $this->term['open_date'] &&
@@ -279,7 +291,6 @@ class EnrollmentLogic
             $globalWindow &&
             (int)$individualWindow === 1;
 
-        // Selected subjects
         $stmt = $this->pdo->prepare("
             SELECT
                 es.subjectID,
@@ -312,7 +323,6 @@ class EnrollmentLogic
 
         $this->picked = $stmt->fetchAll();
 
-        // Rejected subjects no longer count toward the unit limit.
         $this->totalUnits = 0;
 
         foreach ($this->picked as $subject) {
@@ -321,7 +331,6 @@ class EnrollmentLogic
             }
         }
 
-        // Subjects the student has already completed (approved).
         $stmt = $this->pdo->prepare("
             SELECT DISTINCT subjectID
             FROM enrolled_subjects
@@ -330,10 +339,8 @@ class EnrollmentLogic
         ");
 
         $stmt->execute([$this->numericID]);
-
         $approved = array_map('trim', $stmt->fetchAll(PDO::FETCH_COLUMN));
 
-        // Available subjects, with prerequisites grouped to avoid duplicates.
         $stmt = $this->pdo->prepare("
             SELECT
                 sy.subjectID,
@@ -373,14 +380,16 @@ class EnrollmentLogic
 
         $this->available = $stmt->fetchAll();
 
-        // Mark subjects whose prerequisites are not yet approved.
         foreach ($this->available as &$row) {
-            $prereqs = array_filter(array_map('trim', explode(',', $row['prerequisite'])));
+            $prereqs = array_filter(
+                array_map('trim', explode(',', $row['prerequisite']))
+            );
 
             $row['prerequisite'] = implode(', ', $prereqs);
             $row['missing'] = array_values(array_diff($prereqs, $approved));
             $row['blocked'] = !empty($row['missing']);
         }
+
         unset($row);
     }
 
@@ -392,7 +401,7 @@ class EnrollmentLogic
 
         $stmt = $this->pdo->prepare("
             SELECT 1
-            FROM adviser_student
+            FROM professor_student
             WHERE facultyID = ?
               AND studentID = ?
             LIMIT 1
@@ -407,62 +416,63 @@ class EnrollmentLogic
     }
 
     private function loadAdviserData()
-{
-    if (!$this->facultyID) {
-        $this->error = 'Faculty account could not be identified.';
-        return;
-    }
+    {
+        if (!$this->facultyID) {
+            $this->error = 'Program Coordinator account could not be identified.';
+            return;
+        }
 
-    // Show ALL students assigned to this Adviser.
-    // Pending subjects are counted separately, so students with no pending
-    // requests are still visible in the My Advisees list.
-    $stmt = $this->pdo->prepare("
-        SELECT
-            st.studentID,
-            st.first_name,
-            st.last_name,
-            st.program,
-            st.year_level,
-            COALESCE(ep.enrollmentID, 0) AS enrollmentID,
-            ep.acad_year,
-            ep.sem,
-            COUNT(
-                CASE WHEN es.status = 'pending'
-                THEN es.enrolled_subjectID END
-            ) AS subject_count
-        FROM adviser_student aa
-        JOIN students st
-            ON st.studentID = aa.studentID
-        LEFT JOIN enrollment_period ep
-            ON ep.enrollmentID = (
-                SELECT MAX(ep2.enrollmentID)
-                FROM enrollment_period ep2
-                WHERE ep2.program = st.program
-            )
-        LEFT JOIN enrolled_subjects es
-            ON es.studentID = st.studentID
-            AND es.enrollmentID = ep.enrollmentID
-        WHERE aa.facultyID = ?
-        GROUP BY
-            st.studentID,
-            st.first_name,
-            st.last_name,
-            st.program,
-            st.year_level,
-            ep.enrollmentID,
-            ep.acad_year,
-            ep.sem
-        ORDER BY st.last_name, st.first_name
-    ");
+        $stmt = $this->pdo->prepare("
+            SELECT
+                st.studentID,
+                st.first_name,
+                st.last_name,
+                st.program,
+                st.year_level,
+                COALESCE(ep.enrollmentID, 0) AS enrollmentID,
+                ep.acad_year,
+                ep.sem,
+                COUNT(
+                    CASE
+                        WHEN es.status = 'pending'
+                        THEN es.enrolled_subjectID
+                    END
+                ) AS subject_count
+            FROM professor_student aa
+            JOIN students st
+                ON st.studentID = aa.studentID
+            LEFT JOIN enrollment_period ep
+                ON ep.enrollmentID = (
+                    SELECT MAX(ep2.enrollmentID)
+                    FROM enrollment_period ep2
+                    WHERE ep2.program = st.program
+                )
+            LEFT JOIN enrolled_subjects es
+                ON es.studentID = st.studentID
+                AND es.enrollmentID = ep.enrollmentID
+            WHERE aa.facultyID = ?
+            GROUP BY
+                st.studentID,
+                st.first_name,
+                st.last_name,
+                st.program,
+                st.year_level,
+                ep.enrollmentID,
+                ep.acad_year,
+                ep.sem
+            ORDER BY st.last_name, st.first_name
+        ");
 
-    $stmt->execute([$this->facultyID]);
-    $this->pendingStudents = $stmt->fetchAll();
+        $stmt->execute([$this->facultyID]);
+        $this->pendingStudents = $stmt->fetchAll();
 
-    // Load a selected advisee for review.
-    if (
-        isset($_GET['review_student']) &&
-        isset($_GET['enroll_id'])
-    ) {
+        if (
+            !isset($_GET['review_student']) ||
+            !isset($_GET['enroll_id'])
+        ) {
+            return;
+        }
+
         $reviewID = (int)$_GET['review_student'];
         $enrollID = (int)$_GET['enroll_id'];
 
@@ -485,8 +495,6 @@ class EnrollmentLogic
             return;
         }
 
-        // A student can be assigned to an Adviser even when no enrollment
-        // period exists yet. Do not try to review or toggle enrollment 0.
         if ($enrollID < 1) {
             $this->error = 'There is no enrollment period available for this student yet.';
             $this->selectedStudent = null;
@@ -496,10 +504,15 @@ class EnrollmentLogic
         $periodStmt = $this->pdo->prepare("
             SELECT enrollmentID
             FROM enrollment_period
-            WHERE enrollmentID = ? AND program = ?
+            WHERE enrollmentID = ?
+              AND program = ?
             LIMIT 1
         ");
-        $periodStmt->execute([$enrollID, $this->selectedStudent['program']]);
+
+        $periodStmt->execute([
+            $enrollID,
+            $this->selectedStudent['program']
+        ]);
 
         if (!$periodStmt->fetchColumn()) {
             $this->error = 'The selected enrollment period does not belong to this student.';
@@ -514,6 +527,7 @@ class EnrollmentLogic
               AND studentID = ?
             LIMIT 1
         ");
+
         $stmt->execute([$enrollID, $reviewID]);
         $window = $stmt->fetchColumn();
 
@@ -552,7 +566,6 @@ class EnrollmentLogic
 
         $this->studentSubjects = $stmt->fetchAll();
     }
-}
 
     private function loadRegistrarData()
     {
@@ -572,7 +585,6 @@ class EnrollmentLogic
             ORDER BY ep.enrollmentID DESC
         ")->fetchAll();
 
-        // Syllabus is the writable table; prospectus is a VIEW.
         $this->prerequisiteOptions = $this->pdo->query("
             SELECT subjectID, name
             FROM subjects
@@ -588,14 +600,42 @@ class EnrollmentLogic
                 sy.year,
                 sy.program,
                 sy.sem_available,
-                COALESCE(GROUP_CONCAT(DISTINCT sp.prerequisite ORDER BY sp.prerequisite SEPARATOR ', '), '') AS prerequisite_codes,
-                COALESCE(GROUP_CONCAT(DISTINCT CONCAT(ps.subjectID, ' - ', ps.name) ORDER BY ps.subjectID SEPARATOR '||'), '') AS prerequisite_labels
+                COALESCE(
+                    GROUP_CONCAT(
+                        DISTINCT sp.prerequisite
+                        ORDER BY sp.prerequisite
+                        SEPARATOR ', '
+                    ),
+                    ''
+                ) AS prerequisite_codes,
+                COALESCE(
+                    GROUP_CONCAT(
+                        DISTINCT CONCAT(ps.subjectID, ' - ', ps.name)
+                        ORDER BY ps.subjectID
+                        SEPARATOR '||'
+                    ),
+                    ''
+                ) AS prerequisite_labels
             FROM syllabus sy
-            JOIN subjects s ON s.subjectID = sy.subjectID
-            LEFT JOIN subject_prerequisite sp ON sp.subjectID = sy.subjectID
-            LEFT JOIN subjects ps ON ps.subjectID = sp.prerequisite
-            GROUP BY sy.id, s.subjectID, s.name, sy.unit, sy.year, sy.program, sy.sem_available
-            ORDER BY sy.program, sy.year, sy.sem_available, s.subjectID
+            JOIN subjects s
+                ON s.subjectID = sy.subjectID
+            LEFT JOIN subject_prerequisite sp
+                ON sp.subjectID = sy.subjectID
+            LEFT JOIN subjects ps
+                ON ps.subjectID = sp.prerequisite
+            GROUP BY
+                sy.id,
+                s.subjectID,
+                s.name,
+                sy.unit,
+                sy.year,
+                sy.program,
+                sy.sem_available
+            ORDER BY
+                sy.program,
+                sy.year,
+                sy.sem_available,
+                s.subjectID
         ")->fetchAll();
     }
 
@@ -629,9 +669,6 @@ class EnrollmentLogic
         ];
     }
 
-    /**
-     * Shows a safe message instead of raw database errors.
-     */
     private function fail(Throwable $e)
     {
         if ($this->pdo->inTransaction()) {
@@ -658,7 +695,6 @@ class EnrollmentLogic
             exit;
         }
 
-        // Fallback if the router already sent output.
         echo '<script>location.replace(' . json_encode($url) . ');</script>';
         echo '<noscript><meta http-equiv="refresh" content="0;url='
             . htmlspecialchars($url, ENT_QUOTES, 'UTF-8') . '"></noscript>';
@@ -683,8 +719,13 @@ class EnrollmentLogic
             $this->go(array_intersect_key($_GET, array_flip(self::MODULE_PARAMS)));
         }
 
-        // Manager actions
-        if ($this->group === 'manager') {
+        if ($this->group === 'instructor') {
+            http_response_code(403);
+            $this->error = 'You do not have permission to perform Enrollment actions.';
+            return;
+        }
+
+        if ($this->group === 'registrar') {
             if ($action === 'create_period') {
                 $this->createPeriod($_POST);
                 $this->go(['tab' => 'periods'], 'periods-section');
@@ -711,7 +752,6 @@ class EnrollmentLogic
             }
         }
 
-        // Student actions
         if ($this->group === 'student') {
             if ($action === 'add') {
                 $this->loadStudentData();
@@ -726,8 +766,7 @@ class EnrollmentLogic
             }
         }
 
-        // Adviser actions
-        if ($this->group === 'faculty') {
+        if ($this->group === 'coordinator') {
             $studentID = (int)($_POST['student_id'] ?? 0);
             $enrollID = (int)($_POST['enroll_id'] ?? 0);
 
@@ -755,7 +794,6 @@ class EnrollmentLogic
             }
         }
 
-        // Unknown action: go back instead of leaving a POST page open.
         $this->go(array_intersect_key($_GET, array_flip(self::MODULE_PARAMS)));
     }
 
@@ -780,11 +818,18 @@ class EnrollmentLogic
                 throw new Exception('Close date must be after the open date.');
             }
 
-            // datetime-local sends "Y-m-d H:i"; MySQL needs seconds.
-            if (strlen($open) === 16)  $open .= ':00';
-            if (strlen($close) === 16) $close .= ':00';
+            if (strlen($open) === 16) {
+                $open .= ':00';
+            }
 
-            $stmt = $this->pdo->prepare("SELECT 1 FROM programs WHERE program = ?");
+            if (strlen($close) === 16) {
+                $close .= ':00';
+            }
+
+            $stmt = $this->pdo->prepare("
+                SELECT 1 FROM programs WHERE program = ?
+            ");
+
             $stmt->execute([$program]);
 
             if (!$stmt->fetchColumn()) {
@@ -794,9 +839,12 @@ class EnrollmentLogic
             $stmt = $this->pdo->prepare("
                 SELECT 1
                 FROM enrollment_period
-                WHERE program = ? AND acad_year = ? AND sem = ?
+                WHERE program = ?
+                  AND acad_year = ?
+                  AND sem = ?
                 LIMIT 1
             ");
+
             $stmt->execute([$program, $acadYear, $sem]);
 
             if ($stmt->fetchColumn()) {
@@ -805,12 +853,25 @@ class EnrollmentLogic
 
             $stmt = $this->pdo->prepare("
                 INSERT INTO enrollment_period
-                    (program, acad_year, sem, open_date, close_date,
-                     status, student_window_open)
+                    (
+                        program,
+                        acad_year,
+                        sem,
+                        open_date,
+                        close_date,
+                        status,
+                        student_window_open
+                    )
                 VALUES (?, ?, ?, ?, ?, 'open', 1)
             ");
 
-            $stmt->execute([$program, $acadYear, $sem, $open, $close]);
+            $stmt->execute([
+                $program,
+                $acadYear,
+                $sem,
+                $open,
+                $close
+            ]);
 
             $this->flash('ok', 'Enrollment period created successfully.');
         } catch (Throwable $e) {
@@ -821,10 +882,12 @@ class EnrollmentLogic
     private function togglePeriod($id)
     {
         try {
-            // Read the real status from the database; never trust the form.
             $stmt = $this->pdo->prepare("
-                SELECT status FROM enrollment_period WHERE enrollmentID = ?
+                SELECT status
+                FROM enrollment_period
+                WHERE enrollmentID = ?
             ");
+
             $stmt->execute([(int)$id]);
             $current = $stmt->fetchColumn();
 
@@ -832,7 +895,9 @@ class EnrollmentLogic
                 throw new Exception('Enrollment period not found.');
             }
 
-            $newStatus = strtolower($current) === 'open' ? 'closed' : 'open';
+            $newStatus = strtolower($current) === 'open'
+                ? 'closed'
+                : 'open';
 
             $stmt = $this->pdo->prepare("
                 UPDATE enrollment_period
@@ -864,9 +929,11 @@ class EnrollmentLogic
             $stmt = $this->pdo->prepare("
                 SELECT window_open
                 FROM student_enrollment_control
-                WHERE enrollmentID = ? AND studentID = ?
+                WHERE enrollmentID = ?
+                  AND studentID = ?
                 LIMIT 1
             ");
+
             $stmt->execute([(int)$enrollID, (int)$studentID]);
             $current = $stmt->fetchColumn();
 
@@ -904,11 +971,11 @@ class EnrollmentLogic
     {
         $out = [
             'subjectID' => trim($data['subjectID'] ?? ''),
-            'name'      => trim($data['subjectName'] ?? ''),
-            'program'   => trim($data['program'] ?? ''),
-            'sem'       => (int)($data['sem'] ?? 0),
-            'year'      => (int)($data['year'] ?? 0),
-            'unit'      => (int)($data['unit'] ?? 0),
+            'name' => trim($data['subjectName'] ?? ''),
+            'program' => trim($data['program'] ?? ''),
+            'sem' => (int)($data['sem'] ?? 0),
+            'year' => (int)($data['year'] ?? 0),
+            'unit' => (int)($data['unit'] ?? 0)
         ];
 
         if ($out['subjectID'] === '' || $out['name'] === '') {
@@ -931,7 +998,10 @@ class EnrollmentLogic
             throw new Exception('Units must be between 1 and 5.');
         }
 
-        $stmt = $this->pdo->prepare("SELECT 1 FROM programs WHERE program = ?");
+        $stmt = $this->pdo->prepare("
+            SELECT 1 FROM programs WHERE program = ?
+        ");
+
         $stmt->execute([$out['program']]);
 
         if (!$stmt->fetchColumn()) {
@@ -944,24 +1014,52 @@ class EnrollmentLogic
     private function savePrerequisites($subjectID, $data)
     {
         $selected = $data['prerequisites'] ?? [];
-        if (!is_array($selected)) $selected = [];
-        $selected = array_values(array_unique(array_filter(array_map('trim', $selected))));
+
+        if (!is_array($selected)) {
+            $selected = [];
+        }
+
+        $selected = array_values(array_unique(
+            array_filter(array_map('trim', $selected))
+        ));
+
         $selected = array_values(array_diff($selected, [$subjectID]));
 
         if ($selected) {
-            $placeholders = implode(',', array_fill(0, count($selected), '?'));
-            $check = $this->pdo->prepare("SELECT subjectID FROM subjects WHERE subjectID IN ($placeholders)");
+            $placeholders = implode(
+                ',',
+                array_fill(0, count($selected), '?')
+            );
+
+            $check = $this->pdo->prepare("
+                SELECT subjectID
+                FROM subjects
+                WHERE subjectID IN ($placeholders)
+            ");
+
             $check->execute($selected);
             $valid = $check->fetchAll(PDO::FETCH_COLUMN);
+
             if (count($valid) !== count($selected)) {
                 throw new Exception('One or more selected prerequisite subjects are invalid.');
             }
         }
 
-        $this->pdo->prepare("DELETE FROM subject_prerequisite WHERE subjectID = ?")->execute([$subjectID]);
-        if (!$selected) return;
+        $this->pdo->prepare("
+            DELETE FROM subject_prerequisite
+            WHERE subjectID = ?
+        ")->execute([$subjectID]);
 
-        $insert = $this->pdo->prepare("INSERT INTO subject_prerequisite (subjectID, prerequisite) VALUES (?, ?)");
+        if (!$selected) {
+            return;
+        }
+
+        $insert = $this->pdo->prepare("
+            INSERT INTO subject_prerequisite
+                (subjectID, prerequisite)
+            VALUES (?, ?)
+        ");
+
         foreach ($selected as $prerequisite) {
             $insert->execute([$subjectID, $prerequisite]);
         }
@@ -974,30 +1072,44 @@ class EnrollmentLogic
 
             $this->pdo->beginTransaction();
 
-            // The subject may already exist (used by another program).
-            $stmt = $this->pdo->prepare("SELECT 1 FROM subjects WHERE subjectID = ?");
+            $stmt = $this->pdo->prepare("
+                SELECT 1
+                FROM subjects
+                WHERE subjectID = ?
+            ");
+
             $stmt->execute([$d['subjectID']]);
 
             if (!$stmt->fetchColumn()) {
                 $stmt = $this->pdo->prepare("
-                    INSERT INTO subjects (subjectID, name, department)
+                    INSERT INTO subjects
+                        (subjectID, name, department)
                     VALUES (?, ?, 'CCS')
                 ");
-                $stmt->execute([$d['subjectID'], $d['name']]);
+
+                $stmt->execute([
+                    $d['subjectID'],
+                    $d['name']
+                ]);
             }
 
             $stmt = $this->pdo->prepare("
-                SELECT 1 FROM syllabus
-                WHERE subjectID = ? AND program = ?
+                SELECT 1
+                FROM syllabus
+                WHERE subjectID = ?
+                  AND program = ?
                 LIMIT 1
             ");
-            $stmt->execute([$d['subjectID'], $d['program']]);
+
+            $stmt->execute([
+                $d['subjectID'],
+                $d['program']
+            ]);
 
             if ($stmt->fetchColumn()) {
                 throw new Exception('This subject is already in that program\'s curriculum.');
             }
 
-            // Do not INSERT into prospectus; it is a VIEW.
             $stmt = $this->pdo->prepare("
                 INSERT INTO syllabus
                     (subjectID, program, sem_available, year, unit)
@@ -1013,6 +1125,7 @@ class EnrollmentLogic
             ]);
 
             $this->savePrerequisites($d['subjectID'], $data);
+
             $this->pdo->commit();
 
             $this->flash('ok', 'Subject added successfully.');
@@ -1035,8 +1148,12 @@ class EnrollmentLogic
             $this->pdo->beginTransaction();
 
             $stmt = $this->pdo->prepare("
-                SELECT subjectID FROM syllabus WHERE id = ? LIMIT 1
+                SELECT subjectID
+                FROM syllabus
+                WHERE id = ?
+                LIMIT 1
             ");
+
             $stmt->execute([$syllabusID]);
             $realSubjectID = $stmt->fetchColumn();
 
@@ -1044,11 +1161,16 @@ class EnrollmentLogic
                 throw new Exception('Subject entry not found.');
             }
 
-            // The subject code cannot be changed; use the stored one.
             $stmt = $this->pdo->prepare("
-                UPDATE subjects SET name = ? WHERE subjectID = ?
+                UPDATE subjects
+                SET name = ?
+                WHERE subjectID = ?
             ");
-            $stmt->execute([$d['name'], $realSubjectID]);
+
+            $stmt->execute([
+                $d['name'],
+                $realSubjectID
+            ]);
 
             $stmt = $this->pdo->prepare("
                 UPDATE syllabus
@@ -1068,6 +1190,7 @@ class EnrollmentLogic
             ]);
 
             $this->savePrerequisites($realSubjectID, $data);
+
             $this->pdo->commit();
 
             $this->flash('ok', 'Subject updated successfully.');
@@ -1084,8 +1207,12 @@ class EnrollmentLogic
             $this->pdo->beginTransaction();
 
             $stmt = $this->pdo->prepare("
-                SELECT subjectID FROM syllabus WHERE id = ? LIMIT 1
+                SELECT subjectID
+                FROM syllabus
+                WHERE id = ?
+                LIMIT 1
             ");
+
             $stmt->execute([$syllabusID]);
             $subjectID = $stmt->fetchColumn();
 
@@ -1098,6 +1225,7 @@ class EnrollmentLogic
                 FROM enrolled_subjects
                 WHERE subjectID = ?
             ");
+
             $stmt->execute([$subjectID]);
 
             if ((int)$stmt->fetchColumn() > 0) {
@@ -1106,23 +1234,30 @@ class EnrollmentLogic
                 );
             }
 
-            $this->pdo->prepare("DELETE FROM syllabus WHERE id = ?")
-                ->execute([$syllabusID]);
+            $this->pdo->prepare("
+                DELETE FROM syllabus
+                WHERE id = ?
+            ")->execute([$syllabusID]);
 
-            // Remove the master subject only if no program still uses it.
             $stmt = $this->pdo->prepare("
-                SELECT COUNT(*) FROM syllabus WHERE subjectID = ?
+                SELECT COUNT(*)
+                FROM syllabus
+                WHERE subjectID = ?
             ");
+
             $stmt->execute([$subjectID]);
 
             if ((int)$stmt->fetchColumn() === 0) {
                 $this->pdo->prepare("
                     DELETE FROM subject_prerequisite
-                    WHERE subjectID = ? OR prerequisite = ?
+                    WHERE subjectID = ?
+                       OR prerequisite = ?
                 ")->execute([$subjectID, $subjectID]);
 
-                $this->pdo->prepare("DELETE FROM subjects WHERE subjectID = ?")
-                    ->execute([$subjectID]);
+                $this->pdo->prepare("
+                    DELETE FROM subjects
+                    WHERE subjectID = ?
+                ")->execute([$subjectID]);
             }
 
             $this->pdo->commit();
@@ -1167,7 +1302,6 @@ class EnrollmentLogic
                 throw new Exception('This subject is not available for your program and year.');
             }
 
-            // Duplicate check. Rejected rows may be selected again.
             $stmt = $this->pdo->prepare("
                 SELECT 1
                 FROM enrolled_subjects
@@ -1178,17 +1312,24 @@ class EnrollmentLogic
                 LIMIT 1
             ");
 
-            $stmt->execute([$enrollmentID, $this->numericID, $subjectID]);
+            $stmt->execute([
+                $enrollmentID,
+                $this->numericID,
+                $subjectID
+            ]);
 
             if ($stmt->fetchColumn()) {
                 throw new Exception('This subject is already in your selection.');
             }
 
             if ($this->totalUnits + (int)$unit > self::UNIT_LIMIT) {
-                throw new Exception('Adding this subject would exceed the ' . self::UNIT_LIMIT . '-unit limit.');
+                throw new Exception(
+                    'Adding this subject would exceed the ' .
+                    self::UNIT_LIMIT .
+                    '-unit limit.'
+                );
             }
 
-            // Prerequisites must have an approved enrollment record.
             $stmt = $this->pdo->prepare("
                 SELECT prerequisite
                 FROM subject_prerequisite
@@ -1208,29 +1349,41 @@ class EnrollmentLogic
             ");
 
             foreach ($prerequisites as $prerequisite) {
-                $check->execute([$this->numericID, $prerequisite]);
+                $check->execute([
+                    $this->numericID,
+                    $prerequisite
+                ]);
 
                 if (!$check->fetchColumn()) {
-                    throw new Exception('Missing prerequisite: ' . trim($prerequisite));
+                    throw new Exception(
+                        'Missing prerequisite: ' . trim($prerequisite)
+                    );
                 }
             }
 
             $this->pdo->beginTransaction();
 
-            // Clear an older rejected row for the same subject, then re-add.
             $this->pdo->prepare("
                 DELETE FROM enrolled_subjects
                 WHERE enrollmentID = ?
                   AND studentID = ?
                   AND subjectID = ?
                   AND status = 'rejected'
-            ")->execute([$enrollmentID, $this->numericID, $subjectID]);
+            ")->execute([
+                $enrollmentID,
+                $this->numericID,
+                $subjectID
+            ]);
 
             $this->pdo->prepare("
                 INSERT INTO enrolled_subjects
                     (enrollmentID, studentID, subjectID, status)
                 VALUES (?, ?, ?, 'pending')
-            ")->execute([$enrollmentID, $this->numericID, $subjectID]);
+            ")->execute([
+                $enrollmentID,
+                $this->numericID,
+                $subjectID
+            ]);
 
             $this->pdo->commit();
 
@@ -1279,6 +1432,11 @@ class EnrollmentLogic
             return;
         }
 
+        if ((int)$enrollID < 1) {
+            $this->flash('error', 'A valid enrollment period is required.');
+            return;
+        }
+
         try {
             $this->pdo->beginTransaction();
 
@@ -1293,13 +1451,16 @@ class EnrollmentLogic
                   AND status = 'pending'
             ");
 
-            $stmt->execute([$this->facultyID, $enrollID, $studentID]);
+            $stmt->execute([
+                $this->facultyID,
+                $enrollID,
+                $studentID
+            ]);
 
             if ($stmt->rowCount() < 1) {
                 throw new Exception('No pending subjects were found to approve.');
             }
 
-            // Lock this student's enrollment window after approval.
             $stmt = $this->pdo->prepare("
                 INSERT INTO student_enrollment_control
                     (enrollmentID, studentID, window_open, updated_by)
@@ -1309,11 +1470,18 @@ class EnrollmentLogic
                     updated_by = VALUES(updated_by)
             ");
 
-            $stmt->execute([$enrollID, $studentID, $this->facultyID]);
+            $stmt->execute([
+                $enrollID,
+                $studentID,
+                $this->facultyID
+            ]);
 
             $this->pdo->commit();
 
-            $this->flash('ok', 'Enrollment approved. Student enrollment window is now closed.');
+            $this->flash(
+                'ok',
+                'Enrollment approved. Student enrollment window is now closed.'
+            );
         } catch (Throwable $e) {
             $this->fail($e);
         }
@@ -1323,6 +1491,11 @@ class EnrollmentLogic
     {
         if (!$this->isAssignedAdviser($studentID)) {
             $this->flash('error', 'You are not assigned to this student.');
+            return;
+        }
+
+        if ((int)$enrollID < 1) {
+            $this->flash('error', 'A valid enrollment period is required.');
             return;
         }
 
@@ -1343,13 +1516,21 @@ class EnrollmentLogic
                   AND status = 'pending'
             ");
 
-            $stmt->execute([$remarks, $this->facultyID, $enrollID, $studentID]);
+            $stmt->execute([
+                $remarks,
+                $this->facultyID,
+                $enrollID,
+                $studentID
+            ]);
 
             if ($stmt->rowCount() < 1) {
                 throw new Exception('No pending subjects were found to reject.');
             }
 
-            $this->flash('ok', 'Enrollment rejected. The rejection remarks were saved.');
+            $this->flash(
+                'ok',
+                'Enrollment rejected. The rejection remarks were saved.'
+            );
         } catch (Throwable $e) {
             $this->fail($e);
         }
