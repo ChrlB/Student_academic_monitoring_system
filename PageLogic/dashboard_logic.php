@@ -25,33 +25,24 @@ $colors  = ['cleared' => 'green', 'reject' => 'red'];
 
 date_default_timezone_set('Asia/Manila');   
 
-// function parseDays($code) {
-//     preg_match_all('/TH|M|T|W|F|S/', strtoupper($code), $m);
-//     return $m[0];
-// }
-
-// $dayCode = ['Mon' => 'M', 'Tue' => 'T', 'Wed' => 'W', 'Thu' => 'TH', 'Fri' => 'F', 'Sat' => 'S'];
-// $today   = $dayCode[date('D')] ?? null;
 
 
 $schedule = getFacultySchedule($currentAY);
-// $todays   = array_filter($schedule, fn($r) => $today && in_array($today, parseDays($r['day']), true));
-// usort($todays, fn($a, $b) => strcmp($a['time_start'], $b['time_start']));
-// $toClear  = getFacultyClearanceCounts($currentAY);
-// $proj     = getFacultyProjectCounts($currentAY);
 
 date_default_timezone_set('Asia/Manila');
 
+$currentAY = $clearanceDAO->executeQuery('getCurrentAcadYear')[0]['acad_year_sem'] ?? 'ALL';
+$term      = $currentAY;
+$isStudent = strtoupper($_SESSION['role'] ?? '') === 'STUDENT';
+$colors    = ['cleared' => 'green', 'reject' => 'red'];
+
 function parseDays($code) {
-    preg_match_all('/TH|M|T|W|F|S/', strtoupper($code), $m);
+    preg_match_all('/SU|SA|TH|M|T|W|F/', strtoupper($code), $m);
     return $m[0];
 }
 
-$dayCode   = ['Mon' => 'M', 'Tue' => 'T', 'Wed' => 'W', 'Thu' => 'TH', 'Fri' => 'F', 'Sat' => 'S'];
-$today     = $dayCode[date('D')] ?? null;
-$isStudent = strtoupper($_SESSION['role'] ?? '') === 'STUDENT';
-$term      = $currentAY;
-$colors    = ['cleared' => 'green', 'reject' => 'red'];
+$dayCode = ['Mon' => 'M', 'Tue' => 'T', 'Wed' => 'W', 'Thu' => 'TH', 'Fri' => 'F', 'Sat' => 'SA', 'Sun' => 'SU'];
+$today   = $dayCode[date('D')] ?? null;
 
 if ($isStudent) {
     $clr     = getClearanceSummary($term);
@@ -105,10 +96,11 @@ function getRecentClearanceUpdates($acad_year_sem = 'ALL', $category = 'ALL') {
         [$id, $id, $id, $acad_year_sem, $acad_year_sem, $category, $category]);
 }
 
-function getStudentSchedule($acad_year_sem) {
+function getStudentSchedule( $acad_year_sem, $studentID = 'self') {
     global $clearanceDAO;
+    if($studentID == 'self') $studentID = $_SESSION['userID'];
     return $clearanceDAO->executeQuery("getStudentSchedule",
-        [$_SESSION['userID'], $acad_year_sem, $acad_year_sem]);
+        [$studentID, $acad_year_sem, $acad_year_sem]);
 }
 
 function getOpenEnrollments() {
@@ -123,7 +115,6 @@ function getFacultySchedule($term) {
         $term, $term,
         $_SESSION['userID']          // formatted faculty code, F2026...
     ]);
-    // getSubjects repeats a schedule once per syllabus row, so dedupe by schedID
     $seen = [];
     foreach ($rows as $r) { $seen[$r['schedID']] = $r; }
     return array_values($seen);
