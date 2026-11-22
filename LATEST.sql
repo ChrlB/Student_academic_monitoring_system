@@ -1337,3 +1337,8 @@ CREATE TABLE `professor_student` (
   CONSTRAINT `fk_adviser_student_faculty` FOREIGN KEY (`facultyID`) REFERENCES `faculty` (`facultyID`) ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_adviser_student_student` FOREIGN KEY (`studentID`) REFERENCES `students` (`studentID`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO departments (department, name) VALUES
+ ('CBA',  'College of Business and Accountancy'),
+ ('CHTM', 'College of Hospitality and Tourism Management'),
+ ('CEAS', 'College of Education, Arts and Sciences');
