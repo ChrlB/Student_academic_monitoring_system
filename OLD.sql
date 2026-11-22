@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 12, 2026 at 12:53 PM
+-- Generation Time: Nov 12, 2026 at 01:24 PM
 -- Server version: 8.0.34
 -- PHP Version: 8.2.12
 
@@ -48,7 +48,7 @@ INSERT INTO `adviser_student` (`id`, `facultyID`, `studentID`) VALUES
 --
 
 CREATE TABLE `attendance` (
-  `ID` int NOT NULL,
+  `attendanceID` int NOT NULL,
   `eventID` int NOT NULL,
   `facultyID` int UNSIGNED NOT NULL,
   `studentID` int NOT NULL,
@@ -785,7 +785,7 @@ ALTER TABLE `adviser_student`
 -- Indexes for table `attendance`
 --
 ALTER TABLE `attendance`
-  ADD PRIMARY KEY (`ID`,`eventID`,`studentID`),
+  ADD PRIMARY KEY (`attendanceID`,`eventID`,`studentID`),
   ADD KEY `fk_attendance_event_idx` (`eventID`),
   ADD KEY `facultyID` (`facultyID`);
 
@@ -999,7 +999,7 @@ ALTER TABLE `adviser_student`
 -- AUTO_INCREMENT for table `attendance`
 --
 ALTER TABLE `attendance`
-  MODIFY `ID` int NOT NULL AUTO_INCREMENT;
+  MODIFY `attendanceID` int NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `enrolled_subjects`
@@ -1308,3 +1308,32 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+
+/* Registration */
+
+CREATE TABLE IF NOT EXISTS account_restrictions (
+  restriction_id int UNSIGNED NOT NULL AUTO_INCREMENT,
+  account_id     varchar(11)  NOT NULL,                       -- e.g. 202600045 or F202600012
+  reason         varchar(250) NOT NULL,
+  restricted_by  varchar(11)  NOT NULL,
+  restricted_at  timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  lifted_at      timestamp    NULL DEFAULT NULL,
+  lifted_by      varchar(11)  DEFAULT NULL,
+  PRIMARY KEY (restriction_id),
+  KEY account_id (account_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `professor_student` (
+  `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `facultyID` int UNSIGNED NOT NULL,
+  `studentID` int UNSIGNED NOT NULL,
+  `assignment_type` enum('adviser','subject') NOT NULL DEFAULT 'adviser',
+  `assignment` varchar(100) NOT NULL DEFAULT 'Academic Adviser',
+  `assigned_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_assignment` (`facultyID`,`studentID`,`assignment_type`,`assignment`),
+  KEY `fk_adviser_student_student` (`studentID`),
+  CONSTRAINT `fk_adviser_student_faculty` FOREIGN KEY (`facultyID`) REFERENCES `faculty` (`facultyID`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_adviser_student_student` FOREIGN KEY (`studentID`) REFERENCES `students` (`studentID`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
