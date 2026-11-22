@@ -259,8 +259,9 @@ require_once __DIR__ . "/../PageLogic/dashboard_logic.php";
                   </a>
                 </div>
                 <div><hr></div>
-                <div class="row" style="justify-content:space-between"><b>Subjects</b><b style="color:#e6c200"><?= $toClear['subjects'] ?></b></div>
                 <?php if (!$toClear['has_office']): ?>
+                  <div class="row" style="justify-content:space-between"><b>Subjects</b><b style="color:#e6c200"><?= $toClear['subjects'] ?></b></div>
+                
                   <div class="row" style="justify-content:space-between"><b>Faculty clearance</b><b style="color:#e6c200"><?= $toClear['faculty'] ?></b></div>
                 <?php elseif ($toClear['has_office']): ?>
                   <div class="row" style="justify-content:space-between"><b>Office clearance</b><b style="color:#e6c200"><?= $toClear['office'] ?></b></div>
