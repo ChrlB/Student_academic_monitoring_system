@@ -655,3 +655,6 @@ a.syl-btn { text-decoration: none; }
 @media (max-width: 700px) {
     #editor .ql-editor, .lesson-body { padding: 14px 14px; }
 }
+
+/* answer-choice rows: a remove button on each */
+.choice-row .choice-remove { flex: none; padding: 4px 9px; }
