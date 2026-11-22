@@ -1594,7 +1594,6 @@ $userDAO->prepareStatement("updateStudentProfileFull",
                 ON F.facultyID = SS.facultyID
         WHERE CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ?
             AND (CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ? OR 'ALL' = ?)
-            AND ES.status = 'approved'
         ORDER BY EP.acad_year DESC, EP.sem DESC, SS.time_start;"
     );
 

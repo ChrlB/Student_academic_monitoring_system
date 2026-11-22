@@ -137,8 +137,9 @@ require_once __DIR__ . "/../PageLogic/dashboard_logic.php";
                 </div>
                 <b><?= date('D, M j') ?></b>
                 <div><hr></div>
+                <?php //var_dump($todays); ?>
 
-                <?php if (!$schedule): ?>
+                <?php if (count($schedule) < 1): ?>
                   <b>No schedule found for this term.</b>
                 <?php elseif (!$todays): ?>
                   <b>No classes today.</b>
@@ -187,34 +188,36 @@ require_once __DIR__ . "/../PageLogic/dashboard_logic.php";
         <?php else: ?>
           <div class="row" style="gap:20px">
             <div style="gap:20px" class="column">
-              <div class="column drop_shadow" style="padding:30px; border-radius:30px; width:500px; max-height:400px; overflow-y:auto; background: rgba(40,40,40,0.3);">
-                <div class="row" style="align-items:center; justify-content:space-between">
-                  <b style="font-size:30px; font-weight:bold;">TODAY'S CLASSES</b>
-                  <a href="<?= BASE_PATH ?>/class-sched " class="row" style="align-items:center; text-decoration:none; gap:10px">
-                    <b style=" font-size:25px">View </b>
+              <?php if(!in_array($_SESSION['role'],['registrar'])): ?>
+                <?php //var_dump($schedule); ?>
+                <div class="column drop_shadow" style="padding:30px; border-radius:30px; width:500px; max-height:400px; overflow-y:auto; background: rgba(40,40,40,0.3);">
+                  <div class="row" style="align-items:center; justify-content:space-between">
+                    <b style="font-size:30px; font-weight:bold;">TODAY'S CLASSES</b>
+                    <a href="<?= BASE_PATH ?>/class-sched " class="row" style="align-items:center; text-decoration:none; gap:10px">
+                      <b style=" font-size:25px">View </b>
+                      
+                      <div><img src="<?= BASE_PATH ?>/View/resources/arrow.png" alt="" style="width:40px"></div>
+                    </a>
                     
-                    <div><img src="<?= BASE_PATH ?>/View/resources/arrow.png" alt="" style="width:40px"></div>
-                  </a>
-                  
-                </div>
-                <b><?= date('D, M j') ?></b>
-                <div><hr></div>
-                <?php if (!$schedule): ?>
-                  <b>No schedule found for this term.</b>
-                <?php elseif (!$todays): ?>
-                  <b>No classes today.</b>
-                <?php else: foreach ($todays as $c): ?>
-                  <div class="row" style="justify-content:space-between; margin-bottom:10px;">
-                    <div class="column">
-                      <b><?= htmlspecialchars($c['subjectID']) ?> - <?= htmlspecialchars($c['block']) ?></b>
-                      <span><?= htmlspecialchars($c['name']) ?> · Room <?= htmlspecialchars($c['roomID']) ?></span>
-                    </div>
-                    <b><?= date('g:i A', strtotime($c['time_start'])) ?> - <?= date('g:i A', strtotime($c['time_end'])) ?></b>
                   </div>
-                <?php endforeach; endif ?>
-              </div>
+                  <b><?= date('D, M j') ?></b>
+                  <div><hr></div>
+                  <?php if (!$schedule): ?>
+                    <b>No schedule found for this term.</b>
+                  <?php elseif (!$todays): ?>
+                    <b>No classes today.</b>
+                  <?php else: foreach ($todays as $c): ?>
+                    <div class="row" style="justify-content:space-between; margin-bottom:10px;">
+                      <div class="column">
+                        <b><?= htmlspecialchars($c['subjectID']) ?> - <?= htmlspecialchars($c['block']) ?></b>
+                        <span><?= htmlspecialchars($c['name']) ?> · Room <?= htmlspecialchars($c['roomID']) ?></span>
+                      </div>
+                      <b><?= date('g:i A', strtotime($c['time_start'])) ?> - <?= date('g:i A', strtotime($c['time_end'])) ?></b>
+                    </div>
+                  <?php endforeach; endif ?>
+                </div>
 
-              <?php $events = getFacultyEvents(); ?>
+              <?php endif; $events = getFacultyEvents(); ?>
 
               <div class="column drop_shadow" style="padding: 30px; border-radius:30px; width:500px; max-height:400px; overflow-y:auto; background: rgba(40, 40, 40, 0.3);">
                 <div class="row" style="align-items:center; justify-content:space-between">
@@ -262,21 +265,22 @@ require_once __DIR__ . "/../PageLogic/dashboard_logic.php";
                   <div class="row" style="justify-content:space-between"><b>Office clearance</b><b style="color:#e6c200"><?= $toClear['office'] ?></b></div>
                 <?php endif ?>
               </div>
-
-              <div class="column drop_shadow" style="padding:30px; border-radius:30px; width:500px; background: rgba(40,40,40,0.3);">
-                <div class="row" style="align-items:center; justify-content:space-between">
-                  <b style="font-size:30px; font-weight:bold;">PROJECTS</b>
-                  <a href="<?= BASE_PATH ?>/projects " class="row" style="align-items:center; text-decoration:none; gap:10px">
-                    <b style=" font-size:25px">View </b>
-                    
-                    <div><img src="<?= BASE_PATH ?>/View/resources/arrow.png" alt="" style="width:40px"></div>
-                  </a>
+              <?php if(!in_array($_SESSION['role'],['registrar'])): ?>      
+                <div class="column drop_shadow" style="padding:30px; border-radius:30px; width:500px; background: rgba(40,40,40,0.3);">
+                  <div class="row" style="align-items:center; justify-content:space-between">
+                    <b style="font-size:30px; font-weight:bold;">PROJECTS</b>
+                    <a href="<?= BASE_PATH ?>/projects " class="row" style="align-items:center; text-decoration:none; gap:10px">
+                      <b style=" font-size:25px">View </b>
+                      
+                      <div><img src="<?= BASE_PATH ?>/View/resources/arrow.png" alt="" style="width:40px"></div>
+                    </a>
+                  </div>
+                  <div><hr></div>
+                  <div class="row" style="justify-content:space-between"><b>Submitted</b><b style="color:green"><?= $proj['submitted'] ?></b></div>
+                  <div class="row" style="justify-content:space-between"><b>Waiting</b><b style="color:#e6c200"><?= $proj['waiting'] ?></b></div>
+                  <div class="row" style="justify-content:space-between"><b>Overdue</b><b style="color:red"><?= $proj['overdue'] ?></b></div>
                 </div>
-                <div><hr></div>
-                <div class="row" style="justify-content:space-between"><b>Submitted</b><b style="color:green"><?= $proj['submitted'] ?></b></div>
-                <div class="row" style="justify-content:space-between"><b>Waiting</b><b style="color:#e6c200"><?= $proj['waiting'] ?></b></div>
-                <div class="row" style="justify-content:space-between"><b>Overdue</b><b style="color:red"><?= $proj['overdue'] ?></b></div>
-              </div>
+              <?php endif ?>
             </div>
           </div>
         <?php endif ?>
