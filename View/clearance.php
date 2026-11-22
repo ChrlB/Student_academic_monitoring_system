@@ -200,7 +200,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             </div> 
 
           <?php elseif ($student_view === "SUBJECT-REQUIREMENTS"):$acadyear = $_GET['acadyear']; $subject_info = getSubjectRequireMents($search,$acadyear); ?>
-                <?php echo ( $search.$acadyear) ?>
+                
           
                 <div class="row" style="justify-content: space-between; align-items:center">
                   <b class="view_title"><?= $subject_info[0]["name"] ?></b>
@@ -265,6 +265,14 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
                     <?php endforeach ?>
                       
+                  </div>
+                  <div>
+                    <br>
+                    <hr>
+                    <b>REMARKS:</b>
+                    <div>
+                      <p><b><?= $subject_info[0]['remarks'] ?></b></p>
+                    </div>
                   </div>
                   
                 </div>
@@ -467,7 +475,14 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 <?php endforeach ?>
                   
               </div>
-              
+              <div>
+                <br>
+                <hr>
+                <b>REMARKS:</b>
+                <div>
+                  <p><b><?= $faculty_info[0]['remarks'] ?></b></p>
+                </div>
+              </div>
             </div>
             <div class="row fileupload_buttom">
                   <a href="<?= BASE_PATH ?>/clearance?view=FACULTY-REQUIREMENTS&search=<?= $search ?>&upload=1&acadyear=<?= $_GET['acadyear'] ?>">
@@ -613,8 +628,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             </div>
             <!-- <div class="row subject_container">
               <div class="column">
-                <b>NAME: <?= strtoupper($office_info[0]["role"])." " ?></b>
-                <b>ROLE: <?= $office_info[0]["name"]?></b>
+                <b>NAME: < strtoupper($office_info[0]["role"])." " ?></b>
+                <b>ROLE:  $office_info[0]["name"]?></b>
                 
                 
               </div>
@@ -666,7 +681,14 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 <?php endforeach ?>
                   
               </div>
-              
+              <div>
+                <br>
+                <hr>
+                <b>REMARKS:</b>
+                <div>
+                  <p><b><?= $office_info[0]['remarks'] ?></b></p>
+                </div>
+              </div>
             </div>
             <div class="row fileupload_buttom">
                   <a href="<?= BASE_PATH ?>/clearance?view=OFFICE-REQUIREMENTS&search=<?= $search ?>&upload=1&acadyear=<?= $_GET['acadyear'] ?>">
@@ -786,7 +808,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
             <?php endif ?>
 
-            <?php if(in_array($_SESSION["role"],["dean","program coordinator"])): ?>
+            <?php if(!in_array($_SESSION["role"],["student"])): ?>
               <div>
                 <hr>
               </div>
@@ -807,11 +829,11 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               
             <?php endif ?>
 
-
+           
             <?php $subjects_handling = getSubjects(); 
                   if(count($subjects_handling) > 0): $filtered_subjects_handling = getSubjects($department,$search,$block,$year,$acadyear); ?>
 
-                  <?php //var_dump($subjects_handling) ?>
+                  <?php // var_dump($filtered_subjects_handling); var_dump($department.$search.$block.$year.$acadyear) ?>
               <div>
                 <hr>
               </div>
@@ -827,9 +849,15 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     </button>
                   </div>
                   <div  class="row" style="gap:20px; align-items:center; ">
+                    
+                    <?php $options=[$currentAY]; ?>
+
                     <b>ACAD-YEAR:</b>
                     <select name="acadyearfilter" class="filter" onchange="this.form.submit()">
-                      <?php $options = []; foreach( $subjects_handling as $subject): if(!in_array($subject["acad_year_sem"],$options)): $options[] = $subject["acad_year_sem"];?>
+                       
+                      <option  value="<?= $currentAY ?>" <?php if($acadyear == $currentAY) echo 'selected'?>><?= $currentAY ?></option>
+                      
+                      <?php  foreach( $subjects_handling as $subject): if(!in_array($subject["acad_year_sem"],$options)):  $options[] = $subject["acad_year_sem"];?>
                         <option  value="<?= $subject["acad_year_sem"] ?>" <?php if($acadyear == $subject["acad_year_sem"]) echo 'selected'?>><?= $subject["acad_year_sem"] ?></option>
                       <?php endif; endforeach ?>
                     </select>
@@ -885,6 +913,10 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <input type="hidden" name="view" value="SUBJECT">
                     <input type="hidden" name="subjectID" value="<?=  $subject['subjectID'] ?>">
                     <input type="hidden" name="name" value="<?=  $subject['name'] ?>">
+                    <input type="hidden" name="acadyear" value="<?=  $acadyear ?>">
+                    <input type="hidden" name="block" value="<?=   $block ?>">
+                    <input type="hidden" name="year" value="<?=   $year ?>">
+                    <input type="hidden" name="department" value="<?=  $department ?>">
                   </form>
                 <?php endforeach?>
                 
@@ -1204,11 +1236,15 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
 
 
-          <?php elseif($student_view == "SUBJECT"): $students_for_clearance = getStudentsForSubjectClearance($department,$_GET['subjectID'],$block,$year,$acadyear)?>
+          <?php elseif($student_view == "SUBJECT"): $students_for_clearance = getStudentsForSubjectClearance($_GET['department'],$_GET['subjectID'],$_GET['block'],$_GET['year'],$_GET['acadyear'])?>
             
             <?php //var_dump($department." ".$_GET['subjectID']." ".$block." ".$year." ".$acadyear) ?>
-            <?php //var_dump($students_for_clearance) ?>
-            <?php if(!isset($_GET['edit'])): ?>
+            <?php $department=$_GET['department'];
+            $block=$_GET['block'];
+            $year=$_GET['year'];
+            $acadyear=$_GET['acadyear'] ?>
+            
+            <?php if(!isset($_GET['edit'])): ?><?php  //var_dump($department.$search.$block.$year.$acadyear) ?>
               <div class="row" style="justify-content: space-between; align-items:center">
                 <b class="view_title"><?= $_GET['subjectID'].' - '.$_GET['name'] ?>  </b>
                 <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
@@ -1247,9 +1283,13 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                           </div>
                         </td>
                         <td>
+                          <input type="hidden" name="acadyear" value="<?=  $acadyear ?>">
+                          <input type="hidden" name="block" value="<?=   $block ?>">
+                          <input type="hidden" name="year" value="<?=   $year ?>">
+                          <input type="hidden" name="department" value="<?=  $department ?>">
                           
                           <div>
-                            <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>&edit=1&studentID=<?= $row['studentID'] ?>"><button type="submit">EDIT</button></a>
+                            <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>&edit=1&studentID=<?= $row['studentID'] ?>&acadyear=<?=$acadyear ?>&block=<?=$block ?>&year=<?=$year ?>&department=<?=  $department ?>"><button type="submit">EDIT</button></a>
                           </div>
                         </td>
                         
@@ -1260,11 +1300,11 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               </div>
               
               <div class="row fileupload_buttom">
-                <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>&upload=1">
+                <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>&upload=1&acadyear=<?=$acadyear?>&block=<?=$block?>&year=<?=$year?>&department=<?=$department?>">
                   <button type="button">UPLOAD FILE</button>
                 </a>
 
-                <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>&uploaded=1">
+                <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>&uploaded=1&acadyear=<?=$acadyear?>&block=<?=$block?>&year=<?=$year?>&department=<?=$department?>">
                   <button type="button">VIEW UPLOADS</button>
                 </a>
 
@@ -1272,7 +1312,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   <form class="uploads_container upload_container" method="POST" enctype="multipart/form-data" action="<?= BASE_PATH ?>/upload-document">
                     <div class="row upload_header">
                       <b>YOUR FILES</b>
-                      <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>">
+                      <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>&acadyear=<?=$acadyear ?>&block=<?=$block ?>&year=<?=$year ?>&department=<?=  $department ?>">
                         <img src="<?= BASE_PATH ?>/View/resources/Close.png" alt="Close" class="back_buttons">
                       </a>
                     </div>
@@ -1305,7 +1345,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                       <div class="uploads_container uploaded_container">
                           <div class="row"  style="justify-content: space-between;">
                               <b>UPLOADED FILES</b>
-                              <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>">
+                              <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>&acadyear=<?=$acadyear ?>&block=<?=$block ?>&year=<?=$year ?>&department=<?=  $department ?>">
                                 <img src="<?= BASE_PATH?>/View/resources/Close.png" alt="" class="back_buttons"></a>
                           </div>
                           <hr>
@@ -1354,7 +1394,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 <?php //var_dump($department.$_GET['subjectID'].$block.$year.$acadyear. $_GET['studentID']) ?>
                 <div class="row" style="justify-content: space-between; align-items:center">
                   <b class="view_title"><?= $_GET['subjectID'].' - '.$_GET['name'] ?>  </b>
-                  <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
+                  <a href="<?= BASE_PATH ?>/clearance?view=SUBJECT&subjectID=<?= $_GET['subjectID']?>&name=<?=  $_GET['name']?>&acadyear=<?=$acadyear?>&block=<?=$block?>&year=<?=$year?>&department=<?=$department?>" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
                 </div>
                 <div>
                   <hr>
@@ -1413,7 +1453,26 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                         </div>                    
                       </div>  
                       <div class="student_clearance_panel">
-                        <h3>PROJECTS:</h3>
+                        <h3>PROJECTS:</h3><?php $projects = getProjectsStatus($_SESSION['real_userID'],$Facadyear) ?>
+                        <div>
+                          <hr>
+                        </div>
+                        <?php //var_dump($subject_clearance_status) ?>
+                        <?php foreach($projects as $subject): ?>
+                          <div class="row" style="justify-content: space-between;">
+                            <b>
+                              <?= $subject['project_name'] ?>
+                            </b>
+                            <b style="<?php 
+                              if(strtoupper($subject['submission_status']) == 'submitted') echo 'color : green';
+                              elseif(strtoupper($subject['submission_status']) == 'overdue') echo 'color : red';
+                              else  echo 'color : yellow'?>"
+                            >
+                              <?= $subject['submission_status'] ?>
+                            </b>
+                            
+                          </div>
+                        <?php endforeach ?>
                       </div>                 
                     </div>  
                     

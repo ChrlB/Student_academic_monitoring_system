@@ -32,6 +32,7 @@ $Oacadyear= $currentAY ;
 $OstudentID= 'ALL';
 
 
+
 $allowedViews = ($_SESSION["role"] == 'student')
     ? ['MAIN', 'SUBJECTS', 'FACULTY', 'OFFICE', 'UPDATES', 'SUBJECT-REQUIREMENTS','FACULTY-REQUIREMENTS','OFFICE-REQUIREMENTS']
     : ['MAIN', 'SUBJECT', 'FACULTY', 'OFFICE'];
@@ -53,7 +54,6 @@ if($_SESSION["role"] == "student"){
         (int) ($data[0]['not_yet_cleared'] ?? 0),
     ]);
 }
-
 
 
 // var_dump( isset($_GET["view"]));
@@ -114,6 +114,18 @@ function getSubjectClearanceStatus($studentID,$categ,$acad_year){
         $acad_year,
         $categ,
         $categ
+    ]);
+
+    return $records;
+}
+
+function getProjectsStatus($facultyID,$acad_year,$subjectID = 'ALL'){
+    global $clearanceDAO;
+    $records = $clearanceDAO->executeQuery("getProjectsStatus",[
+        $facultyID,
+        $acad_year,
+        $acad_year,
+        $subjectID ,$subjectID 
     ]);
 
     return $records;

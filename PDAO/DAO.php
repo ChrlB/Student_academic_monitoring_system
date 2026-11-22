@@ -1489,4 +1489,42 @@ $userDAO->prepareStatement("updateStudentProfileFull",
         and `studentID` = ? 
         and `officeID` = ?;"
     );
+
+    $clearanceDAO->prepareStatement("getProjectsStatus","SELECT
+            P.projectID,
+            P.name AS project_name,
+            P.deadline,
+            P.status AS project_status,
+            S.subjectID AS subjectID,
+            SS.block AS block,
+            CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem,
+            COUNT(PS.id) AS submissions,
+            MAX(PS.submitted_at) AS last_submitted_at,
+            CASE
+                WHEN COUNT(PS.id) > 0 THEN 'submitted'
+                WHEN P.deadline < NOW() THEN 'overdue'
+                ELSE 'waiting'
+            END AS submission_status
+        FROM projects AS P
+            INNER JOIN enrolled_subjects AS ES
+                ON ES.enrolled_subjectID = P.enrolled_subjectID
+            INNER JOIN students AS ST
+                ON ST.studentID = ES.studentID
+            INNER JOIN subjects AS S
+                ON S.subjectID = ES.subjectID
+            INNER JOIN enrollment_period AS EP
+                ON EP.enrollmentID = ES.enrollmentID
+            INNER JOIN subject_schedules AS SS
+                ON SS.enrollmentID = ES.enrollmentID
+                AND SS.subjectID = ES.subjectID
+                AND SS.block = ST.block
+            LEFT JOIN project_submission AS PS
+                ON PS.projectID = P.projectID
+        WHERE SS.facultyID = ?
+            AND (CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ? OR 'ALL' = ?)
+            AND (ES.subjectID = ? OR 'ALL' = ?)
+        GROUP BY P.projectID, P.name, P.deadline, P.status, S.subjectID,
+            SS.block, EP.acad_year, EP.sem
+        ORDER BY P.deadline DESC;
+    ");
 }
