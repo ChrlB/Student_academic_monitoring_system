@@ -1676,3 +1676,47 @@ $userDAO->prepareStatement("updateStudentProfileFull",
         ORDER BY E.datetime_Start;
     ");
 }
+
+// ---- CLEARANCE FORM: one row per approved enrolled subject ----
+$clearanceDAO->prepareStatement("getClearanceFormSubjects", "SELECT
+        ES.enrolled_subjectID,
+        ES.subjectID,
+        S.name,
+        CONCAT_WS(' ', CONCAT(ST.last_name, ','), ST.first_name, ST.middle_name) AS student_name,
+        ST.program,
+        ST.block,
+        PR.department,
+        CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem,
+        CONCAT(F.last_name, ', ', F.first_name) AS instructor,
+        SC.status,
+        SC.date_cleared
+    FROM enrolled_subjects AS ES
+        INNER JOIN students AS ST
+            ON ST.studentID = ES.studentID
+        INNER JOIN subjects AS S
+            ON S.subjectID = ES.subjectID
+        INNER JOIN enrollment_period AS EP
+            ON EP.enrollmentID = ES.enrollmentID
+        LEFT JOIN programs AS PR
+            ON PR.program = ST.program
+        LEFT JOIN subject_clearance AS SC
+            ON SC.enrolled_subjectID = ES.enrolled_subjectID
+        LEFT JOIN subject_schedules AS SS
+            ON SS.enrollmentID = ES.enrollmentID
+            AND SS.subjectID = ES.subjectID
+            AND SS.block = ST.block
+        LEFT JOIN faculty AS F
+            ON F.facultyID = SS.facultyID
+    WHERE CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ?
+        AND CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ?
+    ORDER BY ES.subjectID;
+");
+
+// ---- CLEARANCE FORM: dean and program coordinator ----
+$clearanceDAO->prepareStatement("getClearanceFormSignatories", "SELECT
+        F.role,
+        CONCAT(F.first_name, ' ', F.last_name) AS name
+    FROM faculty AS F
+    WHERE (LOWER(F.role) LIKE '%dean%' AND F.department = ?)
+        OR (LOWER(F.role) LIKE '%coordinator%' AND F.program = ?);
+");

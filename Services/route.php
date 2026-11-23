@@ -122,4 +122,7 @@ $router->post('/delete-document', fn($request) => deleteDocument($request));
 $router->get('/download-document', fn() => downloadDocument());
 $router->get('/view-document', fn() => require __DIR__ . '/../View/document.php');
 
+$router->post('/file-maker', fn($request) => require __DIR__ . '/../View/file_maker.php');
+
+
 $router->dispatch();
