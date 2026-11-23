@@ -144,8 +144,27 @@ function uploadProfile(){
       profileUploadDone('error', 'Could not save the picture. Please try again.');
   }
 
-  if ($rows_affected > 0) {
+ 
+  $read_back = ($_SESSION['role'] ?? '') === 'student' ? 'getStudentProfile' : 'getFacultyProfile';
+  try {
+      $stored = $userDAO->executeQuery($read_back, [$loggedInUserId]);
+  } catch (Throwable $e) {
+      error_log('Profile picture read-back failed: ' . $e->getMessage());
+      $stored = [];
+  }
+  if (empty($stored)) {
+      profileUploadDone('error', 'Your account record could not be found, so the picture was not saved.');
+  }
+  $storedData = $stored[0]['image_data'] ?? null;
+  if (is_resource($storedData)) {
+      $storedData = stream_get_contents($storedData);
+  }
+  if ($storedData === $imageBinaryData) {
       profileUploadDone('message', 'Profile picture saved!');
+  }
+  if (is_string($storedData) && $storedData !== '' && strlen($storedData) < strlen($imageBinaryData)) {
+      error_log('Profile picture was cut off: stored ' . strlen($storedData) . ' of ' . strlen($imageBinaryData) . ' bytes. Make image_data a MEDIUMBLOB.');
+      profileUploadDone('error', 'The picture is too large for the database column (image_data must be MEDIUMBLOB). Ask the admin to update it.');
   }
   profileUploadDone('error', 'The picture was not saved. Please try again.');
 }
@@ -169,6 +188,11 @@ function getProfilePic(){
         $imageBinaryData = stream_get_contents($imageBinaryData);
     }
       
+    ini_set('display_errors', '0');
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+
     header('Cache-Control: private, no-cache');
 
     if ($imageBinaryData === null || $imageBinaryData === '' || $storedMimeType === null) {
@@ -185,7 +209,7 @@ function getProfilePic(){
         exit;
     }
 
-    $imageEtag = '"' . md5($imageBinaryData) . '"';
+    $imageEtag = '"' . md5($imageBinaryData) . '-2"';
     header('ETag: ' . $imageEtag);
 
     if (($_SERVER['HTTP_IF_NONE_MATCH'] ?? '') === $imageEtag) {

@@ -50,7 +50,7 @@ function facultyRoleConfig(string $role): array {
         ],
         'prof' => [
             'key' => 'prof', 'name' => 'Professor', 'idLabel' => 'Faculty ID:',
-            'officeLabel' => 'College / Office:', 'badge' => 'PROF', 'banner' => 'cap',
+            'officeLabel' => 'College / Office:', 'badge' => 'PROF', 'banner' => 'briefcase',
         ],
         'registrar' => [
             'key' => 'registrar', 'name' => 'Registrar', 'idLabel' => 'Staff ID:',

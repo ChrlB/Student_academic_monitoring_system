@@ -520,113 +520,84 @@ $csrf = $logic->csrf();
                     </h1>
 
                     <div class="enroll-card" style="margin-bottom: 20px;">
-                        <h2>Create New Period</h2>
-
-                        <form method="POST" action="<?= $formAction ?>">
+                        <h2 id="period-form-title">Create New Period</h2>
+                        <form method="POST" action="<?= $formAction ?>" id="period-form">
                             <input type="hidden" name="csrf" value="<?= enroll_e($csrf) ?>">
-                            <input type="hidden" name="enroll_action" value="create_period">
-
+                            <input type="hidden" name="enroll_action" id="period-action" value="create_period">
+                            <input type="hidden" name="enrollment_id" id="period-id" value="">
                             <div class="form-grid">
-
                                 <div class="form-group">
-                                    <label>PROGRAM</label>
-                                    <select name="program" class="form-control" required>
-                                        <?php foreach ($logic->available as $prog): ?>
-                                            <option value="<?= enroll_e($prog['program']) ?>">
-                                                <?= enroll_e($prog['program']) ?>
-                                            </option>
+                                    <label>DEPARTMENT</label>
+                                    <select name="department" id="period-department" class="form-control" required>
+                                        <option value="">Select Department</option>
+                                        <?php $departments = array_unique(array_filter(array_column($logic->periodPrograms, 'department'))); sort($departments); ?>
+                                        <?php foreach ($departments as $department): ?>
+                                            <option value="<?= enroll_e($department) ?>"><?= enroll_e($department) ?></option>
                                         <?php endforeach; ?>
                                     </select>
                                 </div>
-
                                 <div class="form-group">
-                                    <label>ACADEMIC YEAR</label>
-                                    <input type="text" name="acad_year" class="form-control" placeholder="e.g. 2026-2027" required>
-                                </div>
-
-                                <div class="form-group">
-                                    <label>SEMESTER</label>
-                                    <select name="sem" class="form-control" required>
-                                        <option value="1">1st Semester</option>
-                                        <option value="2">2nd Semester</option>
-                                        <option value="3">Summer</option>
+                                    <label>PROGRAM</label>
+                                    <select name="program" id="period-program" class="form-control" required>
+                                        <option value="">Select Program</option>
+                                        <?php foreach ($logic->periodPrograms as $prog): ?>
+                                            <option value="<?= enroll_e($prog['program']) ?>" data-department="<?= enroll_e($prog['department'] ?? '') ?>"><?= enroll_e($prog['program']) ?></option>
+                                        <?php endforeach; ?>
                                     </select>
                                 </div>
-
+                                <div class="form-group">
+                                    <label>YEAR LEVEL</label>
+                                    <select name="year_level" id="period-year-level" class="form-control" required>
+                                        <option value="">Select Year Level</option><option value="1">1st Year</option><option value="2">2nd Year</option><option value="3">3rd Year</option><option value="4">4th Year</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>ACADEMIC YEAR</label>
+                                    <input type="text" name="acad_year" id="period-acad-year" class="form-control" placeholder="e.g. 2026-2027" pattern="[0-9]{4}-[0-9]{4}" title="Use the format YYYY-YYYY" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>SEMESTER</label>
+                                    <select name="sem" id="period-sem" class="form-control" required><option value="1">1st Semester</option><option value="2">2nd Semester</option><option value="3">Summer</option></select>
+                                </div>
                                 <div class="form-group">
                                     <label>OPEN DATE</label>
-                                    <input type="datetime-local" name="open_date" class="form-control" required>
+                                    <input type="datetime-local" name="open_date" id="period-open-date" class="form-control" required>
                                 </div>
-
                                 <div class="form-group">
                                     <label>CLOSE DATE</label>
-                                    <input type="datetime-local" name="close_date" class="form-control" required>
+                                    <input type="datetime-local" name="close_date" id="period-close-date" class="form-control" required>
                                 </div>
-
-                                <div class="form-group" style="display:flex; align-items:flex-end;">
-                                    <button type="submit" class="btn-enroll btn-approve" style="width:100%;">
-                                        Create Period
-                                    </button>
+                                <div class="form-group" style="display:flex; align-items:flex-end; gap:10px;">
+                                    <button type="submit" id="period-submit" class="btn-enroll btn-approve" style="width:100%;">Create Period</button>
+                                    <button type="button" id="period-cancel" class="btn-enroll" style="width:100%; display:none;">Cancel</button>
                                 </div>
-
                             </div>
                         </form>
                     </div>
 
-
                     <div class="enroll-card" style="margin-bottom: 30px;">
                         <h2>Existing Periods</h2>
-
                         <div class="table-responsive">
                             <table class="enroll-table">
-                                <thead>
-                                    <tr>
-                                        <th>PROGRAM</th>
-                                        <th>YEAR</th>
-                                        <th>SEMESTER</th>
-                                        <th>OPEN DATE</th>
-                                        <th>CLOSE DATE</th>
-                                        <th>STATUS</th>
-                                    </tr>
-                                </thead>
-
+                                <thead><tr><th>DEPARTMENT</th><th>PROGRAM</th><th>YEAR LEVEL</th><th>ACADEMIC YEAR</th><th>SEMESTER</th><th>OPEN DATE</th><th>CLOSE DATE</th><th>STATUS / ACTION</th></tr></thead>
                                 <tbody>
-                                    <?php if (empty($logic->allPeriods)): ?>
+                                    <?php if (empty($logic->allPeriods)): ?><tr><td colspan="8" style="text-align:center; color: rgba(255,255,255,0.6);">No enrollment periods yet.</td></tr><?php endif; ?>
+                                    <?php foreach ($logic->allPeriods as $p): $isOpen = strtolower($p['status']) === 'open'; ?>
                                         <tr>
-                                            <td colspan="6" style="text-align:center; color: rgba(255,255,255,0.6);">
-                                                No enrollment periods yet.
-                                            </td>
-                                        </tr>
-                                    <?php endif; ?>
-
-                                    <?php foreach ($logic->allPeriods as $p):
-                                        $isOpen = strtolower($p['status']) === 'open';
-                                    ?>
-                                        <tr>
-                                            <td><?= enroll_e($p['program']) ?></td>
-                                            <td><?= enroll_e($p['acad_year']) ?></td>
-                                            <td><?= enroll_e(enroll_sem($p['sem'])) ?></td>
+                                            <td><?= enroll_e($p['department'] ?? '—') ?></td><td><?= enroll_e($p['program']) ?></td>
+                                            <td><?= !empty($p['year_level']) ? enroll_e(EnrollmentLogic::ordinal($p['year_level'])) . ' Year' : 'Not set' ?></td>
+                                            <td><?= enroll_e($p['acad_year']) ?></td><td><?= enroll_e(enroll_sem($p['sem'])) ?></td>
                                             <td><?= enroll_e(date('M d, Y h:i A', strtotime($p['open_date']))) ?></td>
+                                            <td><?= !empty($p['close_date']) ? enroll_e(date('M d, Y h:i A', strtotime($p['close_date']))) : '—' ?></td>
                                             <td>
-                                                <?= $p['close_date']
-                                                    ? enroll_e(date('M d, Y h:i A', strtotime($p['close_date'])))
-                                                    : '—' ?>
-                                            </td>
-
-                                            <td>
-                                                <span class="status-badge <?= $isOpen ? '' : 'closed' ?>">
-                                                    <?= enroll_e(ucfirst($p['status'])) ?>
-                                                </span>
-
-                                                <form method="POST" action="<?= $formAction ?>" style="display:inline; margin-left:8px;">
-                                                    <input type="hidden" name="csrf" value="<?= enroll_e($csrf) ?>">
-                                                    <input type="hidden" name="enroll_action" value="toggle_period">
-                                                    <input type="hidden" name="enrollment_id" value="<?= (int)$p['enrollmentID'] ?>">
-
-                                                    <button type="submit" class="btn-enroll <?= $isOpen ? 'btn-danger' : 'btn-approve' ?>" style="padding: 4px 10px; font-size:12px;">
-                                                        <?= $isOpen ? 'Close' : 'Open' ?>
-                                                    </button>
-                                                </form>
+                                                <span class="status-badge <?= $isOpen ? '' : 'closed' ?>"><?= enroll_e(ucfirst($p['status'])) ?></span>
+                                                <div style="display:flex; gap:5px; margin-top:8px; flex-wrap:wrap;">
+                                                    <button type="button" class="btn-enroll btn-edit js-edit-period" style="padding:4px 10px; font-size:12px;" data-id="<?= (int)$p['enrollmentID'] ?>" data-department="<?= enroll_e($p['department'] ?? '') ?>" data-program="<?= enroll_e($p['program']) ?>" data-year-level="<?= (int)($p['year_level'] ?? 0) ?>" data-acad-year="<?= enroll_e($p['acad_year']) ?>" data-sem="<?= (int)$p['sem'] ?>" data-open-date="<?= enroll_e(date('Y-m-d\TH:i', strtotime($p['open_date']))) ?>" data-close-date="<?= !empty($p['close_date']) ? enroll_e(date('Y-m-d\TH:i', strtotime($p['close_date']))) : '' ?>">Edit</button>
+                                                    <form method="POST" action="<?= $formAction ?>" style="display:inline; margin:0;">
+                                                        <input type="hidden" name="csrf" value="<?= enroll_e($csrf) ?>"><input type="hidden" name="enroll_action" value="toggle_period"><input type="hidden" name="enrollment_id" value="<?= (int)$p['enrollmentID'] ?>">
+                                                        <button type="submit" class="btn-enroll <?= $isOpen ? 'btn-danger' : 'btn-approve' ?>" style="padding:4px 10px; font-size:12px;"><?= $isOpen ? 'Close' : 'Open' ?></button>
+                                                    </form>
+                                                </div>
                                             </td>
                                         </tr>
                                     <?php endforeach; ?>
@@ -634,7 +605,6 @@ $csrf = $logic->csrf();
                             </table>
                         </div>
                     </div>
-
 
                     <h1 id="subjects-section" style="margin: 0; color: #ffffff; font-size: 32px; font-weight: normal; margin-bottom: 20px;">
                         Master Subject List
@@ -811,6 +781,27 @@ $csrf = $logic->csrf();
                     .prereq-option input{accent-color:#b77be0}
                     .prereq-selected{font-size:12px;color:rgba(255,255,255,.7);margin-top:8px}
                     </style>
+
+                    <script>
+                    (function () {
+                        var form = document.getElementById('period-form');
+                        if (!form) return;
+                        var el = { title: document.getElementById('period-form-title'), action: document.getElementById('period-action'), id: document.getElementById('period-id'), department: document.getElementById('period-department'), program: document.getElementById('period-program'), year: document.getElementById('period-year-level'), acad: document.getElementById('period-acad-year'), sem: document.getElementById('period-sem'), open: document.getElementById('period-open-date'), close: document.getElementById('period-close-date'), submit: document.getElementById('period-submit'), cancel: document.getElementById('period-cancel') };
+                        var programs = Array.from(el.program.options).map(function (o) { return { value:o.value, text:o.textContent, department:o.dataset.department || '' }; });
+                        function filterPrograms(selected) {
+                            var dept = el.department.value; el.program.innerHTML = '';
+                            var placeholder = document.createElement('option'); placeholder.value=''; placeholder.textContent='Select Program'; el.program.appendChild(placeholder);
+                            programs.forEach(function (p) { if (p.value && p.department === dept) { var o=document.createElement('option'); o.value=p.value; o.textContent=p.text; o.dataset.department=p.department; el.program.appendChild(o); } });
+                            if (selected) el.program.value=selected;
+                        }
+                        function reset() { form.reset(); el.action.value='create_period'; el.id.value=''; el.title.textContent='Create New Period'; el.submit.textContent='Create Period'; el.cancel.style.display='none'; filterPrograms(''); }
+                        el.department.addEventListener('change', function(){ filterPrograms(''); });
+                        document.querySelectorAll('.js-edit-period').forEach(function(btn){ btn.addEventListener('click', function(){ var d=btn.dataset; el.action.value='update_period'; el.id.value=d.id; el.department.value=d.department; filterPrograms(d.program); el.year.value=d.yearLevel; el.acad.value=d.acadYear; el.sem.value=d.sem; el.open.value=d.openDate; el.close.value=d.closeDate; el.title.textContent='Edit Enrollment Period'; el.submit.textContent='Update Period'; el.cancel.style.display='block'; form.scrollIntoView({behavior:'smooth',block:'start'}); }); });
+                        el.cancel.addEventListener('click', reset);
+                        filterPrograms('');
+                        form.addEventListener('submit', function(e){ if (el.close.value && el.open.value && new Date(el.close.value) <= new Date(el.open.value)) { e.preventDefault(); alert('Close date must be after the open date.'); } });
+                    })();
+                    </script>
 
                     <script>
                     (function () {

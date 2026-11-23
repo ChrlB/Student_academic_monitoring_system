@@ -32,6 +32,7 @@ class EnrollmentLogic
     public $isWindowOpen = true;
 
     public $allPeriods = [];
+    public $periodPrograms = [];
     public $allSubjects = [];
     public $prerequisiteOptions = [];
     public $editSubject = null;
@@ -238,15 +239,26 @@ class EnrollmentLogic
             return;
         }
 
+        // Select the enrollment period for this student's program and year level.
+        // Older periods with NULL year_level are kept as a fallback.
+        $yearLevel = $this->studentYearNumber();
+
         $stmt = $this->pdo->prepare("
             SELECT *
             FROM enrollment_period
             WHERE program = ?
-            ORDER BY enrollmentID DESC
+              AND (year_level = ? OR year_level IS NULL)
+            ORDER BY
+                CASE WHEN year_level = ? THEN 0 ELSE 1 END,
+                enrollmentID DESC
             LIMIT 1
         ");
 
-        $stmt->execute([$this->studentProgram]);
+        $stmt->execute([
+            $this->studentProgram,
+            $yearLevel,
+            $yearLevel
+        ]);
         $this->term = $stmt->fetch();
 
         if (!$this->term) {
@@ -443,9 +455,14 @@ class EnrollmentLogic
                 ON st.studentID = aa.studentID
             LEFT JOIN enrollment_period ep
                 ON ep.enrollmentID = (
-                    SELECT MAX(ep2.enrollmentID)
+                    SELECT ep2.enrollmentID
                     FROM enrollment_period ep2
                     WHERE ep2.program = st.program
+                      AND (ep2.year_level = st.year_level OR ep2.year_level IS NULL)
+                    ORDER BY
+                        CASE WHEN ep2.year_level = st.year_level THEN 0 ELSE 1 END,
+                        ep2.enrollmentID DESC
+                    LIMIT 1
                 )
             LEFT JOIN enrolled_subjects es
                 ON es.studentID = st.studentID
@@ -506,12 +523,14 @@ class EnrollmentLogic
             FROM enrollment_period
             WHERE enrollmentID = ?
               AND program = ?
+              AND (year_level = ? OR year_level IS NULL)
             LIMIT 1
         ");
 
         $periodStmt->execute([
             $enrollID,
-            $this->selectedStudent['program']
+            $this->selectedStudent['program'],
+            (int)$this->selectedStudent['year_level']
         ]);
 
         if (!$periodStmt->fetchColumn()) {
@@ -569,6 +588,13 @@ class EnrollmentLogic
 
     private function loadRegistrarData()
     {
+        // Program and department options used by the enrollment-period form.
+        $this->periodPrograms = $this->pdo->query("
+            SELECT program, name, department
+            FROM programs
+            ORDER BY department, program
+        ")->fetchAll();
+
         $this->available = $this->pdo->query("
             SELECT program, name
             FROM programs
@@ -578,7 +604,8 @@ class EnrollmentLogic
         $this->allPeriods = $this->pdo->query("
             SELECT
                 ep.*,
-                p.name AS program_name
+                p.name AS program_name,
+                p.department AS department
             FROM enrollment_period ep
             LEFT JOIN programs p
                 ON p.program = ep.program
@@ -731,6 +758,11 @@ class EnrollmentLogic
                 $this->go(['tab' => 'periods'], 'periods-section');
             }
 
+            if ($action === 'update_period') {
+                $this->updatePeriod($_POST);
+                $this->go(['tab' => 'periods'], 'periods-section');
+            }
+
             if ($action === 'toggle_period') {
                 $this->togglePeriod($_POST['enrollment_id'] ?? 0);
                 $this->go(['tab' => 'periods'], 'periods-section');
@@ -797,86 +829,96 @@ class EnrollmentLogic
         $this->go(array_intersect_key($_GET, array_flip(self::MODULE_PARAMS)));
     }
 
+    private function validatePeriodData($data)
+    {
+        $program = trim($data['program'] ?? '');
+        $department = trim($data['department'] ?? '');
+        $yearLevel = (int)($data['year_level'] ?? 0);
+        $acadYear = trim($data['acad_year'] ?? '');
+        $sem = (int)($data['sem'] ?? 0);
+        $open = str_replace('T', ' ', trim($data['open_date'] ?? ''));
+        $close = str_replace('T', ' ', trim($data['close_date'] ?? ''));
+
+        if ($program === '' || $department === '' || $acadYear === '' || $open === '' || $close === '') {
+            throw new Exception('Complete all enrollment period fields.');
+        }
+        if ($yearLevel < 1 || $yearLevel > 4) {
+            throw new Exception('Invalid year level.');
+        }
+        if (!in_array($sem, [1, 2, 3], true)) {
+            throw new Exception('Invalid semester.');
+        }
+        if (strtotime($open) === false || strtotime($close) === false) {
+            throw new Exception('Invalid enrollment dates.');
+        }
+        if (strtotime($close) <= strtotime($open)) {
+            throw new Exception('Close date must be after the open date.');
+        }
+        if (strlen($open) === 16) $open .= ':00';
+        if (strlen($close) === 16) $close .= ':00';
+
+        $stmt = $this->pdo->prepare("SELECT 1 FROM programs WHERE program = ? AND department = ? LIMIT 1");
+        $stmt->execute([$program, $department]);
+        if (!$stmt->fetchColumn()) {
+            throw new Exception('The selected program does not belong to that department.');
+        }
+
+        return [
+            'department' => $department, 'program' => $program,
+            'year_level' => $yearLevel, 'acad_year' => $acadYear,
+            'sem' => $sem, 'open_date' => $open, 'close_date' => $close
+        ];
+    }
+
     private function createPeriod($data)
     {
         try {
-            $program = trim($data['program'] ?? '');
-            $acadYear = trim($data['acad_year'] ?? '');
-            $sem = (int)($data['sem'] ?? 0);
-            $open = str_replace('T', ' ', $data['open_date'] ?? '');
-            $close = str_replace('T', ' ', $data['close_date'] ?? '');
-
-            if ($program === '' || $acadYear === '' || $open === '' || $close === '') {
-                throw new Exception('Complete all enrollment period fields.');
-            }
-
-            if (!in_array($sem, [1, 2, 3], true)) {
-                throw new Exception('Invalid semester.');
-            }
-
-            if (strtotime($close) <= strtotime($open)) {
-                throw new Exception('Close date must be after the open date.');
-            }
-
-            if (strlen($open) === 16) {
-                $open .= ':00';
-            }
-
-            if (strlen($close) === 16) {
-                $close .= ':00';
-            }
-
+            $d = $this->validatePeriodData($data);
             $stmt = $this->pdo->prepare("
-                SELECT 1 FROM programs WHERE program = ?
-            ");
-
-            $stmt->execute([$program]);
-
-            if (!$stmt->fetchColumn()) {
-                throw new Exception('Selected program does not exist.');
-            }
-
-            $stmt = $this->pdo->prepare("
-                SELECT 1
-                FROM enrollment_period
-                WHERE program = ?
-                  AND acad_year = ?
-                  AND sem = ?
+                SELECT 1 FROM enrollment_period
+                WHERE program = ? AND year_level = ? AND acad_year = ? AND sem = ?
                 LIMIT 1
             ");
-
-            $stmt->execute([$program, $acadYear, $sem]);
-
+            $stmt->execute([$d['program'], $d['year_level'], $d['acad_year'], $d['sem']]);
             if ($stmt->fetchColumn()) {
-                throw new Exception('An enrollment period for this program, year and semester already exists.');
+                throw new Exception('An enrollment period for this program, year level, academic year and semester already exists.');
             }
 
             $stmt = $this->pdo->prepare("
                 INSERT INTO enrollment_period
-                    (
-                        program,
-                        acad_year,
-                        sem,
-                        open_date,
-                        close_date,
-                        status,
-                        student_window_open
-                    )
-                VALUES (?, ?, ?, ?, ?, 'open', 1)
+                    (program, year_level, acad_year, sem, open_date, close_date, status, student_window_open)
+                VALUES (?, ?, ?, ?, ?, ?, 'open', 1)
             ");
-
-            $stmt->execute([
-                $program,
-                $acadYear,
-                $sem,
-                $open,
-                $close
-            ]);
-
+            $stmt->execute([$d['program'], $d['year_level'], $d['acad_year'], $d['sem'], $d['open_date'], $d['close_date']]);
             $this->flash('ok', 'Enrollment period created successfully.');
-        } catch (Throwable $e) {
-            $this->fail($e);
-        }
+        } catch (Throwable $e) { $this->fail($e); }
+    }
+
+    private function updatePeriod($data)
+    {
+        try {
+            $id = (int)($data['enrollment_id'] ?? 0);
+            if ($id < 1) throw new Exception('Invalid enrollment period.');
+            $exists = $this->pdo->prepare('SELECT 1 FROM enrollment_period WHERE enrollmentID = ? LIMIT 1');
+            $exists->execute([$id]);
+            if (!$exists->fetchColumn()) throw new Exception('Enrollment period not found.');
+
+            $d = $this->validatePeriodData($data);
+            $stmt = $this->pdo->prepare("
+                SELECT 1 FROM enrollment_period
+                WHERE program = ? AND year_level = ? AND acad_year = ? AND sem = ? AND enrollmentID <> ?
+                LIMIT 1
+            ");
+            $stmt->execute([$d['program'], $d['year_level'], $d['acad_year'], $d['sem'], $id]);
+            if ($stmt->fetchColumn()) throw new Exception('Another enrollment period already exists with these details.');
+
+            $stmt = $this->pdo->prepare("
+                UPDATE enrollment_period SET program = ?, year_level = ?, acad_year = ?, sem = ?, open_date = ?, close_date = ?
+                WHERE enrollmentID = ?
+            ");
+            $stmt->execute([$d['program'], $d['year_level'], $d['acad_year'], $d['sem'], $d['open_date'], $d['close_date'], $id]);
+            $this->flash('ok', 'Enrollment period updated successfully.');
+        } catch (Throwable $e) { $this->fail($e); }
     }
 
     private function togglePeriod($id)

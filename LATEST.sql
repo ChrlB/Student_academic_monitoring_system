@@ -1537,3 +1537,70 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+
+/* Registration */
+
+CREATE TABLE IF NOT EXISTS account_restrictions (
+  restriction_id int UNSIGNED NOT NULL AUTO_INCREMENT,
+  account_id     varchar(11)  NOT NULL,                       -- e.g. 202600045 or F202600012
+  reason         varchar(250) NOT NULL,
+  restricted_by  varchar(11)  NOT NULL,
+  restricted_at  timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  lifted_at      timestamp    NULL DEFAULT NULL,
+  lifted_by      varchar(11)  DEFAULT NULL,
+  PRIMARY KEY (restriction_id),
+  KEY account_id (account_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE `professor_student` (
+  `id` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `facultyID` int UNSIGNED NOT NULL,
+  `studentID` int UNSIGNED NOT NULL,
+  `assignment_type` enum('adviser','subject') NOT NULL DEFAULT 'adviser',
+  `assignment` varchar(100) NOT NULL DEFAULT 'Academic Adviser',
+  `assigned_at` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `unique_assignment` (`facultyID`,`studentID`,`assignment_type`,`assignment`),
+  KEY `fk_adviser_student_student` (`studentID`),
+  CONSTRAINT `fk_adviser_student_faculty` FOREIGN KEY (`facultyID`) REFERENCES `faculty` (`facultyID`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_adviser_student_student` FOREIGN KEY (`studentID`) REFERENCES `students` (`studentID`) ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT INTO departments (department, name) VALUES
+ ('CBA',  'College of Business and Accountancy'),
+ ('CHTM', 'College of Hospitality and Tourism Management'),
+ ('CEAS', 'College of Education, Arts and Sciences');
+
+-- Departments and programs for CBA, CEAS and CHTM (CCS already exists).
+-- Run in phpMyAdmin -> database ams_db -> SQL tab. Safe to run again: INSERT IGNORE skips rows that already exist.
+--
+-- EDIT THIS LIST to match the programs your school really offers (delete a row you do not offer, add ones that are missing).
+-- Program codes are letters only (no hyphens or digits) so a student's Program/Block can be typed as e.g. "BSBA 2A".
+
+INSERT IGNORE INTO departments (department, name) VALUES
+ ('CBA',  'College of Business and Accountancy'),
+ ('CEAS', 'College of Education, Arts and Sciences'),
+ ('CHTM', 'College of Hospitality and Tourism Management');
+
+INSERT IGNORE INTO programs (program, name, department) VALUES
+ -- College of Business and Accountancy
+ ('BSA',      'Bachelor of Science in Accountancy',                'CBA'),
+ ('BSBA',     'Bachelor of Science in Business Administration',    'CBA'),
+ ('BSMA',     'Bachelor of Science in Management Accounting',      'CBA'),
+ ('BSAIS',    'Bachelor of Science in Accounting Information System', 'CBA'),
+ ('BSENTREP', 'Bachelor of Science in Entrepreneurship',           'CBA'),
+ -- College of Education, Arts and Sciences
+ ('BEED',     'Bachelor of Elementary Education',                  'CEAS'),
+ ('BSED',     'Bachelor of Secondary Education',                   'CEAS'),
+ ('BECED',    'Bachelor of Early Childhood Education',             'CEAS'),
+ ('BPED',     'Bachelor of Physical Education',                    'CEAS'),
+ ('BSPSY',    'Bachelor of Science in Psychology',                 'CEAS'),
+ ('ABCOMM',   'Bachelor of Arts in Communication',                 'CEAS'),
+ ('ABPOLSCI', 'Bachelor of Arts in Political Science',             'CEAS'),
+ -- College of Hospitality and Tourism Management
+ ('BSHM',     'Bachelor of Science in Hospitality Management',     'CHTM'),
+ ('BSTM',     'Bachelor of Science in Tourism Management',         'CHTM');
+
+-- check the result:
+-- SELECT department, program, name FROM programs ORDER BY department, program;

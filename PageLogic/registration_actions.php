@@ -1467,7 +1467,7 @@ function registrationUnassign($post) {
 
     regAssignmentReply(
         $pdo,
-        $sNum,
+        $sNum,  
         (int)$fNum,
         'Assignment removed.'
     );

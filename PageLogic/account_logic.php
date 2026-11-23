@@ -21,7 +21,7 @@ function properName(string $s): string {
         return $m[1] . mb_strtoupper($m[2], 'UTF-8');
     }, $s);
 }
-// Email shown when the student has no saved email yet: <school ID>@<school domain>
+
 function schoolEmailFor(string $userID): string {
     $domain = defined('SCHOOL_EMAIL_DOMAIN') ? SCHOOL_EMAIL_DOMAIN : '@amscollege.edu.ph';   // one place to change: account_actions.php
     return $userID !== '' ? $userID . $domain : '';
@@ -89,7 +89,7 @@ function getAccountInfo(): array {
         ],
         'contact' => [
             'phone' => $s('number'),
-            'email' => $s('email') ?: schoolEmailFor($userID),   // stored email if there is one, else derived from the ID
+            'email' => $s('email') ?: schoolEmailFor($userID),  
         ],
         'address' => [
             'region'       => $s('region'),             
