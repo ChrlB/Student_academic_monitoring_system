@@ -48,6 +48,13 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 </div>
                 <input type="hidden" name="view" value="OFFICE">
               </form>
+
+              <?php if ($acadyear !== 'ALL'): ?>
+                <form method="post" action="<?= BASE_PATH ?>/file-maker">
+                  <input type="hidden" name="acad_year_sem" value="<?= e($acadyear) ?>">
+                  <button type="submit">Download clearance form</button>
+                </form>
+              <?php endif ?>
             </div>
 
             <div class="row" style="gap:20px">

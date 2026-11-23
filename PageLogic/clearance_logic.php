@@ -30,7 +30,7 @@ $FstudentID  = 'ALL';
 $Oblock= 'ALL';
 $Oacadyear= $currentAY ;
 $OstudentID= 'ALL';
-
+function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
 
 $allowedViews = ($_SESSION["role"] == 'student')
