@@ -36,7 +36,7 @@ $page = $_SESSION["page"] ?? "";
         <input type="button" value="ATTENDANCE"></a>
     <?php endif ?>
 
-    <?php if(in_array($_SESSION["role"], ["program coordinator","registrar","student"])): ?>  
+    <?php if(in_array($_SESSION["role"], ["program coordinator","registrar","student","dean"])): ?>  
       <a class="nav_buttons row ENROLLMENT" href="<?= BASE_PATH?>/enrollment">
         <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/enrollment.png" alt="" class="nav_button_icons"></div>
         <input type="button" value="ENROLLMENT"></a>
