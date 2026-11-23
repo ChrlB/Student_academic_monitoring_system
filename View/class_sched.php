@@ -91,7 +91,7 @@ function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v, $
       <select id="<?= $uid ?>-subject" name="subject" required>
         <option value="">Select subject</option>
         <?php foreach ($subjects as $s): ?>
-          <option value="<?= sched_e($s['subjectID']) ?>" data-type="<?= sched_e($s['type']) ?>" data-kind="<?= sched_e($s['kind']) ?>"
+          <option value="<?= sched_e($s['subjectID']) ?>" data-type="<?= sched_e($s['type']) ?>" data-kind="<?= sched_e($s['kind']) ?>" data-programs="<?= sched_e($s['programs'] ? implode(',', $s['programs']) : '*') ?>"
             <?= ($v['subject'] ?? null) === $s['subjectID'] ? 'selected' : '' ?>>
             <?= sched_e(trim($s['subjectID']) . ' — ' . $s['name'] . ($s['requires'] ? ' (requires ' . $s['requires'] . ')' : '')) ?>
           </option>
@@ -163,7 +163,7 @@ $csrf      = $logic->csrf();
 $sched = null;
 if ($view === 'class' || $view === 'edit') {
     $sched = ($group === 'manager') ? $logic->find((int)($_GET['id'] ?? 0)) : null;
-    if (!$sched || ($view === 'edit' && !$canManage)) {
+    if (!$sched || !$logic->canAccess($sched) || ($view === 'edit' && !$canManage)) {
         $view = 'list';
         $sched = null;
     } else {
@@ -235,7 +235,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
 <?php /* =============================== MANAGER: LIST =============================== */ ?>
 <?php if ($group === 'manager' && $view === 'list'): ?>
           <div class="sched-toolbar">
-            <h2 class="sched-title">Teaching Schedule</h2>
+            <h2 class="sched-title">Teaching Schedule<?php if ($logic->isCoordinator() && $logic->assignedProgram() !== ''): ?> — <?= sched_e($logic->assignedProgram()) ?><?php endif; ?></h2>
             <form class="sched-sem" method="get" action="<?= sched_e($self) ?>">
               <?php if ($search !== ''): ?><input type="hidden" name="q" value="<?= sched_e($search) ?>"><?php endif; ?>
               <select name="sem" aria-label="Semester" onchange="this.form.submit()">
@@ -604,23 +604,29 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
 <?php if ($needForm): ?>
 <script>
 (function () {
-  // Filter subjects by class type.
+  // Filter subjects by class type, category and program.
   document.querySelectorAll('[data-sched-form]').forEach(function (form) {
     var subject = form.querySelector('select[name="subject"]');
+    var blockSel = form.querySelector('select[name="block"]');
     function val(name, fallback) {
       var c = form.querySelector('input[name="' + name + '"]:checked');
       return c ? c.value : fallback;
     }
     function apply() {
       var type = val('class_type', 'LEC'), kind = val('subject_kind', 'normal');
+      var prog = blockSel && blockSel.value ? blockSel.value.split('|')[0] : '';
+      subject.disabled = (prog === '');
+      subject.options[0].textContent = prog ? 'Select subject' : 'Select block/section first';
       Array.prototype.forEach.call(subject.options, function (o) {
         if (!o.value) return;
-        var hide = o.dataset.type !== type || o.dataset.kind !== kind;
+        var list = (o.dataset.programs || '*').split(',');
+        var offered = list.indexOf('*') !== -1 || list.indexOf(prog) !== -1;
+        var hide = o.dataset.type !== type || o.dataset.kind !== kind || !offered;
         o.hidden = hide; o.disabled = hide;
         if (hide && o.selected) subject.value = '';
       });
     }
-    form.querySelectorAll('input[name="class_type"], input[name="subject_kind"]').forEach(function (r) { r.addEventListener('change', apply); });
+    form.querySelectorAll('input[name="class_type"], input[name="subject_kind"], select[name="block"]').forEach(function (r) { r.addEventListener('change', apply); });
     apply();
   });
   
