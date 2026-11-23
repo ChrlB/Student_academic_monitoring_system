@@ -2,7 +2,7 @@
 require_once __DIR__ . "/../PageLogic/grades_logic.php";
 
 $accountRole = strtolower(trim((string)($_SESSION['role'] ?? '')));
-if (!in_array($accountRole, ['student', 'prof', 'program coordinator', 'dean'], true)) {
+if (!in_array($accountRole, ['student', 'prof', 'program coordinator', 'dean', 'registrar'], true)) {
     $_SESSION['error'] = 'Grades are not available for this account.';
     header('Location: ' . BASE_PATH . '/dashboard');
     exit;
@@ -15,6 +15,9 @@ function grades_e($value)
 
 $gradesLogic = new GradesLogic();
 $isStudentAccount = $accountRole === 'student';
+$isRegistrarAccount = $accountRole === 'registrar';
+$isCoordinatorAccount = in_array($accountRole, ['program coordinator', 'dean'], true);
+$isProfessorAccount = $accountRole === 'prof';
 $isFacultyAccount = in_array($accountRole, ['prof', 'program coordinator', 'dean'], true);
 $semesters = $isStudentAccount
     ? $gradesLogic->studentSemesters()
@@ -55,7 +58,65 @@ if ($isFacultyAccount && $view === 'gradebook' && $_SERVER['REQUEST_METHOD'] ===
     }
 }
 
-if ($isFacultyAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_grades') {
+if ($isCoordinatorAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'coordinator_review') {
+    try {
+        if (!hash_equals($gradesLogic->csrfToken(), (string)($_POST['csrf'] ?? ''))) {
+            throw new InvalidArgumentException('Your form session expired. Reload the page and try again.');
+        }
+        $gradesLogic->coordinatorReview(
+            (int)($_POST['submissionID'] ?? 0),
+            (string)($_POST['decision'] ?? ''),
+            (string)($_POST['remark'] ?? '')
+        );
+        $_SESSION['grades_flash'] = [
+            'type' => 'success',
+            'message' => ($_POST['decision'] ?? '') === 'approve'
+                ? 'Grade submission forwarded to the registrar.'
+                : 'Grade submission rejected.',
+        ];
+    } catch (Throwable $e) {
+        error_log('Coordinator grade review failed: ' . $e->getMessage());
+        $_SESSION['grades_flash'] = [
+            'type' => 'error',
+            'message' => $e instanceof InvalidArgumentException || $e instanceof RuntimeException
+                ? $e->getMessage()
+                : 'Unable to review the grade submission. Please try again.',
+        ];
+    }
+    header('Location: ' . BASE_PATH . '/grades');
+    exit;
+}
+
+if ($isRegistrarAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'registrar_review') {
+    try {
+        if (!hash_equals($gradesLogic->csrfToken(), (string)($_POST['csrf'] ?? ''))) {
+            throw new InvalidArgumentException('Your form session expired. Reload the page and try again.');
+        }
+        $gradesLogic->registrarFinalReview(
+            (int)($_POST['submissionID'] ?? 0),
+            (string)($_POST['decision'] ?? ''),
+            (string)($_POST['remark'] ?? '')
+        );
+        $_SESSION['grades_flash'] = [
+            'type' => 'success',
+            'message' => ($_POST['decision'] ?? '') === 'approve'
+                ? 'Grades verified and added to the student records.'
+                : 'Grade submission rejected.',
+        ];
+    } catch (Throwable $e) {
+        error_log('Registrar grade review failed: ' . $e->getMessage());
+        $_SESSION['grades_flash'] = [
+            'type' => 'error',
+            'message' => $e instanceof InvalidArgumentException || $e instanceof RuntimeException
+                ? $e->getMessage()
+                : 'Unable to complete final grade verification. Please try again.',
+        ];
+    }
+    header('Location: ' . BASE_PATH . '/grades');
+    exit;
+}
+
+if ($isProfessorAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_grades') {
     $semesterKey = $gradesLogic->selectedSemester($_POST['sem'] ?? '', $semesters);
     $semesterLabel = $gradesLogic->semesterLabelForKey($semesterKey, $semesters);
     $class = $gradesLogic->assignedClass($scheduleID, $semesterKey);
@@ -68,8 +129,11 @@ if ($isFacultyAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['actio
             throw new InvalidArgumentException('That class is not assigned to your account.');
         }
 
-        $page = $gradesLogic->saveGrades($class, is_array($_POST['grades'] ?? null) ? $_POST['grades'] : []);
-        $_SESSION['message'] = 'Added Sucessfully';
+        $page = $gradesLogic->submitGradesForVerification($class, is_array($_POST['grades'] ?? null) ? $_POST['grades'] : []);
+        $_SESSION['grades_flash'] = [
+            'type' => 'success',
+            'message' => 'Grades submitted for program coordinator verification.',
+        ];
         unset($_SESSION['grades_old']);
         $returnToPreview = true;
     } catch (InvalidArgumentException $e) {
@@ -114,7 +178,21 @@ if ($isFacultyAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['actio
 $classPreview = $isFacultyAccount ? $gradesLogic->classPreview($semesterKey) : [];
 $class = null;
 $roster = null;
-$flash = $isFacultyAccount ? $gradesLogic->takeFlash() : null;
+$coordinatorSubmissions = $isCoordinatorAccount ? $gradesLogic->coordinatorSubmissions() : [];
+$registrarSubmissions = $isRegistrarAccount ? $gradesLogic->registrarSubmissions() : [];
+$requestedRegistrarListAction = $_GET['list_action'] ?? $_GET['filter_action'] ?? '';
+$registrarListAction = in_array($requestedRegistrarListAction, ['filter', 'generate', 'preview'], true)
+    ? (string)$requestedRegistrarListAction
+    : '';
+$registrarStudentList = $isRegistrarAccount ? $gradesLogic->registrarStudentList([
+    'program' => $_GET['program'] ?? '',
+    'acad_year' => $_GET['acad_year'] ?? '',
+    'faculty' => $_GET['faculty'] ?? '',
+    'sem' => $_GET['sem'] ?? '',
+    'schedule' => $_GET['schedule'] ?? '',
+    'show_students' => $registrarListAction === 'preview',
+]) : null;
+$flash = ($isFacultyAccount || $isRegistrarAccount) ? $gradesLogic->takeFlash() : null;
 $oldGrades = $_SESSION['grades_old'] ?? [];
 unset($_SESSION['grades_old']);
 
@@ -696,6 +774,146 @@ $csrf = $gradesLogic->csrfToken();
       text-align: center;
     }
 
+    .verification-panel {
+      min-height: 220px;
+    }
+
+    .verification-card {
+      margin-top: 14px;
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,0.42);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.07);
+    }
+
+    .verification-card-header {
+      margin-bottom: 12px;
+      color: #fff;
+    }
+
+    .verification-card-header small,
+    .verification-card-header div {
+      display: block;
+      margin-top: 4px;
+    }
+
+    .verification-table-wrap {
+      overflow-x: auto;
+    }
+
+    .verification-table {
+      width: 100%;
+    }
+
+    .verification-remark {
+      display: block;
+      margin-top: 12px;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .verification-remark textarea {
+      width: 100%;
+      margin-top: 6px;
+      border: 1px solid rgba(255,255,255,0.6);
+      border-radius: 8px;
+      padding: 8px;
+      resize: vertical;
+    }
+
+    .verification-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .registrar-list-filters {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: 10px;
+      margin: 12px 0 16px;
+      color: #fff;
+    }
+
+    .registrar-list-filters label {
+      display: grid;
+      gap: 5px;
+      font-size: 0.88rem;
+      font-weight: 700;
+    }
+
+    .registrar-list-filters select {
+      min-height: 38px;
+      border: 1px solid rgba(255,255,255,0.55);
+      border-radius: 8px;
+      padding: 7px 9px;
+      background: rgba(255,255,255,0.9);
+      color: #35233a;
+    }
+
+    .registrar-list-filters .gradebook-submit {
+      align-self: end;
+    }
+
+    .registrar-list-filters .gradebook-submit:disabled,
+    .registrar-list-preview .gradebook-submit:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    .registrar-student-table {
+      width: 100%;
+      margin-bottom: 4px;
+    }
+
+    .registrar-schedule-back {
+      display: flex;
+      width: fit-content;
+      margin: 0 0 12px;
+    }
+
+    .faculty-grades .registrar-list-preview .class-grid {
+      display: grid;
+      grid-auto-flow: row;
+      grid-auto-columns: initial;
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: none;
+      width: 100%;
+      max-width: 360px;
+      overflow: visible;
+    }
+
+    .faculty-grades .registrar-list-preview .class-card {
+      cursor: default;
+    }
+
+    .faculty-grades .class-preview-panel.registrar-list-preview {
+      margin-top: 16px;
+    }
+
+    .faculty-grades .registrar-list-preview form {
+      display: flex;
+      justify-content: flex-start;
+      margin-top: 12px;
+    }
+
+    @media (max-width: 900px) {
+      .registrar-list-filters {
+        grid-template-columns: repeat(2, minmax(140px, 1fr));
+      }
+    }
+
+    @media (max-width: 560px) {
+      .registrar-list-filters {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .verification-reject {
+      background: rgba(145, 35, 54, 0.72);
+    }
+
     .faculty-grades .grades-toolbar {
       min-height: 98px;
       margin-bottom: 20px;
@@ -1008,7 +1226,7 @@ $csrf = $gradesLogic->csrfToken();
             </section>
           </div>
         </section>
-      <?php elseif (in_array($accountRole, ['prof', 'program coordinator', 'dean'], true)): ?>
+      <?php elseif (in_array($accountRole, ['prof', 'program coordinator', 'dean', 'registrar'], true)): ?>
       <div class="grades-add-shell faculty-grades">
           <div class="grades-add-panel">
             <div class="grades-toolbar faculty-grades__heading-panel">
@@ -1043,7 +1261,7 @@ $csrf = $gradesLogic->csrfToken();
                   <div class="semester-pill"><?= grades_e($semesterLabel ?: 'No assigned semester') ?></div>
                 <?php endif; ?>
 
-                <?php if ($view === 'preview'): ?>
+                <?php if ($isFacultyAccount && $view === 'preview'): ?>
                   <form class="term-group" method="get" action="<?= BASE_PATH ?>/grades">
                     <div class="term-picker">
                       <select id="grade-semester" name="sem" aria-label="Select Term" onchange="this.form.submit()" <?= empty($semesters) ? 'disabled' : '' ?>>
@@ -1060,7 +1278,7 @@ $csrf = $gradesLogic->csrfToken();
                     <noscript><button class="term-btn" type="submit">Show Term</button></noscript>
                   </form>
                 <?php endif; ?>
-                <?php if ($view === 'preview'): ?>
+                <?php if ($isFacultyAccount && $view === 'preview'): ?>
                   <?php
                     $gradebookParams = ['view' => 'gradebook', 'sem' => $semesterKey];
                     if (!empty($classPreview)) {
@@ -1080,7 +1298,239 @@ $csrf = $gradesLogic->csrfToken();
               </aside>
 
               <section class="grade-content">
-                <?php if ($view === 'gradebook' && $class && $roster): ?>
+                <?php if ($isCoordinatorAccount): ?>
+                  <section class="gradebook-panel verification-panel" aria-labelledby="coordinator-verification-title">
+                    <h2 class="gradebook-heading" id="coordinator-verification-title">Program Coordinator Grade Verification</h2>
+                    <?php if (!$coordinatorSubmissions): ?>
+                      <div class="gradebook-empty">No grade submissions are awaiting coordinator verification.</div>
+                    <?php else: ?>
+                      <?php foreach ($coordinatorSubmissions as $submission): ?>
+                        <article class="verification-card">
+                          <div class="verification-card-header">
+                            <div>
+                              <strong><?= grades_e($submission['subject_code'] ?? $submission['subjectID']) ?><?= $submission['subject_name'] ? ' - ' . grades_e($submission['subject_name']) : '' ?></strong>
+                              <div><?= grades_e($submission['program'] . $submission['block']) ?> | <?= grades_e(GradesLogic::semesterLabel($submission['acad_year'], $submission['sem'])) ?></div>
+                              <small>Submitted by <?= grades_e($submission['submitted_by_name'] ?: 'Professor') ?> on <?= grades_e($submission['submitted_at']) ?></small>
+                            </div>
+                          </div>
+                          <form method="post" action="<?= BASE_PATH ?>/grades">
+                            <input type="hidden" name="action" value="coordinator_review">
+                            <input type="hidden" name="csrf" value="<?= grades_e($csrf) ?>">
+                            <input type="hidden" name="submissionID" value="<?= (int)$submission['submissionID'] ?>">
+                            <div class="verification-table-wrap">
+                              <table class="grade-table verification-table">
+                                <thead><tr><th>Student ID</th><th>Student</th><th>Midterm</th><th>Final</th></tr></thead>
+                                <tbody>
+                                  <?php foreach ($submission['grades'] as $grade): ?>
+                                    <tr>
+                                      <td><?= grades_e($grade['display_student_id'] ?? ($grade['studentID'] ?? '')) ?></td>
+                                      <td><?= grades_e($grade['student_name'] ?? ('Student ' . $grade['studentID'])) ?></td>
+                                      <td><?= $grade['midterm'] === null ? '—' : grades_e(number_format((float)$grade['midterm'], 2)) ?></td>
+                                      <td><?= $grade['final'] === null ? '—' : grades_e(number_format((float)$grade['final'], 2)) ?></td>
+                                    </tr>
+                                  <?php endforeach; ?>
+                                </tbody>
+                              </table>
+                            </div>
+                            <label class="verification-remark">Remarks
+                              <textarea name="remark" rows="2" placeholder="Optional remarks"></textarea>
+                            </label>
+                            <div class="verification-actions">
+                              <button class="gradebook-submit verification-reject" type="submit" name="decision" value="reject">Reject</button>
+                              <button class="gradebook-submit" type="submit" name="decision" value="approve">Verify & Forward</button>
+                            </div>
+                          </form>
+                        </article>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </section>
+                <?php elseif ($isRegistrarAccount): ?>
+                  <section class="gradebook-panel verification-panel" aria-labelledby="registrar-student-list-title">
+                    <h2 class="gradebook-heading" id="registrar-student-list-title">Enrolled Student List</h2>
+                    <?php
+                      $selectedProgram = trim((string)($_GET['program'] ?? ''));
+                      $selectedFaculty = (int)($_GET['faculty'] ?? 0);
+                      $selectedAcademicYear = (string)($_GET['acad_year'] ?? '');
+                      $selectedSemester = (int)($_GET['sem'] ?? 0);
+                      $registrarFiltersReady = $registrarStudentList['filters_complete'];
+                    ?>
+                    <form class="registrar-list-filters" method="get" action="<?= BASE_PATH ?>/grades">
+                      <input type="hidden" name="filter_action" value="filter">
+                      <label>Program
+                        <select name="program" required
+                          onchange="this.form.elements.faculty.value=''; this.form.elements.acad_year.value=''; this.form.elements.sem.value=''; this.form.elements.filter_action.value='filter'; this.form.submit()">
+                          <option value="">Choose Program</option>
+                          <?php foreach ($registrarStudentList['programs'] as $program): ?>
+                            <option value="<?= grades_e($program) ?>" <?= $selectedProgram === $program ? 'selected' : '' ?>>
+                              <?= grades_e($program) ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                      </label>
+                      <label>Assigned Professor
+                        <select name="faculty" required <?= $selectedProgram === '' ? 'disabled' : '' ?>
+                          onchange="this.form.elements.acad_year.value=''; this.form.elements.sem.value=''; this.form.elements.filter_action.value='filter'; this.form.submit()">
+                          <option value=""><?= $selectedProgram === '' ? 'Choose Program First' : 'Choose Professor' ?></option>
+                          <?php foreach ($registrarStudentList['faculty'] as $faculty): ?>
+                            <option value="<?= (int)$faculty['facultyID'] ?>" <?= $selectedFaculty === (int)$faculty['facultyID'] ? 'selected' : '' ?>>
+                              <?= grades_e($faculty['faculty_name']) ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                      </label>
+                      <label>Academic Year
+                        <select name="acad_year" required <?= $selectedFaculty <= 0 ? 'disabled' : '' ?>
+                          onchange="this.form.elements.sem.value=''; this.form.elements.filter_action.value='filter'; this.form.submit()">
+                          <option value=""><?= $selectedFaculty <= 0 ? 'Choose Professor First' : 'Choose Academic Year' ?></option>
+                          <?php foreach ($registrarStudentList['academic_years'] as $academicYear): ?>
+                            <option value="<?= grades_e($academicYear) ?>" <?= $selectedAcademicYear === $academicYear ? 'selected' : '' ?>>
+                              <?= grades_e(str_replace('-', '–', $academicYear)) ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                      </label>
+                      <label>Semester
+                        <select name="sem" required <?= $selectedAcademicYear === '' ? 'disabled' : '' ?>
+                          onchange="this.form.elements.filter_action.value='filter'; this.form.submit()">
+                          <option value=""><?= $selectedAcademicYear === '' ? 'Choose Academic Year First' : 'Choose Semester' ?></option>
+                          <?php foreach ($registrarStudentList['semesters'] as $semester): ?>
+                            <option value="<?= (int)$semester ?>" <?= $selectedSemester === (int)$semester ? 'selected' : '' ?>>
+                              <?= grades_e(GradesLogic::semesterLabel($selectedAcademicYear, $semester)) ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                      </label>
+                      <button class="gradebook-submit" type="submit" name="list_action" value="generate"
+                        <?= !$registrarFiltersReady ? 'disabled' : '' ?>>Generate List</button>
+                    </form>
+
+                    <?php if ($registrarListAction === 'generate' && $registrarFiltersReady): ?>
+                      <div class="class-preview-panel registrar-list-preview">
+                        <div class="class-grid">
+                          <?php if (!$registrarStudentList['schedules']): ?>
+                            <div class="gradebook-empty">No schedules were found for this professor and academic year.</div>
+                          <?php else: ?>
+                            <?php foreach ($registrarStudentList['schedules'] as $schedule): ?>
+                              <article class="class-card">
+                                <h3><?= grades_e($schedule['subject_code']) ?> - <?= grades_e($schedule['subject_name']) ?></h3>
+                                <ul class="class-meta">
+                                  <li><span class="stat-label">Program / Block:</span> <?= grades_e($schedule['program'] . $schedule['block']) ?></li>
+                                  <li><span class="stat-label">Term:</span> <?= grades_e(GradesLogic::semesterLabel($schedule['acad_year'], $schedule['sem'])) ?></li>
+                                  <li><span class="stat-label">Schedule:</span> <?= grades_e($schedule['day']) ?>, <?= grades_e(date('g:i A', strtotime($schedule['time_start']))) ?>–<?= grades_e(date('g:i A', strtotime($schedule['time_end']))) ?></li>
+                                  <li><span class="stat-label">Room:</span> <?= grades_e($schedule['roomID']) ?></li>
+                                  <li><span class="stat-label">Enrolled Students:</span> <?= (int)$schedule['student_count'] ?></li>
+                                </ul>
+                                <form method="get" action="<?= BASE_PATH ?>/grades">
+                                  <input type="hidden" name="program" value="<?= grades_e($selectedProgram) ?>">
+                                  <input type="hidden" name="faculty" value="<?= $selectedFaculty ?>">
+                                  <input type="hidden" name="acad_year" value="<?= grades_e($selectedAcademicYear) ?>">
+                                  <input type="hidden" name="sem" value="<?= $selectedSemester ?>">
+                                  <input type="hidden" name="schedule" value="<?= (int)$schedule['schedID'] ?>">
+                                  <button class="gradebook-submit" type="submit" name="list_action" value="preview"
+                                    <?= (int)$schedule['student_count'] === 0 ? 'disabled' : '' ?>>Preview Students</button>
+                                </form>
+                              </article>
+                            <?php endforeach; ?>
+                          <?php endif; ?>
+                        </div>
+                      </div>
+                    <?php elseif ($registrarListAction === 'preview' && $registrarFiltersReady): ?>
+                      <?php if ($registrarStudentList['selected_schedule']): ?>
+                        <section class="gradebook-panel verification-panel" aria-labelledby="selected-schedule-title">
+                          <h2 class="gradebook-heading" id="selected-schedule-title">
+                            <?= grades_e($registrarStudentList['selected_schedule']['subject_code']) ?> -
+                            <?= grades_e($registrarStudentList['selected_schedule']['program'] . $registrarStudentList['selected_schedule']['block']) ?>
+                            | <?= grades_e(GradesLogic::semesterLabel($registrarStudentList['selected_schedule']['acad_year'], $registrarStudentList['selected_schedule']['sem'])) ?>
+                          </h2>
+                          <a class="class-scope-btn grades-action-link registrar-schedule-back" href="<?= BASE_PATH ?>/grades?<?= http_build_query([
+                              'program' => $selectedProgram,
+                              'faculty' => $selectedFaculty,
+                              'acad_year' => $selectedAcademicYear,
+                              'sem' => $selectedSemester,
+                              'list_action' => 'generate',
+                          ]) ?>">Back to Schedules</a>
+                          <div class="verification-table-wrap">
+                            <table class="grade-table verification-table registrar-student-table">
+                              <thead>
+                                <tr>
+                                  <th>Student ID</th>
+                                  <th>Student Name</th>
+                                  <th>Program</th>
+                                  <th>Year</th>
+                                  <th>Block</th>
+                                  <th>Academic Year</th>
+                                  <th>Semester</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <?php if (!$registrarStudentList['rows']): ?>
+                                  <tr><td colspan="7" class="gradebook-empty">No approved enrolled students are assigned to this schedule.</td></tr>
+                                <?php else: ?>
+                                  <?php foreach ($registrarStudentList['rows'] as $student): ?>
+                                    <tr>
+                                      <td><?= grades_e($student['display_student_id']) ?></td>
+                                      <td><?= grades_e($student['name']) ?></td>
+                                      <td><?= grades_e($student['program']) ?></td>
+                                      <td><?= (int)$student['year_level'] ?></td>
+                                      <td><?= grades_e($student['block']) ?></td>
+                                      <td><?= grades_e(str_replace('-', '–', $student['acad_year'])) ?></td>
+                                      <td><?= grades_e(GradesLogic::semesterLabel($registrarStudentList['selected_schedule']['acad_year'], $registrarStudentList['selected_schedule']['sem'])) ?></td>
+                                    </tr>
+                                  <?php endforeach; ?>
+                                <?php endif; ?>
+                              </tbody>
+                            </table>
+                          </div>
+                        </section>
+                      <?php endif; ?>
+                    <?php endif; ?>
+                  </section>
+                  <section class="gradebook-panel verification-panel" aria-labelledby="registrar-verification-title">
+                    <h2 class="gradebook-heading" id="registrar-verification-title">Registrar Final Grade Verification</h2>
+                    <?php if (!$registrarSubmissions): ?>
+                      <div class="gradebook-empty">No coordinator-verified grades are awaiting final verification.</div>
+                    <?php else: ?>
+                      <?php foreach ($registrarSubmissions as $submission): ?>
+                        <article class="verification-card">
+                          <div class="verification-card-header">
+                            <div>
+                              <strong><?= grades_e($submission['subjectID']) ?><?= $submission['subject_name'] ? ' - ' . grades_e($submission['subject_name']) : '' ?></strong>
+                              <div><?= grades_e($submission['program'] . $submission['block']) ?> | <?= grades_e(GradesLogic::semesterLabel($submission['acad_year'], $submission['sem'])) ?></div>
+                              <small>Coordinator approved on <?= grades_e($submission['coordinator_verified_at']) ?></small>
+                            </div>
+                          </div>
+                          <form method="post" action="<?= BASE_PATH ?>/grades">
+                            <input type="hidden" name="action" value="registrar_review">
+                            <input type="hidden" name="csrf" value="<?= grades_e($csrf) ?>">
+                            <input type="hidden" name="submissionID" value="<?= (int)$submission['submissionID'] ?>">
+                            <div class="verification-table-wrap">
+                              <table class="grade-table verification-table">
+                                <thead><tr><th>Student ID</th><th>Student</th><th>Midterm</th><th>Final</th></tr></thead>
+                                <tbody>
+                                  <?php foreach ($submission['grades'] as $grade): ?>
+                                    <tr>
+                                      <td><?= grades_e($grade['display_student_id'] ?? ($grade['studentID'] ?? '')) ?></td>
+                                      <td><?= grades_e($grade['student_name'] ?? ('Student ' . $grade['studentID'])) ?></td>
+                                      <td><?= $grade['midterm'] === null ? '—' : grades_e(number_format((float)$grade['midterm'], 2)) ?></td>
+                                      <td><?= $grade['final'] === null ? '—' : grades_e(number_format((float)$grade['final'], 2)) ?></td>
+                                    </tr>
+                                  <?php endforeach; ?>
+                                </tbody>
+                              </table>
+                            </div>
+                            <label class="verification-remark">Remarks
+                              <textarea name="remark" rows="2" placeholder="Optional remarks"></textarea>
+                            </label>
+                            <div class="verification-actions">
+                              <button class="gradebook-submit verification-reject" type="submit" name="decision" value="reject">Reject</button>
+                              <button class="gradebook-submit" type="submit" name="decision" value="approve">Verify & Add Grades</button>
+                            </div>
+                          </form>
+                        </article>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </section>
+                <?php elseif ($view === 'gradebook' && $class && $roster): ?>
                   <section class="gradebook-panel" aria-labelledby="gradebook-class-title">
                     <h2 class="gradebook-heading" id="gradebook-class-title">
                       <?= grades_e($class['subject_code']) ?> - <?= grades_e($class['program'] . $class['block']) ?>

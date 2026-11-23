@@ -130,6 +130,36 @@ INSERT INTO `enrolled_subjects` (`enrolled_subjectID`, `enrollmentID`, `studentI
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `grade_submissions`
+--
+
+CREATE TABLE `grade_submissions` (
+  `submissionID` int UNSIGNED NOT NULL AUTO_INCREMENT,
+  `schedID` int UNSIGNED NOT NULL,
+  `enrollmentID` int UNSIGNED NOT NULL,
+  `subjectID` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `program` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `block` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `acad_year` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `sem` tinyint NOT NULL,
+  `submitted_by` int UNSIGNED NOT NULL,
+  `grade_data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+  `status` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'pending_coordinator',
+  `coordinatorID` int UNSIGNED DEFAULT NULL,
+  `coordinator_remark` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `coordinator_verified_at` datetime DEFAULT NULL,
+  `registrarID` int UNSIGNED DEFAULT NULL,
+  `registrar_remark` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+  `registrar_verified_at` datetime DEFAULT NULL,
+  `submitted_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`submissionID`),
+  KEY `grade_submission_status` (`status`),
+  KEY `grade_submission_class` (`schedID`,`enrollmentID`,`subjectID`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `enrollment_period`
 --
 

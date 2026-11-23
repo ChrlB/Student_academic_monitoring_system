@@ -26,7 +26,7 @@ $page = $_SESSION["page"] ?? "";
         <input type="button" value="SCHEDULE"></a>
     <?php endif ?>
     
-    <?php if(in_array($_SESSION["role"], ["program coordinator","dean","prof","student"])): ?>
+    <?php if(in_array($_SESSION["role"], ["program coordinator","dean","prof","registrar","student"])): ?>
       <a class="nav_buttons row GRADES" href="<?= BASE_PATH?>/grades">
         <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Grades.png" alt="" class="nav_button_icons"></div>
         <input type="button" value="GRADES"></a>
