@@ -705,6 +705,50 @@ class GradesLogic
         return $rows;
     }
 
+    public function coordinatorSubmission(int $submissionID): array
+    {
+        $role = strtolower(trim((string)($_SESSION['role'] ?? '')));
+        if (!in_array($role, ['program coordinator', 'dean'], true)) {
+            throw new RuntimeException('This account cannot verify grades.');
+        }
+
+        $params = [':submissionID' => $submissionID];
+        $programFilter = '';
+        if ($role === 'program coordinator') {
+            $program = trim((string)($_SESSION['program'] ?? ''));
+            if ($program === '') {
+                throw new RuntimeException('The coordinator account is not assigned to a program.');
+            }
+            $programFilter = ' AND gs.program = :program';
+            $params[':program'] = $program;
+        }
+
+        $rows = $this->all(
+            "SELECT gs.*, TRIM(s.name) AS subject_name,
+                    CONCAT(f.first_name, ' ', f.last_name) AS submitted_by_name
+             FROM grade_submissions gs
+             LEFT JOIN subjects s ON TRIM(s.subjectID) = TRIM(gs.subjectID)
+             LEFT JOIN faculty f ON f.facultyID = gs.submitted_by
+             WHERE gs.submissionID = :submissionID
+               AND gs.status = 'pending_coordinator'
+               $programFilter
+             LIMIT 1",
+            $params
+        );
+        if (!$rows) {
+            throw new RuntimeException('This submission is unavailable or has already been reviewed.');
+        }
+
+        $submission = $rows[0];
+        $submission['submissionID'] = (int)$submission['submissionID'];
+        $submission['grades'] = json_decode((string)$submission['grade_data'], true);
+        if (!is_array($submission['grades'])) {
+            throw new RuntimeException('The saved grade submission is invalid.');
+        }
+        $submission['grades'] = $this->enrichGradeStudentIds($submission['grades']);
+        return $submission;
+    }
+
     public function registrarSubmissions(): array
     {
         $rows = $this->all(
