@@ -537,6 +537,51 @@ class GradesLogic
         ];
     }
 
+    public function gradeSubmissionStates(array $class): array
+    {
+        $rows = $this->all(
+            "SELECT status, grade_data
+             FROM grade_submissions
+             WHERE schedID = :schedID
+               AND enrollmentID = :enrollmentID
+               AND TRIM(subjectID) = :subjectID
+             ORDER BY submissionID DESC",
+            [
+                ':schedID' => (int)$class['schedID'],
+                ':enrollmentID' => (int)$class['enrollmentID'],
+                ':subjectID' => $class['subject_code'],
+            ]
+        );
+
+        $states = [];
+        foreach ($rows as $row) {
+            $grades = json_decode((string)$row['grade_data'], true);
+            if (!is_array($grades)) {
+                throw new RuntimeException('The saved grade submission is invalid.');
+            }
+
+            foreach ($grades as $grade) {
+                if (!is_array($grade) || empty($grade['enrolled_subjectID'])) {
+                    throw new RuntimeException('The saved grade submission is invalid.');
+                }
+
+                $enrolledSubjectID = (string)$grade['enrolled_subjectID'];
+                if (isset($states[$enrolledSubjectID])) {
+                    continue;
+                }
+
+                $locked = in_array($row['status'], ['pending_coordinator', 'pending_registrar', 'approved'], true);
+                $states[$enrolledSubjectID] = [
+                    'locked' => $locked,
+                    'midterm' => $locked ? ($grade['midterm'] ?? null) : null,
+                    'final' => $locked ? ($grade['final'] ?? null) : null,
+                ];
+            }
+        }
+
+        return $states;
+    }
+
     private function normalizedGrade($value, $field, $studentID)
     {
         if ($value === null || $value === '') {
@@ -550,6 +595,10 @@ class GradesLogic
 
     public function submitGradesForVerification(array $class, array $gradeInputs): int
     {
+        if (!$gradeInputs) {
+            throw new InvalidArgumentException('There are no new grades to submit.');
+        }
+
         $page = max(1, (int)($_POST['page'] ?? 1));
         $roster = $this->classStudents($class, $page);
         $allowedRows = [];
@@ -557,9 +606,13 @@ class GradesLogic
             $allowedRows[(string)$student['enrolled_subjectID']] = $student;
         }
 
+        $submissionStates = $this->gradeSubmissionStates($class);
         foreach ($gradeInputs as $enrolledSubjectID => $grades) {
             if (!isset($allowedRows[(string)$enrolledSubjectID]) || !is_array($grades)) {
                 throw new InvalidArgumentException('The submitted grade list does not match this class roster.');
+            }
+            if (!empty($submissionStates[(string)$enrolledSubjectID]['locked'])) {
+                throw new InvalidArgumentException('A submitted grade cannot be changed unless the submission is rejected.');
             }
         }
 

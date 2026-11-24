@@ -182,6 +182,7 @@ if ($isProfessorAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act
 $classPreview = $isFacultyAccount ? $gradesLogic->classPreview($semesterKey) : [];
 $class = null;
 $roster = null;
+$gradeSubmissionStates = [];
 $coordinatorSubmissions = $isCoordinatorAccount && $view === 'preview'
     ? $gradesLogic->coordinatorSubmissions()
     : [];
@@ -222,6 +223,7 @@ if ($isFacultyAccount && $view === 'gradebook') {
     $class = $gradesLogic->assignedClass($scheduleID, $semesterKey);
     if ($class) {
         $roster = $gradesLogic->classStudents($class, (int)($_GET['page'] ?? 1));
+        $gradeSubmissionStates = $gradesLogic->gradeSubmissionStates($class);
     }
 }
 $csrf = $gradesLogic->csrfToken();
@@ -733,6 +735,11 @@ $csrf = $gradesLogic->csrfToken();
       border-radius: 8px;
       font: inherit;
       text-align: center;
+    }
+
+    .grade-table input[type="number"]:disabled {
+      opacity: 0.75;
+      cursor: not-allowed;
     }
 
     .grade-table input[type="number"]:focus-visible,
@@ -1630,6 +1637,18 @@ $csrf = $gradesLogic->csrfToken();
                     <h2 class="gradebook-heading" id="gradebook-class-title">
                       <?= grades_e($class['subject_code']) ?> - <?= grades_e($class['program'] . $class['block']) ?>
                     </h2>
+                    <?php
+                      $hasEditableGrades = false;
+                      $hasLockedGrades = false;
+                      foreach ($roster['rows'] as $student) {
+                          $state = $gradeSubmissionStates[(string)$student['enrolled_subjectID']] ?? null;
+                          if (!empty($state['locked'])) {
+                              $hasLockedGrades = true;
+                          } else {
+                              $hasEditableGrades = true;
+                          }
+                      }
+                    ?>
                     <form method="post" action="<?= BASE_PATH ?>/grades?<?= http_build_query([
                         'view' => 'gradebook',
                         'class' => $class['schedID'],
@@ -1642,6 +1661,9 @@ $csrf = $gradesLogic->csrfToken();
                       <input type="hidden" name="sem" value="<?= grades_e($semesterKey) ?>">
                       <input type="hidden" name="page" value="<?= (int)$roster['page'] ?>">
 
+                      <?php if ($hasLockedGrades): ?>
+                        <p class="gradebook-empty">Submitted grades are locked while awaiting verification and after approval.</p>
+                      <?php endif; ?>
                       <?php if (!$roster['rows']): ?>
                         <div class="gradebook-empty">No approved students are enrolled in this class block yet.</div>
                       <?php else: ?>
@@ -1659,9 +1681,15 @@ $csrf = $gradesLogic->csrfToken();
                             <tbody>
                               <?php foreach ($roster['rows'] as $student):
                                   $enrolledID = (string)$student['enrolled_subjectID'];
-                                  $old = $oldGrades[$enrolledID] ?? [];
-                                  $midterm = array_key_exists('midterm', $old) ? $old['midterm'] : $student['midterm_grade'];
-                                  $final = array_key_exists('final', $old) ? $old['final'] : $student['final_grade'];
+                                  $state = $gradeSubmissionStates[$enrolledID] ?? null;
+                                  $gradeLocked = !empty($state['locked']);
+                                  $old = $gradeLocked ? [] : ($oldGrades[$enrolledID] ?? []);
+                                  $midterm = $gradeLocked
+                                      ? $state['midterm']
+                                      : (array_key_exists('midterm', $old) ? $old['midterm'] : $student['midterm_grade']);
+                                  $final = $gradeLocked
+                                      ? $state['final']
+                                      : (array_key_exists('final', $old) ? $old['final'] : $student['final_grade']);
                               ?>
                                 <tr>
                                   <td><?= grades_e($student['display_student_id']) ?></td>
@@ -1669,12 +1697,14 @@ $csrf = $gradesLogic->csrfToken();
                                   <td>
                                     <input type="number" name="grades[<?= (int)$student['enrolled_subjectID'] ?>][midterm]"
                                       min="0" max="100" step="0.01" value="<?= grades_e($midterm) ?>"
-                                      aria-label="Midterm grade for <?= grades_e($student['name']) ?>">
+                                      aria-label="Midterm grade for <?= grades_e($student['name']) ?>"
+                                      <?= $gradeLocked ? 'disabled' : '' ?>>
                                   </td>
                                   <td>
                                     <input type="number" name="grades[<?= (int)$student['enrolled_subjectID'] ?>][final]"
                                       min="0" max="100" step="0.01" value="<?= grades_e($final) ?>"
-                                      aria-label="Final grade for <?= grades_e($student['name']) ?>">
+                                      aria-label="Final grade for <?= grades_e($student['name']) ?>"
+                                      <?= $gradeLocked ? 'disabled' : '' ?>>
                                   </td>
                                   <td data-semester-grade aria-label="Semester grade for <?= grades_e($student['name']) ?>">
                                     <?php if ($midterm !== '' && $midterm !== null && $final !== '' && $final !== null
@@ -1711,7 +1741,7 @@ $csrf = $gradesLogic->csrfToken();
                             ]) ?>" aria-label="Next page">&rsaquo;</a>
                           <?php endif; ?>
                         </div>
-                        <button class="gradebook-submit" type="submit">Submit Grade</button>
+                        <button class="gradebook-submit" type="submit" <?= !$hasEditableGrades ? 'disabled' : '' ?>>Submit Grade</button>
                       </div>
                     </form>
                   </section>
