@@ -59,22 +59,39 @@ function att_role_group(string $role): string {
 function att_has_elapsed_ratio(PDO $db, $startVal, $endVal, float $ratio = ATT_TIMEOUT_ELAPSED_RATIO): bool {
   if (empty($startVal) || empty($endVal)) return false;
   $st = $db->prepare("
-    SELECT CASE
-      WHEN TIMESTAMPDIFF(SECOND, ?, ?) <= 0 THEN 1
-      WHEN TIMESTAMPDIFF(SECOND, ?, NOW()) >= (TIMESTAMPDIFF(SECOND, ?, ?) * ?) THEN 1
-      ELSE 0
-    END
+    SELECT
+      TIMESTAMPDIFF(SECOND, ?, ?) AS total_sec,
+      TIMESTAMPDIFF(SECOND, ?, NOW()) AS elapsed_sec
   ");
-  $st->execute([$startVal, $endVal, $startVal, $endVal, $startVal, $endVal, (string)$ratio]);
-  return (bool)$st->fetchColumn();
+  $st->execute([$startVal, $endVal, $startVal]);
+  $row = $st->fetch(PDO::FETCH_ASSOC);
+  if (!$row) return false;
+
+  $totalSec   = (int)($row['total_sec'] ?? 0);
+  $elapsedSec = (int)($row['elapsed_sec'] ?? 0);
+  if ($totalSec <= 0) return true;
+
+  return $elapsedSec >= ($totalSec * $ratio);
 }
 
 # Time-out window is open only once at least 60% of [start, end] duration has elapsed
-function att_record_timeout(PDO $db, int $attendanceID, $startVal, $endVal, string $who): array {
-  if (!att_has_elapsed_ratio($db, $startVal, $endVal)) {
+function att_record_timeout(PDO $db, int $attendanceID, $startVal, $endVal, string $who, float $ratio = ATT_TIMEOUT_ELAPSED_RATIO): array {
+  if (!att_has_elapsed_ratio($db, $startVal, $endVal, $ratio)) {
+    $msg = 'Time-out window is not open yet: at least 60% of the event duration must elapse first.';
+    try {
+      $startDt  = new DateTime((string)$startVal);
+      $endDt    = new DateTime((string)$endVal);
+      $totalSec = max(0, $endDt->getTimestamp() - $startDt->getTimestamp());
+      $openSec  = (int)ceil($totalSec * $ratio);
+      $openDt   = (clone $startDt)->modify("+{$openSec} seconds");
+      $msg      = 'Event Time-Out window: (' . $openDt->format('g:i A') . ')';
+    } catch (Throwable $e) {
+      // keep fallback message if date parsing fails
+    }
+
     return [
       'status'  => 'error',
-      'message' => 'Time-out window is not open yet: at least 60% of the event duration must elapse first.',
+      'message' => $msg,
     ];
   }
 
@@ -149,11 +166,10 @@ if ($attGroup !== 'student' && $attFacultyID > 0) {
 }
 
 $isAuthorizedDepartment = ($attGroup === 'student') || ($attMyDept !== '' && in_array($attMyDept, $validDepartments, true));
-$attCanEdit = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($attPos, ['coordinator', 'dean'], true);   # only coordinator (own program) and dean (own department) manage events
+$attCanEdit = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($attPos, ['coordinator', 'dean'], true);
 $attCanScan = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($attPos, ['coordinator', 'faculty', 'dean'], true);
 $attIsDean  = ($attPos === 'dean');
 $attScoped  = ($attPos === 'coordinator');
-# Dean and registrar only manage their own department, and faculty is department-scoped
 $attDeptScoped = (in_array($attPos, ['dean', 'registrar'], true) && (string)$attMyDept !== '') || $attPos === 'faculty';
 $evpage     = ($attGroup !== 'student' && (!empty($_GET['events']) || !empty($_POST['events'])));
 if ($evpage) $_SESSION["page"] = "EVENTS | " . $attLabel;
@@ -236,7 +252,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
     exit;
   }
 
-  # Process QR/ID scan for time-in / time-out with department, event, and window checks
+  # Process QR/ID scan for time-in / time-out with event restriction checked before scope
   if ($attGroup !== 'student' && $act === 'scan') {
     att_sync_elapsed_events($db_connection);
     if (!$attCanScan || !$isAuthorizedDepartment) {
@@ -265,12 +281,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
       $who = att_title($stuRow['first_name'] . ' ' . $stuRow['last_name']);
       $studentProgram = strtoupper(trim((string)($stuRow['program'] ?? '')));
       $studentDept = strtoupper(trim((string)($stuRow['department'] ?? '')));
-      if ($attDeptScoped && $studentDept !== strtoupper(trim((string)$attMyDept))) {
-        att_json(['status' => 'error', 'message' => "$who is not in your department."]);
-      }
-      if ($attScoped && $studentProgram !== strtoupper(trim((string)$attMyProgram))) {
-        att_json(['status' => 'error', 'message' => "$who is not in your assigned program."]);
-      }
 
       $ev = $db_connection->prepare("
         SELECT eventID, status, program, department, datetime_Start, datetime_End,
@@ -295,6 +305,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
       }
       if ($eventProg === '' && $eventDept !== '' && $eventDept !== $studentDept) {
         att_json(['status' => 'error', 'message' => "$who belongs to department '$studentDept', but this event is restricted to department '$eventDept'."]);
+      }
+
+      if ($attDeptScoped && $studentDept !== strtoupper(trim((string)$attMyDept))) {
+        att_json(['status' => 'error', 'message' => "$who is not in your department."]);
+      }
+      if ($attScoped && $studentProgram !== strtoupper(trim((string)$attMyProgram))) {
+        att_json(['status' => 'error', 'message' => "$who is not in your assigned program."]);
       }
 
       $chk = $db_connection->prepare("
@@ -456,12 +473,10 @@ function att_student_scope_filters(PDO $db, array $stu): array {
     $evDept = strtoupper(trim((string)($r['department'] ?? '')));
     $evProg = strtoupper(trim((string)($r['program'] ?? '')));
 
-    # 1. Department check first
     if ($evDept !== '') {
       if ($dept === '' || $evDept !== $dept) continue;
     }
 
-    # 2. Program check second (if program is specified on the event, it must match student's program)
     if ($evProg !== '') {
       if ($prog === '' || $evProg !== $prog) continue;
     }
@@ -712,8 +727,6 @@ function att_handle_event_action(PDO $db, string $act): void {
     $remark = mb_substr(trim((string)($_POST['remark'] ?? '')), 0, 500);
     $remarkVal = null;
     $prog = strtoupper(trim((string)($_POST['program'] ?? '')));
-    # The dialog locks name/program for non-deans when editing; disabled fields are never submitted,
-    # so keep the stored values (otherwise every edit fails with "Enter the event name.")
     if (!$isDean && $act === 'edit_event' && $existing) {
       $name = (string)$existing['eventName'];
       $prog = strtoupper(trim((string)($existing['program'] ?? '')));
@@ -802,7 +815,6 @@ if ($course && !$dept) {
 $view  = ($getStr('view') === 'list') ? 'list' : 'grid';
 $sid   = $getStr('student');
 $stu   = ($sid !== '' && isset($students[$sid])) ? $students[$sid] : null;
-# Event filter lists only events that apply to this student's department/program (not every event in the system)
 if ($stu) $ATT_EVENT_NAMES = att_student_scope_filters($db_connection, $stu)['events'];
 $event = in_array($getStr('event'), $ATT_EVENT_NAMES, true) ? $getStr('event') : null;
 $yr    = (int)($_GET['year'] ?? 0);
@@ -909,9 +921,9 @@ if (isset($summary)) {
 
 foreach ([
   'validDepartments', 'attPos', 'attCanEdit', 'attScoped', 'attMyProgram', 'attMyDept',
-  'evpage', 'attCanScan', 'attIsDean', 'attFacultyID', 'q', 'dept', 'course', 'view',
-  'stu', 'event', 'year', 'sa_event', 'sa_year', 'sa_events', 'sa_years',
-  'currentActiveEvent', 'ATT_OPEN_EVENTS',
+  'evpage', 'attCanScan', 'attIsDean', 'attDeptScoped', 'isAuthorizedDepartment',
+  'attFacultyID', 'q', 'dept', 'course', 'view', 'stu', 'event', 'year',
+  'sa_event', 'sa_year', 'sa_events', 'sa_years', 'currentActiveEvent', 'ATT_OPEN_EVENTS',
 ] as $gKey) {
   if (isset($$gKey)) $GLOBALS[$gKey] = $$gKey;
 }
