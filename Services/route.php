@@ -123,6 +123,6 @@ $router->get('/download-document', fn() => downloadDocument());
 $router->get('/view-document', fn() => require __DIR__ . '/../View/document.php');
 
 $router->post('/file-maker', fn($request) => require __DIR__ . '/../View/file_maker.php');
-
+$router->post('/class-list-maker', fn($request) => require __DIR__ . '/../View/class_list_maker.php');
 
 $router->dispatch();

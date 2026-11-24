@@ -52,7 +52,11 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <?php if ($acadyear !== 'ALL'): ?>
                 <form method="post" action="<?= BASE_PATH ?>/file-maker">
                   <input type="hidden" name="acad_year_sem" value="<?= e($acadyear) ?>">
-                  <button type="submit">Download clearance form</button>
+                  
+                  <button type="submit" class="row" style="align-items:center">Download clearance form 
+                    <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons" style="width:40px">
+                  </button>
+                  
                 </form>
               <?php endif ?>
             </div>
@@ -1254,6 +1258,16 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             <?php if(!isset($_GET['edit'])): ?><?php  //var_dump($department.$search.$block.$year.$acadyear) ?>
               <div class="row" style="justify-content: space-between; align-items:center">
                 <b class="view_title"><?= $_GET['subjectID'].' - '.$_GET['name'] ?>  </b>
+
+                <form method="post" action="<?= BASE_PATH ?>/class-list-maker">
+                  <input type="hidden" name="subjectID" value="<?= e($_GET['subjectID']) ?>">
+                  <input type="hidden" name="block" value="<?= e($block) ?>">
+                  <input type="hidden" name="acad_year_sem" value="<?= e($acadyear) ?>">
+                  <button type="submit" class="row" style="align-items:center">Download class list 
+                    <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons" style="width:40px">
+                  </button>
+                </form>
+                
                 <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
               </div>
               <div>
@@ -1492,7 +1506,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                           
                           
                         </div>                    
-                      </div>
+                      </div>  
+                      
                       <form method="post" action="<?= BASE_PATH ?>/update_clearance"   class="column student_clearance_panel" style="gap: 20px; ">
                         REMARKS:
                         <textarea name="remarks" id="" style="min-width:500px; max-width:650px; height:150px; padding:20px" class="filter" ><?= htmlspecialchars($students_for_clearance['remarks'] ?? '')?>

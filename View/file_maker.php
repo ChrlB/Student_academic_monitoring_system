@@ -50,10 +50,18 @@ foreach ($sigs as $s) {
     if (strpos($role, 'coordinator') !== false) $coor = $s['name'];
 }
 
-$isCleared = fn($r) => strtolower(trim($r['status'] ?? '')) === 'cleared';
-$allCleared = count(array_filter($subjects, $isCleared)) === count($subjects);
+// $isCleared = fn($r) => strtolower(trim($r['status'] ?? '')) === 'cleared';
+// $allCleared = count(array_filter($subjects, $isCleared)) === count($subjects);
 
+$offices = $clearanceDAO->executeQuery('getClearanceFormOffices', [$studentCode, $term]);
 
+$isCleared  = fn($r) => strtolower(trim($r['status'] ?? '')) === 'cleared';
+$allCleared = count(array_filter(array_merge($subjects, $offices), $isCleared))
+              === count($subjects) + count($offices);
+
+if (!function_exists('e')) {
+    function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
+}
 
 $file = 'clearance_' . preg_replace('/[^A-Za-z0-9_-]/', '', $studentCode) . '.doc';
 
@@ -94,6 +102,7 @@ header('Content-Disposition: attachment; filename="' . $file . '"');
       <th>Subject</th>
       <th>Instructor</th>
       <th>Cleared</th>
+      <th>Signature</th>
     </tr>
     <?php foreach ($subjects as $r): ?>
     <tr>
@@ -101,13 +110,34 @@ header('Content-Disposition: attachment; filename="' . $file . '"');
       <td><?= e($r['name']) ?></td>
       <td><?= e($r['instructor'] ?? '') ?></td>
       <td class="c"><?= $isCleared($r) ? 'CLEARED' : '' ?></td>
+      <td ></td>
     </tr>
     <?php endforeach ?>
   </table>
 
   <?php if (!$allCleared): ?>
     <p><i>Note: some subjects are not yet cleared.</i></p>
+  <?php else: ?> 
+    <br>
   <?php endif ?>
+  <?php if ($offices): ?>
+    <table>
+      <tr>
+        <th>Office</th>
+        <th>Office Head</th>
+        <th>Cleared</th>
+      </tr>
+      <?php foreach ($offices as $o): ?>
+      <tr>
+        <td><?= e($o['name']) ?></td>
+        <td><?= e($o['office_head'] ?? '') ?></td>
+        <td class="c"><?= $isCleared($o) ? 'CLEARED' : 'NOT CLEARED' ?></td>
+      </tr>
+      <?php endforeach ?>
+    </table>
+    <br>
+  <?php endif ?>
+  
 
   <table style="margin-top:30px">
     <tr>
