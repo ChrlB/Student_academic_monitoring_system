@@ -7,6 +7,7 @@ if (!defined('ATT_DEBUG')) define('ATT_DEBUG', false);
 if (ATT_DEBUG) { ini_set('display_errors', 1); error_reporting(E_ALL); }
 
 const ATT_GRACE_MIN = 15;
+const ATT_TIMEOUT_ELAPSED_RATIO = 0.60;
 const ATT_EVENT_STATUSES = ['ACTIVE', 'INACTIVE', 'FINISHED', 'RESCHEDULE', 'PENDING'];
 
 # Escape output strings safely for HTML rendering
@@ -52,6 +53,39 @@ function att_role_group(string $role): string {
   if (preg_match('/coordinator|dean|registrar/', $r)) return 'manager';
   if (preg_match('/prof|faculty|instructor|teacher/', $r))  return 'faculty';
   return 'student';
+}
+
+# Check whether at least $ratio (e.g. 0.60) of [start, end] duration has elapsed
+function att_has_elapsed_ratio(PDO $db, $startVal, $endVal, float $ratio = ATT_TIMEOUT_ELAPSED_RATIO): bool {
+  if (empty($startVal) || empty($endVal)) return false;
+  $st = $db->prepare("
+    SELECT CASE
+      WHEN TIMESTAMPDIFF(SECOND, ?, ?) <= 0 THEN 1
+      WHEN TIMESTAMPDIFF(SECOND, ?, NOW()) >= (TIMESTAMPDIFF(SECOND, ?, ?) * ?) THEN 1
+      ELSE 0
+    END
+  ");
+  $st->execute([$startVal, $endVal, $startVal, $endVal, $startVal, $endVal, (string)$ratio]);
+  return (bool)$st->fetchColumn();
+}
+
+# Time-out window is open only once at least 60% of [start, end] duration has elapsed
+function att_record_timeout(PDO $db, int $attendanceID, $startVal, $endVal, string $who): array {
+  if (!att_has_elapsed_ratio($db, $startVal, $endVal)) {
+    return [
+      'status'  => 'error',
+      'message' => 'Time-out window is not open yet: at least 60% of the event duration must elapse first.',
+    ];
+  }
+
+  $db->prepare("UPDATE attendance SET timeout = NOW() WHERE attendanceID = ? AND timeout IS NULL")
+     ->execute([$attendanceID]);
+
+  return [
+    'status'  => 'success',
+    'message' => "Time-out recorded for $who.",
+    'type'    => 'timeout',
+  ];
 }
 
 # Sync ACTIVE event statuses based on current time (past end -> FINISHED)
@@ -239,7 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
       }
 
       $ev = $db_connection->prepare("
-        SELECT eventID, status, program, department,
+        SELECT eventID, status, program, department, datetime_Start, datetime_End,
                (NOW() BETWEEN datetime_Start - INTERVAL 30 MINUTE AND COALESCE(datetime_End, datetime_Start + INTERVAL 12 HOUR)) AS in_window
         FROM events WHERE eventID = ? OR eventName = ?
         ORDER BY (eventID = ?) DESC,
@@ -279,9 +313,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
         if ((int)$row['secs'] < 60) {
           att_json(['status' => 'info', 'message' => "$who just timed in. Scan again later to time out."]);
         }
-        $db_connection->prepare("UPDATE attendance SET timeout = NOW() WHERE attendanceID = ?")
-                      ->execute([(int)$row['attendanceID']]);
-        att_json(['status' => 'success', 'message' => "Time-out recorded for $who.", 'type' => 'timeout']);
+        att_json(att_record_timeout(
+          $db_connection,
+          (int)$row['attendanceID'],
+          $event['datetime_Start'],
+          $event['datetime_End'],
+          $who
+        ));
       }
       att_json(['status' => 'info', 'message' => "$who has already completed time-in and time-out for this event."]);
     } catch (Throwable $e) {
