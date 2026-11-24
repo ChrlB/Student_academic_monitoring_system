@@ -657,7 +657,7 @@ header a.att-back svg { display: block; width: 22px; height: 22px; min-width: 0;
   text-align: center;
 }
 
-.ev-top-edit:not([hidden]) {
+.att .ev-top-edit:not([hidden]) {
   position: absolute;
   right: 0;
   top: 50%;
@@ -666,6 +666,8 @@ header a.att-back svg { display: block; width: 22px; height: 22px; min-width: 0;
   align-items: center;
   justify-content: center;
   margin-left: auto;
+  transition: none !important;
+  animation: none !important;
 }
 
 #ev-remark {
