@@ -91,6 +91,29 @@ if ($isCoordinatorAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['a
     exit;
 }
 
+if ($isRegistrarAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'registrar_allow_edit') {
+    try {
+        if (!hash_equals($gradesLogic->csrfToken(), (string)($_POST['csrf'] ?? ''))) {
+            throw new InvalidArgumentException('Your form session expired. Reload the page and try again.');
+        }
+        $gradesLogic->registrarAllowGradeEdit((int)($_POST['submissionID'] ?? 0));
+        $_SESSION['grades_flash'] = [
+            'type' => 'success',
+            'message' => 'The professor can now edit and resubmit these grades for verification.',
+        ];
+    } catch (Throwable $e) {
+        error_log('Registrar grade edit permission failed: ' . $e->getMessage());
+        $_SESSION['grades_flash'] = [
+            'type' => 'error',
+            'message' => $e instanceof InvalidArgumentException || $e instanceof RuntimeException
+                ? $e->getMessage()
+                : 'Unable to allow grade edits. Please try again.',
+        ];
+    }
+    header('Location: ' . BASE_PATH . '/grades');
+    exit;
+}
+
 if ($isRegistrarAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'registrar_review') {
     try {
         if (!hash_equals($gradesLogic->csrfToken(), (string)($_POST['csrf'] ?? ''))) {
@@ -203,11 +226,13 @@ if ($isCoordinatorAccount && $view === 'verification') {
     }
 }
 $registrarSubmissions = $isRegistrarAccount ? $gradesLogic->registrarSubmissions() : [];
+$registrarApprovedSubmissions = $isRegistrarAccount ? $gradesLogic->registrarApprovedSubmissions() : [];
 $requestedRegistrarListAction = $_GET['list_action'] ?? $_GET['filter_action'] ?? '';
 $registrarListAction = in_array($requestedRegistrarListAction, ['filter', 'generate', 'preview'], true)
     ? (string)$requestedRegistrarListAction
     : '';
 $registrarStudentList = $isRegistrarAccount ? $gradesLogic->registrarStudentList([
+    'department' => $_GET['department'] ?? '',
     'program' => $_GET['program'] ?? '',
     'acad_year' => $_GET['acad_year'] ?? '',
     'faculty' => $_GET['faculty'] ?? '',
@@ -524,10 +549,6 @@ $csrf = $gradesLogic->csrfToken();
       border: 1px solid rgba(255,255,255,0.7);
       border-radius: 14px;
       background: rgba(74, 43, 79, 0.72);
-    }
-
-    .faculty-grades .class-preview-panel {
-      margin-top: -40px;
     }
 
     .class-card {
@@ -931,7 +952,7 @@ $csrf = $gradesLogic->csrfToken();
 
     .registrar-list-filters {
       display: grid;
-      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 10px;
       margin: 12px 0 16px;
       color: #fff;
@@ -939,13 +960,17 @@ $csrf = $gradesLogic->csrfToken();
 
     .registrar-list-filters label {
       display: grid;
+      min-width: 0;
       gap: 5px;
       font-size: 0.88rem;
       font-weight: 700;
     }
 
     .registrar-list-filters select {
+      width: 100%;
+      min-width: 0;
       min-height: 38px;
+      box-sizing: border-box;
       border: 1px solid rgba(255,255,255,0.55);
       border-radius: 8px;
       padding: 7px 9px;
@@ -1001,7 +1026,7 @@ $csrf = $gradesLogic->csrfToken();
 
     @media (max-width: 900px) {
       .registrar-list-filters {
-        grid-template-columns: repeat(2, minmax(140px, 1fr));
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
@@ -1450,6 +1475,7 @@ $csrf = $gradesLogic->csrfToken();
                   <section class="gradebook-panel verification-panel" aria-labelledby="registrar-student-list-title">
                     <h2 class="gradebook-heading" id="registrar-student-list-title">Enrolled Student List</h2>
                     <?php
+                      $selectedDepartment = trim((string)($_GET['department'] ?? ''));
                       $selectedProgram = trim((string)($_GET['program'] ?? ''));
                       $selectedFaculty = (int)($_GET['faculty'] ?? 0);
                       $selectedAcademicYear = (string)($_GET['acad_year'] ?? '');
@@ -1458,10 +1484,21 @@ $csrf = $gradesLogic->csrfToken();
                     ?>
                     <form class="registrar-list-filters" method="get" action="<?= BASE_PATH ?>/grades">
                       <input type="hidden" name="filter_action" value="filter">
+                      <label>Department
+                        <select name="department" required
+                          onchange="this.form.elements.program.value=''; this.form.elements.faculty.value=''; this.form.elements.acad_year.value=''; this.form.elements.sem.value=''; this.form.elements.filter_action.value='filter'; this.form.submit()">
+                          <option value="">Choose Department</option>
+                          <?php foreach ($registrarStudentList['departments'] as $department): ?>
+                            <option value="<?= grades_e($department['department']) ?>" <?= $selectedDepartment === $department['department'] ? 'selected' : '' ?>>
+                              <?= grades_e($department['department'] . ' — ' . $department['name']) ?>
+                            </option>
+                          <?php endforeach; ?>
+                        </select>
+                      </label>
                       <label>Program
-                        <select name="program" required
+                        <select name="program" required <?= $selectedDepartment === '' ? 'disabled' : '' ?>
                           onchange="this.form.elements.faculty.value=''; this.form.elements.acad_year.value=''; this.form.elements.sem.value=''; this.form.elements.filter_action.value='filter'; this.form.submit()">
-                          <option value="">Choose Program</option>
+                          <option value=""><?= $selectedDepartment === '' ? 'Choose Department First' : 'Choose Program' ?></option>
                           <?php foreach ($registrarStudentList['programs'] as $program): ?>
                             <option value="<?= grades_e($program) ?>" <?= $selectedProgram === $program ? 'selected' : '' ?>>
                               <?= grades_e($program) ?>
@@ -1523,6 +1560,7 @@ $csrf = $gradesLogic->csrfToken();
                                   <li><span class="stat-label">Enrolled Students:</span> <?= (int)$schedule['student_count'] ?></li>
                                 </ul>
                                 <form method="get" action="<?= BASE_PATH ?>/grades">
+                                  <input type="hidden" name="department" value="<?= grades_e($selectedDepartment) ?>">
                                   <input type="hidden" name="program" value="<?= grades_e($selectedProgram) ?>">
                                   <input type="hidden" name="faculty" value="<?= $selectedFaculty ?>">
                                   <input type="hidden" name="acad_year" value="<?= grades_e($selectedAcademicYear) ?>">
@@ -1545,6 +1583,7 @@ $csrf = $gradesLogic->csrfToken();
                             | <?= grades_e(GradesLogic::semesterLabel($registrarStudentList['selected_schedule']['acad_year'], $registrarStudentList['selected_schedule']['sem'])) ?>
                           </h2>
                           <a class="class-scope-btn grades-action-link registrar-schedule-back" href="<?= BASE_PATH ?>/grades?<?= http_build_query([
+                              'department' => $selectedDepartment,
                               'program' => $selectedProgram,
                               'faculty' => $selectedFaculty,
                               'acad_year' => $selectedAcademicYear,
@@ -1632,6 +1671,41 @@ $csrf = $gradesLogic->csrfToken();
                       <?php endforeach; ?>
                     <?php endif; ?>
                   </section>
+                  <section class="gradebook-panel verification-panel" aria-labelledby="registrar-edit-grant-title">
+                    <h2 class="gradebook-heading" id="registrar-edit-grant-title">Allow Grade Edits</h2>
+                    <p class="gradebook-empty">
+                      Allowing edits unlocks this submission in the professor's gradebook. Resubmitted grades will go through verification again.
+                    </p>
+                    <?php if (!$registrarApprovedSubmissions): ?>
+                      <div class="gradebook-empty">There are no approved grade submissions available to reopen.</div>
+                    <?php else: ?>
+                      <?php foreach ($registrarApprovedSubmissions as $submission): ?>
+                        <article class="verification-card">
+                          <div class="verification-card-header">
+                            <strong>
+                              <?= grades_e($submission['subjectID']) ?>
+                              <?= $submission['subject_name'] ? ' - ' . grades_e($submission['subject_name']) : '' ?>
+                            </strong>
+                            <div>
+                              <?= grades_e($submission['program'] . $submission['block']) ?>
+                              | <?= grades_e(GradesLogic::semesterLabel($submission['acad_year'], $submission['sem'])) ?>
+                            </div>
+                            <small>
+                              Professor: <?= grades_e($submission['submitted_by_name'] ?: 'Professor') ?>
+                              | <?= count($submission['grades']) ?> students
+                              | Approved <?= grades_e($submission['registrar_verified_at']) ?>
+                            </small>
+                          </div>
+                          <form class="verification-actions" method="post" action="<?= BASE_PATH ?>/grades">
+                            <input type="hidden" name="action" value="registrar_allow_edit">
+                            <input type="hidden" name="csrf" value="<?= grades_e($csrf) ?>">
+                            <input type="hidden" name="submissionID" value="<?= (int)$submission['submissionID'] ?>">
+                            <button class="gradebook-submit" type="submit">Allow Professor to Edit</button>
+                          </form>
+                        </article>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </section>
                 <?php elseif ($view === 'gradebook' && $class && $roster): ?>
                   <section class="gradebook-panel" aria-labelledby="gradebook-class-title">
                     <h2 class="gradebook-heading" id="gradebook-class-title">
@@ -1640,12 +1714,16 @@ $csrf = $gradesLogic->csrfToken();
                     <?php
                       $hasEditableGrades = false;
                       $hasLockedGrades = false;
+                      $hasEditAllowedGrades = false;
                       foreach ($roster['rows'] as $student) {
                           $state = $gradeSubmissionStates[(string)$student['enrolled_subjectID']] ?? null;
                           if (!empty($state['locked'])) {
                               $hasLockedGrades = true;
                           } else {
                               $hasEditableGrades = true;
+                          }
+                          if (!empty($state['edit_allowed'])) {
+                              $hasEditAllowedGrades = true;
                           }
                       }
                     ?>
@@ -1663,6 +1741,9 @@ $csrf = $gradesLogic->csrfToken();
 
                       <?php if ($hasLockedGrades): ?>
                         <p class="gradebook-empty">Submitted grades are locked while awaiting verification and after approval.</p>
+                      <?php endif; ?>
+                      <?php if ($hasEditAllowedGrades): ?>
+                        <p class="gradebook-empty">The registrar allowed edits to these submitted grades. Resubmit them for verification when finished.</p>
                       <?php endif; ?>
                       <?php if (!$roster['rows']): ?>
                         <div class="gradebook-empty">No approved students are enrolled in this class block yet.</div>
