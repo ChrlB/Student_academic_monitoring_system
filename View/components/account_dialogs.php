@@ -93,10 +93,11 @@ $box = function (string $name, string $label, string $value, string $w, string $
       </div>
 
       <h3 class="dlg-sub">Current Address</h3>
+      <?php /* Region > Province > Municipality are filled by View/script/address.js (PSGC list); the chosen names post as before */ ?>
       <div class="df-row">
-        <?php $box('region', 'Region', $val('region', $a['region']), 'w3', 'text', [], false, true); ?>
-        <?php $box('province', 'Province', $val('province', $a['province']), 'w3', 'text', [], false, true); ?>
-        <?php $box('municipality', 'Municipality', $val('municipality', $a['municipality']), 'w3', 'text', [], false, true); ?>
+        <?php $vreg = $val('region', $a['region']); $box('region', 'Region', $vreg, 'w3', 'select', $vreg !== '' ? [$vreg] : [], false, true); ?>
+        <?php $vpro = $val('province', $a['province']); $box('province', 'Province', $vpro, 'w3', 'select', $vpro !== '' ? [$vpro] : [], false, true); ?>
+        <?php $vmun = $val('municipality', $a['municipality']); $box('municipality', 'Municipality', $vmun, 'w3', 'select', $vmun !== '' ? [$vmun] : [], false, true); ?>
         <?php $box('street', 'House No/Lot No/Street', $val('street', $a['street']), 'w4'); ?>
         <?php $box('zip_code', 'Zip Code', $val('zip_code', $a['zip']), 'w2', 'text', [], false, true); ?>
       </div>

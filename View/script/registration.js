@@ -1,3 +1,10 @@
+/* View/script/registration.js : registrar page.
+   - search box + role chips filter the table (everything is already on the page)
+   - Add posts to /registration-add, Restrict / Lift posts to /registration-restrict
+   - Edit posts to /registration-update; Archive / Restore post to /registration-archive;
+     permanent Delete (Archived tab only) posts to /registration-delete
+   - Logs opens the account activity log (/registration-logs: newest first, searchable, 40 at a time)
+   - the table updates in place, no reload */
 (function () {
   'use strict';
 
@@ -32,23 +39,42 @@
   function rows() {
     return [].slice.call(body.querySelectorAll('tr'));
   }
+  function isArchivedRow(tr) {
+    return tr.dataset.archived === '1';
+  }
+  // the Archived chip shows only archived accounts; every other chip shows only active (non-archived) ones
+  function inScope(tr) {
+    return (filter === 'archived') === isArchivedRow(tr);
+  }
   function matchesFilter(tr) {
-    if (filter === 'all') return true;
+    if (filter === 'all' || filter === 'archived') return true;
     if (filter === 'faculty') return tr.dataset.kind === 'faculty';
     return tr.dataset.role === filter;
   }
   function applyFilter() {
     var q = searchInput.value.trim().toLowerCase();
     var shown = 0,
-      all = rows();
-    all.forEach(function (tr) {
+      total = 0,
+      archivedView = filter === 'archived';
+    rows().forEach(function (tr) {
+      var scoped = inScope(tr);
+      if (scoped) total++;
       var ok =
-        matchesFilter(tr) && (q === '' || tr.dataset.search.indexOf(q) !== -1);
+        scoped &&
+        matchesFilter(tr) &&
+        (q === '' || tr.dataset.search.indexOf(q) !== -1);
       tr.hidden = !ok;
       if (ok) shown++;
     });
     countEl.textContent =
-      'Showing ' + shown + ' of ' + all.length + ' accounts';
+      'Showing ' +
+      shown +
+      ' of ' +
+      total +
+      (archivedView ? ' archived accounts' : ' accounts');
+    emptyEl.textContent = archivedView
+      ? 'No archived accounts.'
+      : 'No accounts match.';
     emptyEl.hidden = shown !== 0;
   }
   chips.forEach(function (chip) {
@@ -80,6 +106,8 @@
     tr.dataset.account = JSON.stringify(a);
     tr.dataset.kind = a.kind;
     tr.dataset.role = a.role;
+    tr.dataset.archived = a.archived ? '1' : '0';
+    tr.classList.toggle('is-archived', !!a.archived);
     tr.dataset.search = (
       a.name +
       ' ' +
@@ -89,13 +117,7 @@
       ' ' +
       a.programBlock +
       ' ' +
-      a.roleLabel +
-      ' ' +
-      (a.assignments || [])
-        .map(function (x) {
-          return x.name + ' ' + x.label;
-        })
-        .join(' ')
+      a.roleLabel
     ).toLowerCase();
     tr.textContent = '';
     var th = el('th', '', a.name);
@@ -111,102 +133,49 @@
       role.appendChild(el('span', 'tag', 'Faculty'));
     }
     tr.appendChild(role);
-    tr.appendChild(assignedCell(a));
     var st = el('td');
-    st.appendChild(
-      el(
-        'span',
-        'status status-' + a.status,
-        a.status === 'restricted' ? 'Restricted' : 'Active',
-      ),
-    );
+    if (a.archived) {
+      var arch = el('span', 'status status-archived', 'Archived');
+      if (a.archivedAt) arch.title = 'Archived on ' + a.archivedAt;
+      st.appendChild(arch);
+    } else {
+      st.appendChild(
+        el(
+          'span',
+          'status status-' + a.status,
+          a.status === 'restricted' ? 'Restricted' : 'Active',
+        ),
+      );
+    }
     tr.appendChild(st);
     var act = el('td', 'reg-row-actions');
-    act.appendChild(rowButton('edit', 'Edit', a));
-    act.appendChild(rowButton('delete', 'Delete', a));
-    tr.appendChild(act);
-  }
-  var NS = 'http://www.w3.org/2000/svg';
-  function icon(paths, cls) {
-    var svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('viewBox', '0 0 24 24');
-    svg.setAttribute('aria-hidden', 'true');
-    if (cls) svg.setAttribute('class', cls);
-    paths.forEach(function (d) {
-      var p = document.createElementNS(NS, 'path');
-      p.setAttribute('d', d);
-      svg.appendChild(p);
-    });
-    return svg;
-  }
-  var PERSON_CHECK = [
-    'M9.5 4.4a3.6 3.6 0 100 7.2 3.6 3.6 0 000-7.2z',
-    'M3 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6',
-    'M16.5 11.5l2 2 3.5-4',
-  ];
-
-  /* the "Assigned Professors" cell: a student shows one chip per professor (+ Add Prof), a faculty shows a count */
-  function assignedCell(a) {
-    var td = el('td', 'reg-asg');
-    if (a.kind === 'faculty') {
-      if (a.role === 'registrar') {
-        td.appendChild(el('span', 'asg-none', '—'));
-        return td;
-      }
-      var n = a.assignedCount || 0;
-      var pill = el('span', 'asg-pill');
-      pill.appendChild(
-        icon([
-          'M8.5 6a3 3 0 100 6 3 3 0 000-6z',
-          'M3 19c0-3 2.4-5 5.5-5s5.5 2 5.5 5',
-          'M17 6.6a2.4 2.4 0 100 4.8 2.4 2.4 0 000-4.8z',
-          'M16 14.2c2.7-.3 5 1.3 5 4.3',
-        ]),
-      );
-      pill.appendChild(
-        document.createTextNode(n + ' assigned student' + (n === 1 ? '' : 's')),
-      );
-      td.appendChild(pill);
-      return td;
+    if (a.archived) {
+      // archived accounts: look, bring back, or delete for good
+      act.appendChild(rowButton('view', 'View', a));
+      act.appendChild(rowButton('restore', 'Restore', a));
+      act.appendChild(rowButton('delete', 'Delete', a));
+    } else {
+      act.appendChild(rowButton('edit', 'Edit', a));
+      act.appendChild(rowButton('archive', 'Archive', a));
     }
-    var list = a.assignments || [];
-    list.forEach(function (x) {
-      var chip = el(
-        'div',
-        'asg-chip' + (x.type === 'adviser' ? ' is-adviser' : ''),
-      );
-      chip.appendChild(icon(PERSON_CHECK, 'asg-chip-ic'));
-      var txt = el('span', 'asg-chip-txt');
-      txt.appendChild(el('b', '', x.name));
-      txt.appendChild(el('small', '', x.label));
-      chip.appendChild(txt);
-      var rm = el('button', 'asg-x', '\u00d7');
-      rm.type = 'button';
-      rm.dataset.asgRemove = x.id;
-      rm.setAttribute(
-        'aria-label',
-        'Remove ' + x.name + ' (' + x.label + ') from ' + a.name,
-      );
-      chip.appendChild(rm);
-      td.appendChild(chip);
-    });
-    var add = el('button', 'asg-add');
-    add.type = 'button';
-    add.dataset.asgAdd = a.id;
-    add.setAttribute(
-      'aria-label',
-      (list.length ? 'Add a professor to ' : 'Assign a professor to ') + a.name,
-    );
-    add.appendChild(icon(list.length ? ['M12 5v14M5 12h14'] : PERSON_CHECK));
-    add.appendChild(
-      document.createTextNode(list.length ? 'Add Prof' : 'Assign Prof'),
-    );
-    td.appendChild(add);
-    return td;
+    tr.appendChild(act);
   }
   var ROW_ICONS = {
     edit: ['M4 20h4l10-10-4-4L4 16z', 'M13 7l4 4'],
+    archive: ['M4 7h16v3H4zM6 10v9h12v-9M10 14h4'],
+    restore: ['M4 12a8 8 0 108-8M4 4v5h5'],
+    view: [
+      'M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z',
+      'M12 9.2a2.8 2.8 0 100 5.6 2.8 2.8 0 000-5.6z',
+    ],
     delete: ['M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10.5 11v5M13.5 11v5'],
+  };
+  var LOCK_WORD = {
+    edit: 'edited',
+    archive: 'archived',
+    restore: 'restored',
+    delete: 'deleted',
+    view: 'viewed',
   };
   function rowButton(kind, label, a) {
     var b = el('button', 'row-btn row-btn-' + kind);
@@ -215,10 +184,7 @@
     b.setAttribute('aria-label', label + ' ' + a.name);
     if (a.locked) {
       b.disabled = true;
-      b.title =
-        'This account cannot be ' +
-        (kind === 'edit' ? 'edited' : 'deleted') +
-        ' here';
+      b.title = 'This account cannot be ' + LOCK_WORD[kind] + ' here';
     }
     var NS = 'http://www.w3.org/2000/svg';
     var svg = document.createElementNS(NS, 'svg');
@@ -337,6 +303,102 @@
     else toast(data.message || 'Something went wrong.', true);
   }
 
+  /* ---------- department follows the program ---------- */
+  /* cfg.programs is {"BSCS": "CCS", ...}. Students, coordinators and professors get their department from the
+     program they type; only a dean (no program) picks a department by hand. The server does the same lookup. */
+  var programDepts = {};
+  try {
+    programDepts = JSON.parse(cfg.programs || '{}');
+  } catch (e) {
+    programDepts = {};
+  }
+  function programCode(text) {
+    var m = String(text || '')
+      .toUpperCase()
+      .trim()
+      .match(/^([A-Z]+) ?(?:[1-6][A-Z])?$/);
+    return m ? m[1] : '';
+  }
+  function autoDept(form, pb, role) {
+    var sel = form.elements.department;
+    if (role === 'Dean') {
+      sel.disabled = false;
+      return;
+    }
+    sel.disabled = true;
+    var d = programDepts[programCode(pb.value)];
+    sel.value = d || '';
+  }
+
+  /* ---------- name format: "Last Name, Middle Initial, First Name" ---------- */
+  /* Same rules as regParseName() on the server; the preview shows how the box will be read before saving. */
+  function nameWordsOk(name) {
+    return name.split(' ').every(function (w) {
+      var core = w.replace(/\.$/, '');
+      return (
+        core.length >= 2 &&
+        /^[A-Za-z\u00C0-\u024F][A-Za-z\u00C0-\u024F'\-]*$/.test(core)
+      );
+    });
+  }
+  function parseName(raw) {
+    var t = String(raw || '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!t) return { empty: true };
+    var fmt =
+      'Use the format: Last Name, Middle Initial, First Name (e.g. Fazbear, D., Freddie).';
+    if (t.indexOf(',') < 0) return { error: fmt };
+    var p = t.split(',').map(function (x) {
+      return x.trim();
+    });
+    if (p.length === 2) p = [p[0], '', p[1]];
+    else if (p.length !== 3) return { error: fmt };
+    var last = p[0],
+      mid = p[1].replace(/\.$/, ''),
+      first = p[2];
+    if (!last || !first)
+      return { error: 'The last name and the first name are both required.' };
+    if (!nameWordsOk(last) || !nameWordsOk(first))
+      return {
+        error:
+          'The last and first names must be whole names without initials or symbols. The middle initial goes in the middle: Last Name, M., First Name.',
+      };
+    if (mid && !/^[A-Za-z\u00C0-\u024F]$/.test(mid))
+      return {
+        error:
+          'The middle part must be a single letter (the middle initial), e.g. D',
+      };
+    return { first: first, mid: mid.toUpperCase(), last: last };
+  }
+  function bindNamePreview(input, out) {
+    function show() {
+      var r = parseName(input.value);
+      out.classList.remove('is-bad');
+      if (r.empty) {
+        out.textContent = '';
+        return;
+      }
+      if (r.error) {
+        out.textContent = r.error;
+        out.classList.add('is-bad');
+        return;
+      }
+      out.textContent =
+        'Last name: ' +
+        r.last +
+        '  \u00B7  First name: ' +
+        r.first +
+        (r.mid ? '  \u00B7  Middle initial: ' + r.mid + '.' : '');
+    }
+    input.addEventListener('input', show);
+    input.form.addEventListener('reset', function () {
+      setTimeout(show, 0);
+    });
+    show();
+    return show;
+  }
+
   /* ---------- Add ---------- */
   var addDlg = document.getElementById('add-dialog');
   var addForm = document.getElementById('add-form');
@@ -363,8 +425,16 @@
         (r === 'Professor' ? 'professor teaches in' : 'coordinator handles') +
         ', e.g. <b>BSCS</b>.';
     }
+    autoDept(addForm, pbInput, r);
   }
   roleSel.addEventListener('change', syncRole);
+  var showAddName = bindNamePreview(
+    addForm.elements.full_name,
+    document.getElementById('add-name-preview'),
+  );
+  pbInput.addEventListener('input', function () {
+    autoDept(addForm, pbInput, roleSel.value);
+  });
 
   document
     .querySelector('[data-action="open-add"]')
@@ -382,12 +452,31 @@
     e.preventDefault();
     if (addBusy) return;
     clearErrors(addForm);
+    // a swapped first/last name is still a valid name, so ask the registrar to confirm how it was read
+    var nm = parseName(addForm.elements.full_name.value);
+    if (
+      nm.first &&
+      !window.confirm(
+        'Register this name?\n\nLast name: ' +
+          nm.last +
+          '\nFirst name: ' +
+          nm.first +
+          (nm.mid ? '\nMiddle initial: ' + nm.mid + '.' : '') +
+          '\n\nPress OK only if the first and last name are not swapped.',
+      )
+    )
+      return;
     var params = new URLSearchParams();
-    ['full_name', 'school_id', 'department', 'program_block', 'role'].forEach(
-      function (k) {
-        params.set(k, addForm.elements[k].value);
-      },
-    );
+    [
+      'full_name',
+      'email',
+      'school_id',
+      'department',
+      'program_block',
+      'role',
+    ].forEach(function (k) {
+      params.set(k, addForm.elements[k].value);
+    });
     addBusy = true;
     var btn = addForm.querySelector('button[type="submit"]');
     btn.disabled = true;
@@ -410,6 +499,37 @@
           ') was registered.';
         document.getElementById('done-id').textContent = data.account.id;
         document.getElementById('done-pw').textContent = data.tempPassword;
+        // with an email on file, one click opens the registrar's own mail app with the login details filled in
+        var mailBtn = document.getElementById('done-mail'),
+          mailNote = document.getElementById('done-mailnote');
+        if (data.account.email) {
+          var loginUrl = window.location.href.replace(
+            /\/registration.*$/,
+            '/login',
+          );
+          var mailBody =
+            'Hello,\n\nYour account has been created.\n\nSchool ID: ' +
+            data.account.id +
+            '\nTemporary password: ' +
+            data.tempPassword +
+            '\nLogin: ' +
+            loginUrl +
+            '\n\nPlease log in and change your password right away. Do not share it with anyone.';
+          mailBtn.href =
+            'mailto:' +
+            encodeURIComponent(data.account.email) +
+            '?subject=' +
+            encodeURIComponent('Your account details') +
+            '&body=' +
+            encodeURIComponent(mailBody);
+          mailBtn.hidden = false;
+          mailNote.textContent =
+            'An email address is on file: use "Email to student" to send it.';
+        } else {
+          mailBtn.hidden = true;
+          mailNote.textContent =
+            'No email on file: give it to the person in person.';
+        }
         openDialog(document.getElementById('done-dialog'));
         tr.scrollIntoView({ block: 'nearest' });
       })
@@ -549,32 +669,33 @@
   body.addEventListener('click', function (e) {
     var tr = e.target.closest('tr');
     if (!tr) return;
-    var asgAdd = e.target.closest('[data-asg-add]');
-    if (asgAdd) {
-      openAssign(asgAdd.dataset.asgAdd);
-      return;
-    }
-    var asgRm = e.target.closest('[data-asg-remove]');
-    if (asgRm) {
-      unassign(accountOf(tr).id, asgRm.dataset.asgRemove, asgRm);
-      return;
-    }
     var btn = e.target.closest('[data-row-action]');
     if (btn) {
-      // Edit / Delete buttons: do not also open the Restrict dialog
+      // row buttons: do not also open the Restrict dialog
       e.stopPropagation();
       if (btn.disabled) return;
-      if (btn.dataset.rowAction === 'edit') openEdit(accountOf(tr));
-      else openDelete(accountOf(tr));
+      var act = btn.dataset.rowAction,
+        acct = accountOf(tr);
+      if (act === 'edit') openEdit(acct);
+      else if (act === 'view') openEdit(acct, true);
+      else if (act === 'archive') openArchive(acct);
+      else if (act === 'restore') restoreAccount(acct, btn);
+      else openDelete(acct);
       return;
     }
-    openRestrict(accountOf(tr));
+    rowOpen(accountOf(tr));
   });
+  // clicking an active row opens Restrict as before; an archived row opens its details (read only)
+  function rowOpen(a) {
+    if (!a) return;
+    if (a.archived) openEdit(a, true);
+    else openRestrict(a);
+  }
   body.addEventListener('keydown', function (e) {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.tagName === 'TR') {
       // (buttons inside the row keep their own keys)
       e.preventDefault();
-      openRestrict(accountOf(e.target));
+      rowOpen(accountOf(e.target));
     }
   });
 
@@ -606,17 +727,47 @@
       editPb.placeholder = 'e.g. BSCS';
       editHint.innerHTML = 'Enter the program, e.g. <b>BSCS</b>.';
     }
+    autoDept(editForm, editPb, editKind === 'student' ? 'Students' : r);
   }
   editRole.addEventListener('change', syncEditRole);
+  var showEditName = bindNamePreview(
+    editForm.elements.full_name,
+    document.getElementById('edit-name-preview'),
+  );
+  editPb.addEventListener('input', function () {
+    autoDept(
+      editForm,
+      editPb,
+      editKind === 'student' ? 'Students' : editRole.value,
+    );
+  });
 
-  function openEdit(a) {
+  var editTitle = document.getElementById('edit-title');
+  var editCancel = editDlg.querySelector('.dlg-actions .pill-grey');
+  // view-only (archived accounts): every box is locked, no Save button
+  function setEditViewOnly(on) {
+    [].slice.call(editForm.elements).forEach(function (f) {
+      if (f.tagName === 'BUTTON' || f.name === 'school_id') return;
+      if (f.tagName === 'SELECT') f.disabled = on;
+      else f.readOnly = on; // (openEdit re-applies its own disabled states afterwards)
+    });
+    editSubmit.hidden = on;
+    editTitle.textContent = on
+      ? 'Archived Account (view only)'
+      : 'Edit Student / Faculty';
+    editCancel.textContent = on ? 'Close' : 'Cancel';
+  }
+  function openEdit(a, viewOnly) {
     if (!a) return;
+    setEditViewOnly(false);
     editKind = a.kind;
     editForm.reset();
     clearErrors(editForm);
     editFormErr.hidden = true;
     editForm.elements.school_id.value = a.id;
     editForm.elements.full_name.value = a.name;
+    showEditName();
+    editForm.elements.email.value = a.email || '';
     editForm.elements.department.value = a.dept || cfg.defaultDept;
     editPb.value =
       a.programBlock &&
@@ -632,8 +783,9 @@
     editRole.value = a.roleLabel;
     editRole.disabled = a.kind === 'student';
     syncEditRole();
+    if (viewOnly) setEditViewOnly(true);
     openDialog(editDlg);
-    editForm.elements.full_name.focus();
+    if (!viewOnly) editForm.elements.full_name.focus();
   }
 
   var editBusy = false;
@@ -643,11 +795,16 @@
     clearErrors(editForm);
     editFormErr.hidden = true;
     var params = new URLSearchParams();
-    ['school_id', 'full_name', 'department', 'program_block', 'role'].forEach(
-      function (k) {
-        params.set(k, editForm.elements[k].value);
-      },
-    );
+    [
+      'school_id',
+      'full_name',
+      'email',
+      'department',
+      'program_block',
+      'role',
+    ].forEach(function (k) {
+      params.set(k, editForm.elements[k].value);
+    });
     editBusy = true;
     editSubmit.disabled = true;
     post(cfg.updateUrl, params)
@@ -677,7 +834,211 @@
       });
   });
 
-  /* ---------- Delete ---------- */
+  /* ---------- Activity logs ---------- */
+  var logsDlg = document.getElementById('logs-dialog');
+  var logsBody = document.getElementById('logs-body');
+  var logsQ = document.getElementById('logs-q');
+  var logsAction = document.getElementById('logs-action');
+  var logsEmpty = document.getElementById('logs-empty');
+  var logsCount = document.getElementById('logs-count');
+  var logsMore = document.getElementById('logs-more');
+  var logsLast = 0,
+    logsShown = 0,
+    logsSeq = 0,
+    logsTimer = null;
+
+  function logRow(l) {
+    var tr = el('tr');
+    tr.appendChild(el('td', 'lg-when', l.when));
+    var acct = el('td', 'lg-acct');
+    acct.appendChild(el('b', '', l.accountName || '(unknown name)'));
+    var idBtn = el('button', '', l.accountId); // click an ID to see only that account's activity
+    idBtn.type = 'button';
+    idBtn.dataset.logAccount = l.accountId;
+    idBtn.title = 'Show only this account';
+    acct.appendChild(idBtn);
+    tr.appendChild(acct);
+    var act = el('td');
+    act.appendChild(el('span', 'lg-badge lg-' + l.action, l.label));
+    tr.appendChild(act);
+    tr.appendChild(el('td', 'lg-det', l.details));
+    var by = el('td', 'lg-by');
+    if (l.actorId && l.actorId === l.accountId) {
+      by.appendChild(el('span', '', 'The account itself'));
+    } else if (l.actorId) {
+      by.appendChild(el('span', '', l.actorName || l.actorId));
+      by.appendChild(el('small', '', l.actorId));
+    } else {
+      by.appendChild(el('span', '', '\u2014'));
+    }
+    tr.appendChild(by);
+    return tr;
+  }
+  function loadLogs(reset) {
+    var seq = ++logsSeq;
+    if (reset) {
+      logsLast = 0;
+      logsShown = 0;
+      logsBody.textContent = '';
+    }
+    var params = new URLSearchParams();
+    params.set('q', logsQ.value.trim());
+    params.set('action', logsAction.value);
+    if (logsLast) params.set('before', String(logsLast));
+    logsMore.disabled = true;
+    return post(cfg.logsUrl, params)
+      .then(function (data) {
+        if (seq !== logsSeq) return; // a newer search already replaced this one
+        if (!data.ok) {
+          logsEmpty.textContent = data.message || 'Could not load the log.';
+          logsEmpty.hidden = false;
+          logsMore.hidden = true;
+          logsCount.textContent = '';
+          return;
+        }
+        data.logs.forEach(function (l) {
+          logsBody.appendChild(logRow(l));
+          logsLast = l.id;
+        });
+        logsShown += data.logs.length;
+        logsMore.hidden = !data.more;
+        logsEmpty.hidden = logsShown !== 0;
+        logsEmpty.textContent =
+          logsQ.value.trim() || logsAction.value
+            ? 'No activity matches.'
+            : 'No activity has been recorded yet.';
+        logsCount.textContent = logsShown
+          ? 'Showing ' +
+            logsShown +
+            (data.more ? '+' : '') +
+            ' entr' +
+            (logsShown === 1 ? 'y' : 'ies')
+          : '';
+      })
+      .catch(function () {
+        if (seq !== logsSeq) return;
+        logsEmpty.textContent =
+          'Could not reach the server. Check your connection and try again.';
+        logsEmpty.hidden = false;
+      })
+      .then(function () {
+        logsMore.disabled = false;
+      });
+  }
+  document
+    .querySelector('[data-action="open-logs"]')
+    .addEventListener('click', function () {
+      logsQ.value = '';
+      logsAction.value = '';
+      logsEmpty.hidden = true;
+      logsMore.hidden = true;
+      logsCount.textContent = 'Loading\u2026';
+      openDialog(logsDlg);
+      loadLogs(true);
+      logsQ.focus();
+    });
+  logsQ.addEventListener('input', function () {
+    clearTimeout(logsTimer);
+    logsTimer = setTimeout(function () {
+      loadLogs(true);
+    }, 300);
+  });
+  logsAction.addEventListener('change', function () {
+    loadLogs(true);
+  });
+  logsMore.addEventListener('click', function () {
+    loadLogs(false);
+  });
+  logsBody.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-log-account]');
+    if (!b) return;
+    logsQ.value = b.dataset.logAccount;
+    loadLogs(true);
+  });
+
+  /* ---------- Archive / Restore ---------- */
+  var arcDlg = document.getElementById('archive-dialog');
+  var arcForm = document.getElementById('archive-form');
+  var arcErr = document.getElementById('archive-formerr');
+  var arcSubmit = document.getElementById('archive-submit');
+  var arcId = '';
+
+  function openArchive(a) {
+    if (!a) return;
+    arcId = a.id;
+    arcErr.hidden = true;
+    document.getElementById('archive-text').textContent =
+      'Archive this ' +
+      (a.kind === 'faculty' ? a.roleLabel.toLowerCase() : 'student') +
+      ' account?';
+    document.getElementById('archive-name').textContent = a.name;
+    document.getElementById('archive-id').textContent = a.id;
+    openDialog(arcDlg);
+    arcDlg.querySelector('.pill-grey').focus();
+  }
+  function archiveCall(id, mode) {
+    var params = new URLSearchParams();
+    params.set('school_id', id);
+    params.set('mode', mode);
+    return post(cfg.archiveUrl, params);
+  }
+  function applyArchiveReply(data) {
+    var tr = findRow(data.account.id);
+    if (tr) fillRow(tr, data.account);
+    applyFilter();
+  }
+  var arcBusy = false;
+  arcForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (arcBusy) return;
+    arcErr.hidden = true;
+    arcBusy = true;
+    arcSubmit.disabled = true;
+    archiveCall(arcId, 'archive')
+      .then(function (data) {
+        if (!data.ok) {
+          arcErr.textContent = data.message || 'Something went wrong.';
+          arcErr.hidden = false;
+          return;
+        }
+        applyArchiveReply(data);
+        closeDialog(arcDlg);
+        toast(data.message);
+      })
+      .catch(function () {
+        arcErr.textContent =
+          'Could not reach the server. Check your connection and try again.';
+        arcErr.hidden = false;
+      })
+      .then(function () {
+        arcBusy = false;
+        arcSubmit.disabled = false;
+      });
+  });
+  function restoreAccount(a, btn) {
+    if (!a || btn.disabled) return;
+    btn.disabled = true;
+    archiveCall(a.id, 'restore')
+      .then(function (data) {
+        if (!data.ok) {
+          toast(data.message || 'Something went wrong.', true);
+          return;
+        }
+        applyArchiveReply(data);
+        toast(data.message);
+      })
+      .catch(function () {
+        toast(
+          'Could not reach the server. Check your connection and try again.',
+          true,
+        );
+      })
+      .then(function () {
+        btn.disabled = false;
+      });
+  }
+
+  /* ---------- Delete (permanent, Archived tab only) ---------- */
   var delDlg = document.getElementById('delete-dialog');
   var delForm = document.getElementById('delete-form');
   var delErr = document.getElementById('delete-formerr');
@@ -689,9 +1050,9 @@
     delId = a.id;
     delErr.hidden = true;
     document.getElementById('delete-text').textContent =
-      'Delete this ' +
+      'Permanently delete this archived ' +
       (a.kind === 'faculty' ? a.roleLabel.toLowerCase() : 'student') +
-      ' account?';
+      ' account? This cannot be undone.';
     document.getElementById('delete-name').textContent = a.name;
     document.getElementById('delete-id').textContent = a.id;
     openDialog(delDlg);
@@ -729,228 +1090,6 @@
         delBusy = false;
         delSubmit.disabled = false;
       });
-  });
-
-  /* ---------- Assign professors ---------- */
-  var asgDlg = document.getElementById('assign-dialog');
-  var asgForm = document.getElementById('assign-form');
-  var asgStudent = asgForm.elements.school_id;
-  var asgFaculty = asgForm.elements.faculty_id;
-  var asgType = asgForm.elements.type;
-  var asgLabel = asgForm.elements.assignment;
-  var asgList = document.getElementById('assign-list');
-  var asgInfo = document.getElementById('assign-info');
-  var asgCount = document.getElementById('assign-count');
-  var asgHint = document.getElementById('assign-hint');
-  var asgFormErr = document.getElementById('assign-formerr');
-  var asgSubmit = document.getElementById('assign-submit');
-
-  function option(value, text) {
-    var o = el('option', '', text);
-    o.value = value;
-    return o;
-  }
-
-  /* redraw the table rows the server sent back (the student and the professor) */
-  function applyAccounts(accounts) {
-    (accounts || []).forEach(function (a) {
-      var tr = findRow(a.id);
-      if (tr) fillRow(tr, a);
-    });
-    applyFilter();
-  }
-
-  function selectedStudent() {
-    var tr = findRow(asgStudent.value);
-    return tr ? accountOf(tr) : null;
-  }
-
-  /* the info strip + the "Currently Assigned Professors" list for the chosen student */
-  function renderAssigned() {
-    var a = selectedStudent();
-    asgInfo.textContent = '';
-    asgList.textContent = '';
-    if (!a) {
-      asgCount.textContent = '';
-      return;
-    }
-    var pb = el('span');
-    pb.appendChild(document.createTextNode('Program / Block: '));
-    pb.appendChild(el('b', '', a.programBlock));
-    var dp = el('span');
-    dp.appendChild(document.createTextNode('Dept: '));
-    dp.appendChild(el('b', '', a.dept || '—'));
-    asgInfo.appendChild(pb);
-    asgInfo.appendChild(dp);
-
-    var list = a.assignments || [];
-    asgCount.textContent = list.length + ' assigned';
-    if (!list.length) {
-      asgList.appendChild(el('li', 'asg-empty', 'No professors assigned yet.'));
-      return;
-    }
-    list.forEach(function (x) {
-      var li = el('li', 'asg-item');
-      var txt = el('div', 'asg-item-txt');
-      txt.appendChild(el('b', '', x.name + ' (' + x.roleLabel + ')'));
-      txt.appendChild(
-        el(
-          'small',
-          '',
-          x.label + (x.type === 'adviser' ? ' • reviews enrollment' : ''),
-        ),
-      );
-      li.appendChild(txt);
-      var rm = el('button', 'asg-remove', 'Remove');
-      rm.type = 'button';
-      rm.dataset.asgRemove = x.id;
-      rm.setAttribute('aria-label', 'Remove ' + x.name + ' (' + x.label + ')');
-      li.appendChild(rm);
-      asgList.appendChild(li);
-    });
-  }
-
-  function syncAsgType() {
-    if (asgType.value === 'adviser') {
-      asgLabel.placeholder = 'Academic Adviser (optional)';
-      asgHint.textContent =
-        'An academic adviser can review this student’s enrollment requests. Use this for one adviser per student.';
-    } else {
-      asgLabel.placeholder = 'e.g. CS 202 — Object-Oriented Programming';
-      asgHint.textContent =
-        'Add one assignment per subject. The same professor can be added again for another subject.';
-    }
-  }
-  asgType.addEventListener('change', syncAsgType);
-  asgStudent.addEventListener('change', function () {
-    clearErrors(asgForm);
-    asgFormErr.hidden = true;
-    renderAssigned();
-  });
-
-  function openAssign(studentId) {
-    var studentRows = rows()
-      .map(accountOf)
-      .filter(function (a) {
-        return a && a.kind === 'student';
-      });
-    if (!studentRows.length) {
-      toast('Register a student first.', true);
-      return;
-    }
-    var profs = rows()
-      .map(accountOf)
-      .filter(function (a) {
-        return a && a.kind === 'faculty' && a.role !== 'registrar';
-      });
-    if (!profs.length) {
-      toast('Register a professor first.', true);
-      return;
-    }
-
-    asgStudent.textContent = '';
-    studentRows.forEach(function (a) {
-      asgStudent.appendChild(option(a.id, a.name + ' (' + a.id + ')'));
-    });
-    asgFaculty.textContent = '';
-    asgFaculty.appendChild(option('', 'Select a professor…'));
-    profs.forEach(function (a) {
-      asgFaculty.appendChild(
-        option(
-          a.id,
-          a.name + ' — ' + a.roleLabel + (a.dept ? ' (' + a.dept + ')' : ''),
-        ),
-      );
-    });
-
-    asgStudent.value = studentId || studentRows[0].id;
-    if (asgStudent.value !== (studentId || studentRows[0].id))
-      asgStudent.value = studentRows[0].id;
-    asgType.value = 'subject';
-    asgLabel.value = '';
-    clearErrors(asgForm);
-    asgFormErr.hidden = true;
-    syncAsgType();
-    renderAssigned();
-    openDialog(asgDlg);
-    asgFaculty.focus();
-  }
-  document
-    .querySelector('[data-action="open-assign"]')
-    .addEventListener('click', function () {
-      openAssign(null);
-    });
-
-  var asgBusy = false;
-  asgForm.addEventListener('submit', function (e) {
-    e.preventDefault();
-    if (asgBusy) return;
-    clearErrors(asgForm);
-    asgFormErr.hidden = true;
-    var params = new URLSearchParams();
-    params.set('school_id', asgStudent.value);
-    params.set('faculty_id', asgFaculty.value);
-    params.set('type', asgType.value);
-    params.set('assignment', asgLabel.value);
-    asgBusy = true;
-    asgSubmit.disabled = true;
-    post(cfg.assignUrl, params)
-      .then(function (data) {
-        if (!data.ok) {
-          if (data.errors) showErrors(asgForm, data);
-          else {
-            asgFormErr.textContent = data.message || 'Something went wrong.';
-            asgFormErr.hidden = false;
-          }
-          return;
-        }
-        applyAccounts(data.accounts);
-        renderAssigned();
-        asgFaculty.value = '';
-        asgLabel.value = ''; // ready for the next subject
-        toast(data.message);
-        asgFaculty.focus();
-      })
-      .catch(function () {
-        asgFormErr.textContent =
-          'Could not reach the server. Check your connection and try again.';
-        asgFormErr.hidden = false;
-      })
-      .then(function () {
-        asgBusy = false;
-        asgSubmit.disabled = false;
-      });
-  });
-
-  /* remove one assignment (from the dialog list or the x on a chip) */
-  function unassign(studentId, assignmentId, btn) {
-    if (btn.disabled) return;
-    btn.disabled = true;
-    var params = new URLSearchParams();
-    params.set('school_id', studentId);
-    params.set('assignment_id', assignmentId);
-    post(cfg.unassignUrl, params)
-      .then(function (data) {
-        if (!data.ok) {
-          toast(data.message || 'Could not remove the assignment.', true);
-          btn.disabled = false;
-          return;
-        }
-        applyAccounts(data.accounts);
-        if (asgDlg.open) renderAssigned();
-        toast(data.message);
-      })
-      .catch(function () {
-        toast(
-          'Could not reach the server. Check your connection and try again.',
-          true,
-        );
-        btn.disabled = false;
-      });
-  }
-  asgList.addEventListener('click', function (e) {
-    var rm = e.target.closest('[data-asg-remove]');
-    if (rm) unassign(asgStudent.value, rm.dataset.asgRemove, rm);
   });
 
   // first paint: every row is drawn by fillRow so the page and later updates look identical

@@ -181,10 +181,7 @@ function validateProfileValue(string $field, array $rule, string $raw): array {
     if ($type === 'email') {
         if (mb_strlen($v) > $limit) return ['', "$label is too long ($limit characters at most)."];
         if (!filter_var($v, FILTER_VALIDATE_EMAIL)) return ['', 'Enter a valid email address.'];
-        $v = strtolower($v);
-        $d = strtolower(SCHOOL_EMAIL_DOMAIN);
-        if (substr($v, -strlen($d)) !== $d) return ['', 'Use your school email (ending in ' . SCHOOL_EMAIL_DOMAIN . ').'];
-        return [$v, null];
+        return [strtolower($v), null];
     }
     if ($type === 'phone') {
         // Philippine mobile number: 09XX XXX XXXX (11 digits) or +63 9XX XXX XXXX. Spaces, dashes and brackets are ignored.
