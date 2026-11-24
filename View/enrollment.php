@@ -40,17 +40,9 @@ if (!function_exists('enroll_sem')) {
 if (!function_exists('enroll_badge')) {
     function enroll_badge($status) {
         if ($status === 'approved') $status = 'enrolled';
-        $colors = [
-            'pending' => '#f1c40f',
-            'approved' => '#2ecc71',
-            'enrolled' => '#2ecc71',
-            'rejected' => '#ff6b6b'
-        ];
-
-        $c = $colors[$status] ?? '#bbb';
-
-        return '<span style="background:' . $c . '; color:#111; padding:2px 10px; border-radius:12px; font-size:11px; font-weight:bold;">'
-            . enroll_e(ucfirst($status)) . '</span>';
+        $status = strtolower(trim((string)$status));
+        $variant = in_array($status, ['pending','enrolled','credited','passed','failed','rejected','finished'], true) ? $status : 'neutral';
+        return '<span class="enrollment-result result-' . $variant . '">' . enroll_e(ucfirst($status)) . '</span>';
     }
 }
 
@@ -81,10 +73,10 @@ $csrf = $logic->csrf();
     <div class="row main_box">
         <?php require_once __DIR__ . "/components/navigation.php"; ?>
 
-        <div class="column" style="flex: 1;">
+        <div class="column enrollment-shell" style="flex: 1; min-width:0; min-height:0;">
             <?php require_once __DIR__ . "/components/header.php"; ?>
 
-            <main class="column scrollbar enrollment-page">
+            <main class="column scrollbar enrollment-page" data-enrollment-role="<?= enroll_e($group) ?>">
 
                 <?php if ($flash): ?>
                     <div class="popup <?= $flash['type'] === 'error' ? 'error' : '' ?>">
@@ -115,7 +107,7 @@ $csrf = $logic->csrf();
                     })();
                     </script>
 
-                    <div class="row" style="justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <div class="row enrollment-hero" style="justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
                         <div>
                             <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: normal;">
                                 Enroll in Subjects
@@ -533,9 +525,7 @@ $csrf = $logic->csrf();
 
                     <?php else: ?>
 
-                        <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: normal;">
-                            Pending Approvals
-                        </h1>
+                        <div class="enrollment-hero"><div><h1>Pending Approvals</h1><p>Review student subject selections and manage enrollment decisions.</p></div></div>
 
                         <div class="enroll-card" style="margin-top: 20px;">
                             <h2>My Advisees</h2>
@@ -618,12 +608,12 @@ $csrf = $logic->csrf();
                 ?>
                 <section class="dean-stage1">
                     <div class="dean-stage1-heading">
-                        <div><h1>Dean Enrollment Management</h1><p>College enrollment oversight · <?= enroll_e($logic->deanName) ?></p></div>
+                        <div><h1>Dean Enrollment Management</h1><p>College enrollment oversight. </p></div>
                         <label>Academic period
                             <select id="dean-period-filter" name="dean_period" class="form-control" aria-label="Academic period">
                                 <?php foreach ($logic->deanPeriods as $dp): ?>
                                 <option value="<?= (int)$dp['enrollmentID'] ?>" <?= $deanPeriod && (int)$deanPeriod['enrollmentID']===(int)$dp['enrollmentID']?'selected':'' ?>>
-                                    <?= enroll_e($dp['acad_year'].' · '.enroll_sem($dp['sem']).' · '.$dp['program']) ?>
+                                    <?= enroll_e($dp['acad_year'].' · '.enroll_sem($dp['sem']).' · '.$dp['program'].' · '.(!empty($dp['year_level']) ? 'Year '.(int)$dp['year_level'] : 'All years')) ?>
                                 </option>
                                 <?php endforeach; ?>
                             </select>
@@ -670,8 +660,7 @@ $csrf = $logic->csrf();
                     <?php elseif ($deanTab === 'requests'): ?>
                         <div class="enroll-card">
                             <h2>Subject crediting requests</h2>
-                            <p>Credit requests across all academic periods, including requests without an assigned period. Other special request types require a separate approved workflow.</p>
-                            <label>Request status <select class="form-control dean-local-filter" data-target="dean-request-table" data-field="status"><option value="">All statuses</option><option value="pending">Pending</option><option value="credited">Credited</option><option value="not_credited">Not credited</option></select></label>
+                            <label>Request status <h2><h2/> <select class="form-control dean-local-filter" data-target="dean-request-table" data-field="status"><option value="">All statuses</option><option value="pending">Pending</option><option value="credited">Credited</option><option value="not_credited">Not credited</option></select></label>
                             <div class="table-responsive"><table id="dean-request-table" class="enroll-table">
                                 <thead><tr><th>Student</th><th>Program / Year</th><th>Subject</th><th>Submitted</th><th>Reason</th><th>Status / Decision</th></tr></thead><tbody>
                                 <?php foreach ($logic->creditRequests as $cr): ?>
@@ -703,18 +692,18 @@ $csrf = $logic->csrf();
                         </div>
                     <?php elseif ($deanTab === 'students'): ?>
                         <div class="enroll-card">
-                            <h2>Student enrollment monitoring</h2><p>Read-only. Coordinator approval remains unchanged.</p>
+                            <h2>Student enrollment monitoring</h2>
                             <div class="dean-filter-row">
                                 <input class="form-control dean-local-filter" data-target="dean-student-table" data-field="search" placeholder="Search name, student ID or subject">
-                                <select class="form-control dean-local-filter" data-target="dean-student-table" data-field="year"><option value="">All years</option><?php foreach (array_unique(array_column($logic->deanStudents,'year_level')) as $v): ?><option value="<?= (int)$v ?>">Year <?= (int)$v ?></option><?php endforeach; ?></select>
-                                <select class="form-control dean-local-filter" data-target="dean-student-table" data-field="status"><option value="">All statuses</option><option value="pending">Pending</option><option value="enrolled">Enrolled</option><option value="rejected">Rejected</option><option value="finished">Finished</option></select>
+                                <select class="form-control dean-local-filter" data-target="dean-student-table" data-field="type"><option value="">All student types</option><option value="regular">Regular</option><option value="irregular">Irregular</option></select>
+                                <select class="form-control dean-local-filter" data-target="dean-student-table" data-field="status"><option value="">All statuses</option><option value="pending">Pending</option><option value="enrolled">Enrolled</option><option value="rejected">Rejected</option><option value="credited">Credited</option><option value="passed">Passed</option><option value="failed">Failed</option></select>
                             </div>
                             <div class="table-responsive"><table id="dean-student-table" class="enroll-table">
                             <thead><tr><th>Student</th><th>Year / Block</th><th>Type</th><th>Subject</th><th>Status</th></tr></thead><tbody>
                             <?php foreach ($logic->deanStudents as $r): ?>
-                            <tr data-program="<?= enroll_e($r['program']) ?>" data-year="<?= (int)$r['year_level'] ?>" data-status="<?= enroll_e($r['status']) ?>">
+                            <tr data-program="<?= enroll_e($r['program']) ?>" data-type="<?= enroll_e($r['student_type']) ?>" data-status="<?= enroll_e($r['status']) ?>">
                                 <td><?= enroll_e($r['last_name'].', '.$r['first_name']) ?> · #<?= (int)$r['studentID'] ?></td>
-                                <td><?= (int)$r['year_level'] ?> · <?= enroll_e($r['block']) ?></td>
+                                <td><?= (int)$r['year_level'] ?> · <?= enroll_e(preg_replace('/^'.(int)$r['year_level'].'(?=[A-Za-z])/', '', trim((string)$r['block']))) ?></td>
                                 <td><?= enroll_e($r['student_type']) ?></td>
                                 <td><?= enroll_e(trim($r['subjectID']).' · '.($r['subject_name'] ?? '')) ?></td>
                                 <td><?= enroll_badge($r['status']) ?><?= $r['rejection_remarks'] ? '<small>'.enroll_e($r['rejection_remarks']).'</small>' : '' ?></td>
@@ -724,7 +713,7 @@ $csrf = $logic->csrf();
                         </div>
                     <?php elseif ($deanTab === 'subjects'): ?>
                         <div class="enroll-card">
-                            <h2>Subject and section monitoring</h2><p>Read-only scheduled offerings. Section capacity is not available in the current database.</p>
+                            <h2>Subject and section monitoring</h2>
                             <div class="table-responsive"><table class="enroll-table"><thead><tr><th>Subject</th><th>Block</th><th>Day / Time</th><th>Room</th><th>Faculty</th><th>Selected students</th></tr></thead><tbody>
                             <?php foreach ($logic->deanOfferings as $r): ?><tr>
                                 <td><?= enroll_e(trim($r['subjectID']).' · '.($r['subject_name'] ?? '')) ?></td>
@@ -801,7 +790,8 @@ $csrf = $logic->csrf();
                                     if (!value) return true;
                                     const field = f.dataset.field;
                                     const actual = field === 'search' ? row.textContent : row.dataset[field];
-                                    return String(actual || '').toLowerCase().includes(value);
+                                    const normalized = String(actual || '').trim().toLowerCase();
+                                    return field === 'search' ? normalized.includes(value) : normalized === value;
                                 });
                                 row.hidden = !show;
                             });
@@ -813,6 +803,16 @@ $csrf = $logic->csrf();
                 <?php endif; ?>
 
                 <?php if ($group === 'registrar'): ?>
+                    <div class="enrollment-hero">
+                        <div><h1>Enrollment Management</h1><p>Manage academic periods, subject catalog and student adviser assignments.</p></div>
+                    </div>
+                    <nav class="registrar-tabs" aria-label="Registrar enrollment sections">
+                        <a href="#periods-section" data-reg-tab="periods">Enrollment Periods</a>
+                        <a href="#subjects-section" data-reg-tab="subjects">Subjects</a>
+                        <a href="#advisers-section" data-reg-tab="advisers">Faculty Assignment</a>
+                    </nav>
+                    <div class="registrar-panel" data-reg-panel="periods">
+
 
                     <h1 id="periods-section" style="margin: 0; color: #ffffff; font-size: 32px; font-weight: normal; margin-bottom: 20px;">
                         Enrollment Periods
@@ -904,6 +904,72 @@ $csrf = $logic->csrf();
                         </div>
                     </div>
 
+                    </div>
+                    <div class="registrar-panel" data-reg-panel="advisers">
+                    <section class="enroll-card" id="advisers-section" style="margin-bottom:24px;">
+                        <div class="ba-heading"><div><h2>Faculty Assignment</h2><p>Assign advisers or subject professors to students and blocks.</p></div></div>
+                        <form method="POST" action="<?= $formAction ?>" id="bulk-adviser-form">
+                            <input type="hidden" name="csrf" value="<?= enroll_e($csrf) ?>">
+                            <input type="hidden" name="enroll_action" value="bulk_assign_adviser">
+                            <input type="hidden" name="student_ids" id="bulk-student-ids">
+                            <div class="form-group"><label for="bulk-kind">Assignment type</label><select class="form-control" id="bulk-kind" name="assignment_type"><option value="adviser">Academic adviser</option><option value="subject">Subject professor</option></select></div>
+                            <div id="bulk-class-wrap" hidden><label for="bulk-class">Enrolled subject / academic period</label><select class="form-control" id="bulk-class"></select><input type="hidden" name="subject_id" id="bulk-subject"><input type="hidden" name="subject_period" id="bulk-period"></div>
+                            <div class="ba-filters">
+                                <div class="form-group"><label for="bulk-dept">Department</label><select class="form-control" name="department" id="bulk-dept" required><option value="">Select department</option><?php foreach ($logic->periodDepartments as $d): ?><option value="<?= enroll_e($d['department']) ?>"><?= enroll_e($d['department'].' - '.$d['name']) ?></option><?php endforeach; ?></select></div>
+                                <div class="form-group"><label for="bulk-program">Program</label><select class="form-control" name="program" id="bulk-program" required><option value="">Select program</option><?php foreach ($logic->periodPrograms as $p): ?><option value="<?= enroll_e($p['program']) ?>" data-dept="<?= enroll_e($p['department']) ?>"><?= enroll_e($p['program']) ?></option><?php endforeach; ?></select></div>
+                                <div class="form-group"><label for="bulk-year">Year level</label><select class="form-control" id="bulk-year" name="year_level"><option value="">All years</option></select></div>
+                                <div class="form-group"><label for="bulk-block">Block</label><select class="form-control" id="bulk-block" name="block"><option value="">All blocks</option></select></div>
+                                <div class="form-group"><label for="bulk-faculty">Academic adviser</label><select class="form-control" id="bulk-faculty" name="faculty_id" required><option value="">Select adviser</option><?php foreach ($logic->bulkAdvisers as $a): ?><option value="<?= (int)$a['facultyID'] ?>" data-dept="<?= enroll_e($a['department']) ?>" data-program="<?= enroll_e($a['program'] ?? '') ?>"><?= enroll_e($a['name'].' ('.$a['role'].')'.(empty($a['program'])?' - department-wide': ' - '.$a['program'])) ?></option><?php endforeach; ?></select></div>
+                                <div class="form-group"><label for="bulk-type">Student type</label><select class="form-control" id="bulk-type"><option value="">All types</option><option>Regular</option><option>Irregular</option></select></div>
+                            </div>
+                            <div class="ba-mode"><label for="bulk-mode">Assignment action</label><select class="form-control" id="bulk-mode"><option value="assign">Assign unassigned students</option><option value="reassign">Reassign existing advisers</option></select><input type="hidden" id="bulk-replace" name="replace_existing" value="0"><small>For an entire block, choose a year and block, then use Select entire block. For individual students, select their checkboxes.</small></div>
+                            <div class="ba-list-head"><div><h3>Student roster</h3><p id="bulk-stats" aria-live="polite">Select a department and program to preview students.</p></div><button type="button" class="btn-enroll" id="bulk-select-block" disabled>Select entire block</button></div>
+                            <input class="form-control" id="bulk-search" placeholder="Search student name or ID" aria-label="Search students">
+                            <div class="ba-table">
+                                <table class="enroll-table" style="width:100%;"><thead><tr><th class="ba-check"><input type="checkbox" id="bulk-all" aria-label="Select all eligible visible students"></th><th>Student</th><th>Year / Block</th><th>Type</th><th id="bulk-current-heading">Current adviser</th></tr></thead><tbody id="bulk-rows">
+                                <?php foreach ($logic->bulkStudents as $st): $block = preg_replace('/^\d+\s*/', '', (string)$st['block']); ?>
+                                    <tr hidden data-dept="<?= enroll_e($st['department']) ?>" data-program="<?= enroll_e($st['program']) ?>" data-year="<?= enroll_e($st['year_level']) ?>" data-block="<?= enroll_e($block) ?>" data-type="<?= enroll_e($st['student_type']) ?>" data-adviser="<?= enroll_e($st['adviser_id'] ?? '') ?>">
+                                        <td class="ba-check"><input type="checkbox" class="bulk-pick" value="<?= (int)$st['studentID'] ?>" aria-label="Select <?= enroll_e($st['student_name']) ?>"></td>
+                                        <td><strong><?= enroll_e($st['student_name']) ?></strong><small class="ba-id"><?= enroll_e($st['display_id']) ?></small></td><td><?= enroll_e($st['year_level'].' / '.$block) ?></td><td><span class="ba-type"><?= enroll_e($st['student_type']) ?></span></td><td><span class="ba-current"><?= $st['adviser_id'] ? enroll_e($st['adviser_name']) : 'Unassigned' ?></span><small class="ba-row-note"></small></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                                </tbody></table>
+                            </div>
+                            <div id="ba-empty" class="ba-empty" hidden>No students match these filters.</div><div class="ba-footer"><div><strong id="bulk-selected" aria-live="polite">0 selected</strong><small id="ba-action-hint">Select an adviser to continue.</small></div><button class="btn-enroll btn-approve" id="bulk-submit" type="submit" disabled>Assign selected students</button></div>
+                        </form>
+                    </section>
+                    <style>
+#advisers-section{padding:clamp(16px,2.4vw,30px);border:1px solid rgba(255,255,255,.16);border-radius:20px;background:linear-gradient(145deg,rgba(42,25,64,.82),rgba(65,35,85,.88));color:#fff;box-shadow:0 16px 40px #20102d30;scroll-margin-top:20px}
+#advisers-section *{box-sizing:border-box} #advisers-section h2{margin:5px 0 8px;font-size:clamp(22px,2vw,28px);font-weight:700} #advisers-section p{margin:0;color:#e1d3ee;font-size:13px;line-height:1.5} .ba-heading,.ba-list-head,.ba-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}.ba-kicker{font-size:10px;letter-spacing:.12em;color:#cbb3ec;font-weight:700}.ba-tag,.ba-type{display:inline-block;padding:5px 10px;border-radius:7px;background:#b99be322;color:#f0e4ff;font-size:12px}.ba-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:24px 0 16px}.ba-filters .form-group{margin:0;min-width:0}.ba-filters label{display:block;margin-bottom:7px;font-size:12px;font-weight:600;color:#e5d6f3} #advisers-section .form-control{width:100%;min-height:43px;border:1px solid #ffffff25;border-radius:9px;background:#21142f;color:#fff;padding:10px 12px} #advisers-section select option{background:#21142f;color:#fff} #advisers-section :focus-visible{outline:2px solid #d1a8ff;outline-offset:3px}.ba-replace{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid #ffffff20;border-radius:12px;background:#ffffff08;cursor:pointer}.ba-replace small,.ba-footer small,.ba-id,.ba-row-note{display:block;color:#d8c7e7;font-size:12px;margin-top:4px}.ba-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:20px 0}.ba-metrics>div{background:#ffffff09;border:1px solid #ffffff19;border-radius:13px;padding:16px}.ba-metrics small{display:block;color:#dfcfee;font-size:12px}.ba-metrics strong{display:block;font-size:27px;margin-top:7px}.ba-list-head{margin:20px 0 12px}.ba-list-head h3{margin:0 0 5px;font-size:17px}.ba-table{max-height:420px;overflow:auto;margin-top:12px;border:1px solid #ffffff20;border-radius:12px}.ba-table table{border-collapse:collapse;min-width:570px}.ba-table th{position:sticky;top:0;background:#2d1c40!important;z-index:1;text-align:left}.ba-table td,.ba-table th{padding:13px 12px!important;border-bottom:1px solid #ffffff12}.ba-table .ba-check{width:48px;text-align:center}.ba-table tr[data-selected="true"] td{background:#a983e524}.ba-table tr:hover td{background:#ffffff09}.ba-table tr[data-selected="true"]:hover td{background:#a983e530} #bulk-rows tr[hidden],#ba-empty[hidden]{display:none!important} #bulk-adviser-form input[type=checkbox]{appearance:auto!important;-webkit-appearance:checkbox!important;position:static!important;opacity:1!important;pointer-events:auto!important;width:19px;height:19px;min-width:19px;accent-color:#b88af5;cursor:pointer;margin:0;vertical-align:middle} #bulk-adviser-form input[type=checkbox]:disabled{opacity:.38!important;cursor:not-allowed}.ba-footer{margin-top:16px;padding:16px 0 0;border-top:1px solid #ffffff20}.ba-footer #bulk-submit{background:#b48bf1;color:#241333;border:0;border-radius:10px;padding:12px 20px;font-weight:700} #bulk-submit:disabled{opacity:.45;cursor:not-allowed}.ba-empty{padding:24px;text-align:center;color:#e0d0ef} @media(max-width:900px){.ba-filters{grid-template-columns:repeat(2,minmax(0,1fr))}} @media(max-width:550px){.ba-filters{grid-template-columns:1fr}.ba-metrics{gap:6px}.ba-metrics>div{padding:10px}.ba-metrics strong{font-size:21px}.ba-footer #bulk-submit{width:100%}}
+                    </style>
+                    <script>
+                    (()=>{
+                        const get=id=>document.getElementById(id), form=get('bulk-adviser-form');
+                        const dept=get('bulk-dept'), program=get('bulk-program'), year=get('bulk-year'), block=get('bulk-block'), faculty=get('bulk-faculty'), type=get('bulk-type'), search=get('bulk-search'), replace=get('bulk-replace'), all=get('bulk-all'), submit=get('bulk-submit'), mode=get('bulk-mode'), kind=get('bulk-kind'), cls=get('bulk-class'), blockButton=get('bulk-select-block');
+                        const rows=[...get('bulk-rows').querySelectorAll('tr')], programs=[...program.options].slice(1), advisers=[...faculty.options].slice(1);
+                        const professors=<?= json_encode($logic->bulkProfessors, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_INVALID_UTF8_SUBSTITUTE) ?>, classes=<?= json_encode($logic->bulkSubjectClasses, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_INVALID_UTF8_SUBSTITUTE) ?>, assignments=<?= json_encode($logic->bulkSubjectAssignments, JSON_HEX_TAG|JSON_HEX_AMP|JSON_HEX_APOS|JSON_HEX_QUOT|JSON_INVALID_UTF8_SUBSTITUTE) ?>;
+                        const pick=r=>r.querySelector('.bulk-pick'), isSubject=()=>kind.value==='subject';
+                        rows.forEach(r=>r.dataset.adviserName=r.querySelector('.ba-current').textContent);
+                        function options(select,list,placeholder){const old=select.value;select.replaceChildren(new Option(placeholder,''));list.forEach(o=>select.append(o.cloneNode(true)));select.value=old;if(select.selectedIndex<0)select.value='';}
+                        function values(select,list,placeholder){options(select,[...new Set(list.filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).map(v=>new Option(v,v)),placeholder);}
+                        function scope(){return rows.filter(r=>dept.value&&program.value&&r.dataset.dept===dept.value&&r.dataset.program===program.value);}
+                        const classKey=c=>JSON.stringify([String(c.enrollmentID),c.subjectID]);
+                        function selectedClasses(){return classes.filter(c=>c.program===program.value&&classKey(c)===cls.value);}
+                        function current(r){return isSubject()?assignments.filter(a=>String(a.studentID)===pick(r).value&&a.subjectID.trim()===get('bulk-subject').value.trim()):r.dataset.adviser?[{facultyID:r.dataset.adviser,name:r.dataset.adviserName}]:[];}
+                        function counts(){const eligible=rows.filter(r=>!r.hidden&&!pick(r).disabled), chosen=eligible.filter(r=>pick(r).checked);rows.forEach(r=>r.dataset.selected=String(pick(r).checked&&!r.hidden));all.checked=eligible.length>0&&chosen.length===eligible.length;all.indeterminate=chosen.length>0&&chosen.length<eligible.length;all.disabled=!eligible.length;get('bulk-selected').textContent=chosen.length+' selected';submit.disabled=!faculty.value||!chosen.length;blockButton.disabled=!year.value||!block.value||!eligible.length;submit.textContent=(mode.value==='reassign'?'Reassign ':'Assign ')+chosen.length+' selected student(s)';get('ba-action-hint').textContent=!faculty.value?'Choose an eligible faculty member.':!chosen.length?'Select eligible students.':'Ready to confirm assignment.';return chosen;}
+                        function render(){const inScope=new Set(scope()), active=selectedClasses();let visible=0;rows.forEach(r=>{const d=r.dataset, old=current(r), matching=active.filter(c=>String(c.studentID)===pick(r).value), show=inScope.has(r)&&(!year.value||d.year===year.value)&&(!block.value||d.block===block.value)&&(!type.value||d.type.toLowerCase()===type.value.toLowerCase())&&(!isSubject()||matching.length>0)&&r.textContent.toLowerCase().includes(search.value.trim().toLowerCase());r.hidden=!show;r.querySelector('.ba-current').textContent=old.map(a=>a.name).join(', ')||'Unassigned';const same=old.length===1&&String(old[0].facultyID)===faculty.value, blocked=mode.value==='reassign'?!old.length:!!old.length, wrong=isSubject()&&faculty.value&&!matching.some(c=>String(c.facultyID)===faculty.value);const c=pick(r);c.disabled=!show||blocked||same||wrong;if(c.disabled)c.checked=false;r.querySelector('.ba-row-note').textContent=wrong?'Not in selected professor’s class':same?'Already assigned':blocked?'Not eligible for selected action':old.length?'Eligible for reassignment':'Available for assignment';if(show)visible++;});get('ba-empty').hidden=!(dept.value&&program.value&&!visible);get('bulk-stats').textContent=isSubject()&&!cls.value?'Select an enrolled subject and academic period.':'Select eligible students and faculty.';counts();}
+                        function refreshFaculty(){const active=selectedClasses();const list=isSubject()?professors.filter(a=>a.department===dept.value&&(!a.program||a.program===program.value)&&active.some(c=>String(c.facultyID)===String(a.facultyID))).map(a=>new Option(a.name+' ('+a.role+')',a.facultyID)):advisers.filter(o=>dept.value&&program.value&&o.dataset.dept===dept.value&&(!o.dataset.program||o.dataset.program===program.value));options(faculty,list,isSubject()?'Select professor':'Select adviser');render();}
+                        function refreshClass(){const selected=cls.value?JSON.parse(cls.value):['',''];get('bulk-period').value=selected[0];get('bulk-subject').value=selected[1];rows.forEach(r=>pick(r).checked=false);refreshFaculty();}
+                        function refreshBlocks(){values(block,scope().filter(r=>!year.value||r.dataset.year===year.value).map(r=>r.dataset.block),'All blocks');}
+                        function refreshProgram(){values(year,scope().map(r=>r.dataset.year),'All years');refreshBlocks();const unique=new Map();classes.filter(c=>c.program===program.value).forEach(c=>unique.set(classKey(c),new Option(c.subjectID+' — '+c.acad_year+' · '+({'1':'1st Semester','2':'2nd Semester','3':'Summer'}[String(c.sem)] || 'Semester '+c.sem),classKey(c))));options(cls,[...unique.values()],'Select subject and period');refreshClass();}
+                        dept.addEventListener('change',()=>{options(program,programs.filter(o=>o.dataset.dept===dept.value),'Select program');refreshProgram();});program.addEventListener('change',refreshProgram);year.addEventListener('change',()=>{refreshBlocks();render();});[block,type].forEach(e=>e.addEventListener('change',render));cls.addEventListener('change',refreshClass);kind.addEventListener('change',()=>{get('bulk-class-wrap').hidden=!isSubject();get('bulk-current-heading').textContent=isSubject()?'Current subject professor':'Current adviser';form.querySelector('label[for=bulk-faculty]').textContent=isSubject()?'Subject professor':'Academic adviser';mode.options[0].textContent='Assign unassigned students';mode.options[1].textContent=isSubject()?'Reassign existing subject professors':'Reassign existing advisers';faculty.value='';refreshProgram();});mode.addEventListener('change',()=>{replace.value=mode.value==='reassign'?'1':'0';rows.forEach(r=>pick(r).checked=false);render();});blockButton.addEventListener('click',()=>{search.value='';type.value='';render();rows.forEach(r=>{if(!r.hidden&&!pick(r).disabled)pick(r).checked=true;});counts();});faculty.addEventListener('change',render);search.addEventListener('input',render);rows.forEach(r=>pick(r).addEventListener('change',counts));all.addEventListener('change',()=>{rows.forEach(r=>{if(!r.hidden&&!pick(r).disabled)pick(r).checked=all.checked;});counts();});
+                        form.addEventListener('submit',e=>{const selected=counts();if(!selected.length||!faculty.value||!confirm('Confirm '+mode.value+' for '+selected.length+' student(s)?')){e.preventDefault();return;}get('bulk-student-ids').value=JSON.stringify(selected.map(r=>Number(pick(r).value)));submit.disabled=true;});
+                        options(program,[],'Select program');refreshProgram();
+                    })();
+                    </script>
+
+                    </div>
+                    <div class="registrar-panel" data-reg-panel="subjects">
                     <h1 id="subjects-section" style="margin: 0; color: #ffffff; font-size: 32px; font-weight: normal; margin-bottom: 20px;">
                         Master Subject List
                     </h1>
@@ -1273,6 +1339,30 @@ $csrf = $logic->csrf();
                     })();
                     </script>
 
+                    </div>
+                    <script>
+                    (() => {
+                        const nav = document.querySelector('.registrar-tabs');
+                        if (!nav) return;
+                        const tabs = [...nav.querySelectorAll('[data-reg-tab]')];
+                        const panels = [...document.querySelectorAll('[data-reg-panel]')];
+                        const key = 'ams-registrar-enrollment-tab';
+                        function valid(name) { return tabs.some(t => t.dataset.regTab === name); }
+                        function activate(name, scroll) {
+                            if (!valid(name)) name = 'periods';
+                            panels.forEach(p => p.hidden = p.dataset.regPanel !== name);
+                            tabs.forEach(t => { const active = t.dataset.regTab === name; t.classList.toggle('active', active); if(active) t.setAttribute('aria-current','page'); else t.removeAttribute('aria-current'); });
+                            try { sessionStorage.setItem(key,name); } catch(e) {}
+                            if (scroll) document.querySelector('.enrollment-page').scrollTo({top:0,behavior:'auto'});
+                        }
+                        function fromHash(){ return tabs.find(t=>t.getAttribute('href')===location.hash)?.dataset.regTab; }
+                        let initial = fromHash();
+                        if(!initial) { try { initial=sessionStorage.getItem(key); } catch(e) {} }
+                        activate(initial,false);
+                        tabs.forEach(t => t.addEventListener('click',e=>{e.preventDefault();history.replaceState(null,'',t.getAttribute('href'));activate(t.dataset.regTab,true);}));
+                        window.addEventListener('hashchange',()=>{const name=fromHash();if(name)activate(name,true);});
+                    })();
+                    </script>
                 <?php endif; ?>
 
                 <?php if ($group === 'instructor'): ?>
@@ -1282,6 +1372,88 @@ $csrf = $logic->csrf();
                         </p>
                     </div>
                 <?php endif; ?>
+
+
+<style id="enrollment-modern-layout">
+/* Scoped enrollment workspace: no changes to shared navigation or other modules. */
+body[data-page="ENROLLMENT"] .enrollment-page{--en-bg:rgba(80,38,108,.35);--en-panel:rgba(82,39,110,.40);--en-line:#ffffff38;--en-muted:#f3e9fa;--en-text:#fff;--en-accent:#e6ceff;--en-primary:#7050b4;color:var(--en-text);background:radial-gradient(ellipse at top right,#dba6ff38 0,transparent 45%),var(--en-bg);border:1px solid #ffffff26;border-radius:20px;padding:clamp(16px,2.5vw,32px);overflow:auto;min-width:0;max-width:100%;box-sizing:border-box;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;scrollbar-color:#745e91 transparent;gap:0;}
+.enrollment-page *, .enrollment-page *::before,.enrollment-page *::after{box-sizing:border-box;}
+.enrollment-page [hidden]{display:none!important;}
+.enrollment-page .enrollment-role-label{margin-bottom:14px;}
+.enrollment-page .enrollment-eyebrow{display:block;color:var(--en-accent);font-size:10px;font-weight:750;letter-spacing:.13em;line-height:1.5;}
+.enrollment-page .enrollment-hero,.enrollment-page .dean-stage1-heading,.enrollment-page .review-header{padding:22px 24px;border:1px solid var(--en-line);border-radius:16px;background:linear-gradient(120deg,#ffffff20,#b36bdb25);margin:0 0 20px!important;align-items:center;gap:16px;flex-wrap:wrap;}
+.enrollment-page .enrollment-hero h1,.enrollment-page .dean-stage1 h1,.enrollment-page .review-header h1,.enrollment-page h1{font-size:clamp(23px,2.2vw,32px)!important;font-weight:700!important;line-height:1.2;letter-spacing:-.035em;color:var(--en-text)!important;margin:0 0 8px!important;}
+.enrollment-page .enrollment-hero p,.enrollment-page .dean-stage1-heading p{color:var(--en-muted);margin:6px 0 0;font-size:14px;opacity:1;}
+.enrollment-page .enroll-card,.enrollment-page #advisers-section{background:var(--en-panel)!important;border:1px solid var(--en-line)!important;border-radius:16px!important;padding:clamp(16px,2vw,24px)!important;box-shadow:0 4px 16px #10091b20!important;min-width:0;max-width:100%;color:var(--en-text);}
+.enrollment-page .enroll-card h2,.enrollment-page #advisers-section h2{font-size:19px!important;font-weight:650!important;letter-spacing:-.02em;line-height:1.3;margin:0 0 14px;color:var(--en-text);}
+.enrollment-page .enroll-card p{line-height:1.55;}
+.enrollment-page .registrar-tabs,.enrollment-page .dean-tabs{display:flex;flex-wrap:wrap;gap:5px;padding:5px;background:rgba(82,40,112,.30);border:1px solid var(--en-line);border-radius:12px;margin:0 0 22px;align-self:stretch;}
+.enrollment-page .registrar-tabs a,.enrollment-page .dean-tabs a{flex:0 1 auto;display:inline-flex;align-items:center;justify-content:center;padding:10px 16px;border:1px solid transparent;border-radius:8px;background:transparent;color:var(--en-muted);font-size:13px;font-weight:600;text-decoration:none;min-height:42px;}
+.enrollment-page .registrar-tabs a:hover,.enrollment-page .dean-tabs a:hover{background:#ffffff0a;color:#fff;}
+.enrollment-page .registrar-tabs a.active,.enrollment-page .dean-tabs a.active{background:rgba(106,62,160,.78);border-color:#e6ceff36;color:#fff;}
+.enrollment-page .registrar-panel{width:100%;min-width:0;}
+.enrollment-page .registrar-panel>h1{font-size:23px!important;margin:0 0 16px!important;}
+.enrollment-page .registrar-panel>p{margin:0 0 18px!important;}
+.enrollment-page .form-grid,.enrollment-page .ba-filters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:16px;align-items:start;}
+.enrollment-page .form-group{min-width:0;margin:0;}
+.enrollment-page .form-group label,.enrollment-page form>label{display:block;color:var(--en-muted);font-size:12px;font-weight:650;margin:0 0 7px;letter-spacing:.015em;}
+.enrollment-page .form-control,.enrollment-page #advisers-section .form-control{background:rgba(80,38,108,.35)!important;border:1px solid #ffffff24!important;color:var(--en-text)!important;border-radius:9px!important;min-height:42px;max-width:100%;padding:10px 12px!important;font-family:inherit;font-size:13px;line-height:1.4;box-shadow:none!important;color-scheme:dark;}
+.enrollment-page .form-group .form-control{width:100%;}
+.enrollment-page textarea.form-control{resize:vertical;min-height:80px;}
+.enrollment-page .form-control::placeholder{color:#e6d8f1;opacity:1;}
+.enrollment-page select option{background:#58336e;color:#fff;}
+.enrollment-page :is(a,button,input,select,textarea):focus-visible{outline:2px solid var(--en-accent)!important;outline-offset:3px;}
+.enrollment-page .btn-enroll{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-height:34px;padding:7px 13px!important;border:1px solid #ad92eb55!important;border-radius:8px!important;background:#453362!important;color:#fff!important;font-family:inherit;font-weight:650;font-size:12px!important;line-height:1.3;text-decoration:none;cursor:pointer;white-space:normal;}
+.enrollment-page .btn-enroll:hover:not(:disabled){filter:brightness(1.15);}
+.enrollment-page .btn-enroll.btn-approve{background:#7050b4!important;border-color:#a78bfa66!important;color:#fff!important;}
+.enrollment-page .btn-enroll.btn-danger{background:#522839!important;border-color:#dc78984d!important;color:#ffd5e0!important;}
+.enrollment-page .btn-enroll:disabled{opacity:.42;cursor:not-allowed;}
+.enrollment-page .table-responsive,.enrollment-page .ba-table{width:100%;max-width:100%;overflow-x:auto;border:1px solid var(--en-line);border-radius:11px;margin-top:12px;}
+.enrollment-page .enroll-table{width:100%;border-collapse:separate!important;border-spacing:0;text-align:left;font-size:13px;color:var(--en-text);background:transparent;}
+.enrollment-page .enroll-table th{background:rgba(74,34,102,.65)!important;color:#f1e4ff!important;font-size:11px;font-weight:700;text-transform:none;letter-spacing:.025em;text-align:left;}
+.enrollment-page .enroll-table th,.enrollment-page .enroll-table td{padding:12px 13px;border-bottom:1px solid #ffffff12;vertical-align:middle;}
+.enrollment-page .enroll-table td{background:transparent;}
+.enrollment-page .enroll-table tbody tr:last-child td{border-bottom:0;}
+.enrollment-page .enroll-table tbody tr:hover td{background:#ffffff08;}
+.enrollment-page .enroll-table tbody tr.is-editing td{background:#aa83ed20;}
+.enrollment-page .enrollment-result,.enrollment-page .status-badge,.enrollment-page .locked-badge{display:inline-flex;align-items:center;justify-content:center;border:1px solid #ffffff20;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:650;line-height:1.2;white-space:nowrap;background:#ffffff10;color:#e3d9ef;}
+.enrollment-page .result-pending{background:#f5c46b18;color:#f8d599;border-color:#f5c46b33;}
+.enrollment-page .result-enrolled,.enrollment-page .result-passed,.enrollment-page .status-badge:not(.closed){background:#51d4ae19;color:#a2efd7;border-color:#51d4ae33;}
+.enrollment-page .result-credited{background:#88b5ff1c;color:#b9d4ff;border-color:#88b5ff40;}
+.enrollment-page .result-failed,.enrollment-page .result-rejected,.enrollment-page .status-badge.closed{background:#f18da51a;color:#ffc3d0;border-color:#f18da533;}
+.enrollment-page .dean-stat-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,155px),1fr));gap:12px;}
+.enrollment-page .dean-metric{gap:8px;}
+.enrollment-page .dean-metric span{color:var(--en-muted);opacity:1;}
+.enrollment-page .dean-metric strong{font-size:29px;color:#fff;font-variant-numeric:tabular-nums;}
+.enrollment-page .dean-filter-row{gap:12px;}
+.enrollment-page .dean-two-col,.enrollment-page .subject-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:16px;align-items:start;}
+.enrollment-page .subject-grid>*{min-width:0;}
+.enrollment-page .enroll-grid{display:grid!important;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)!important;gap:16px!important;align-items:start;}
+.enrollment-page .selection-table-wrap,.enrollment-page .selection-picked-wrap{overflow-x:auto!important;scrollbar-width:thin;}
+.enrollment-page .selection-table{min-width:520px!important;table-layout:auto!important;}
+.enrollment-page .selection-picked-table{min-width:280px!important;table-layout:auto!important;}
+.enrollment-page .selection-table td,.enrollment-page .selection-table th,.enrollment-page .selection-picked-table td,.enrollment-page .selection-picked-table th{padding:9px 8px;overflow-wrap:normal;}
+.enrollment-page .ba-metrics>div{background:rgba(74,34,102,.65);border:1px solid var(--en-line);border-radius:10px;padding:15px;}
+.enrollment-page .ba-replace{display:flex!important;align-items:center;gap:12px;background:rgba(74,34,102,.65);color:var(--en-text);}
+.enrollment-page .ba-table tr[data-selected="true"] td{background:#ad8ff52a;}
+.enrollment-page .ba-table tr[data-selected="true"]:hover td{background:#ad8ff538;}
+.enrollment-page .ba-footer{padding-top:16px;border-top:1px solid var(--en-line);}
+.enrollment-page input[type=checkbox]{accent-color:#e6ceff;}
+.enrollment-page .prereq-picker{background:rgba(74,34,102,.65);border-color:var(--en-line);}
+.enrollment-page .popup{border-radius:10px;margin-bottom:16px;}
+@media(max-width:1250px){.enrollment-page .enroll-grid{grid-template-columns:minmax(0,1fr)!important;}}
+@media(max-width:700px){body[data-page="ENROLLMENT"] .enrollment-page{padding:12px;border-radius:12px;}.enrollment-page .enrollment-hero,.enrollment-page .dean-stage1-heading,.enrollment-page .review-header{padding:16px;}.enrollment-page .registrar-tabs a,.enrollment-page .dean-tabs a{flex:1 1 130px;}.enrollment-page .ba-metrics{grid-template-columns:1fr;}.enrollment-page .enroll-card{padding:14px!important;}.enrollment-page .enroll-table th,.enrollment-page .enroll-table td{padding:10px;}.enrollment-page .dean-stage1 .enroll-table{min-width:460px;}}
+@media(prefers-reduced-motion:reduce){.enrollment-page *{scroll-behavior:auto!important;transition:none!important;}}
+
+body[data-page="ENROLLMENT"] .enrollment-page{backdrop-filter:blur(18px) saturate(125%);-webkit-backdrop-filter:blur(18px) saturate(125%);box-shadow:inset 0 1px 0 #ffffff45,0 12px 36px #3f195126;}
+.enrollment-page .enroll-card,.enrollment-page #advisers-section{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:inset 0 1px 0 #ffffff24,0 6px 18px #3f195119!important;}
+.enrollment-page .enroll-table th{background:rgba(79,39,108,.88)!important;}
+.enrollment-page .form-control,.enrollment-page #advisers-section .form-control{background:rgba(76,36,103,.64)!important;}
+.enrollment-page #advisers-section select option{background:#58336e!important;}
+.enrollment-page .ba-mode{display:grid;gap:8px;max-width:100%;padding:14px;border:1px solid #ffffff36;border-radius:12px;background:#ffffff0e;}
+.enrollment-page .ba-mode label{font-weight:650;}.enrollment-page .ba-mode small{color:var(--en-muted);font-size:12px;}
+.enrollment-page .ba-table th{background:#603a7b!important;}
+</style>
 
             </main>
         </div>
