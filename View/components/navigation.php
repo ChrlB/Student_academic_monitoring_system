@@ -31,11 +31,16 @@ $page = $_SESSION["page"] ?? "";
         <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Grades.png" alt="" class="nav_button_icons"></div>
         <input type="button" value="GRADES"></a>
 
+      
+    <?php endif ?>
+
+    <?php if(in_array($_SESSION["role"], ["program coordinator","dean","prof","registrar","student"])): ?>
       <a class="nav_buttons row ATTENDANCE"  href="<?= BASE_PATH?>/attendance">
         <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/Attendance.png" alt="" class="nav_button_icons"></div>
         <input type="button" value="ATTENDANCE"></a>
     <?php endif ?>
-
+    
+    
     <?php if(in_array($_SESSION["role"], ["program coordinator","registrar","student","dean"])): ?>  
       <a class="nav_buttons row ENROLLMENT" href="<?= BASE_PATH?>/enrollment">
         <div class="nav_icon_holder row"><img src="<?= BASE_PATH?>/View/resources/enrollment.png" alt="" class="nav_button_icons"></div>
