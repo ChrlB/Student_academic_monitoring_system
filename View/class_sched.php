@@ -214,6 +214,8 @@ function sched_form_step2($uid, $blocks, $subjects, $instructors, $v)
 }
 
 $group     = $logic->group;
+$isDean    = $logic->isDean();
+$isCoord   = $logic->isCoordinator();
 $canManage = $logic->canManage();
 $semesters = $logic->semesters();
 $semKey    = $logic->selectedSemester($_GET['sem'] ?? '');
@@ -224,7 +226,7 @@ $csrf      = $logic->csrf();
 
 $sched = null;
 if ($view === 'class' || $view === 'edit') {
-    $sched = ($group === 'manager') ? $logic->find((int)($_GET['id'] ?? 0)) : null;
+    $sched = $isDean ? $logic->find((int)($_GET['id'] ?? 0)) : null;
     if (!$sched || !$logic->canAccess($sched) || ($view === 'edit' && !$canManage)) {
         $view = 'list';
         $sched = null;
@@ -234,11 +236,10 @@ if ($view === 'class' || $view === 'edit') {
 }
 
 $dayName = ucfirst(strtolower($_GET['d'] ?? ''));
-if ($view === 'day' && ($group === 'manager' || !in_array($dayName, ScheduleLogic::WEEK, true))) {
+if ($view === 'day' && ($isDean || !in_array($dayName, ScheduleLogic::WEEK, true))) {
     $view = 'list';
 }
 
-$isDean = $logic->isDean();
 $search = $isDean ? '' : trim((string)($_GET['q'] ?? ''));   // the dean filters with dropdowns, not text search
 $programs = $isDean ? $logic->programs() : [];
 $fl = ['program' => '', 'block' => '', 'status' => '', 'instructor' => ''];
@@ -297,7 +298,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
           <h2 class="sched-title">Schedule</h2>
           <p class="sched-empty">The schedule is not available for your role.</p>
 
-<?php elseif ($group === 'manager' && $view === 'list'): ?>
+<?php elseif ($isDean && $view === 'list'): ?>
           <div class="sched-toolbar">
             <h2 class="sched-title">Teaching Schedule<?php if ($scopeLabel !== ''): ?> - <?= sched_e($scopeLabel) ?><?php endif; ?></h2>
             <form class="sched-sem" method="get" action="<?= sched_e($self) ?>">
@@ -375,15 +376,6 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
               <?php endforeach; ?>
             </span>
           </p>
-          <?php else: ?>
-          <form class="sched-search" method="get" action="<?= sched_e($self) ?>" role="search">
-            <input type="hidden" name="sem" value="<?= sched_e($semKey) ?>">
-            <label class="sched-search__box">
-              <?= sched_icon('search') ?>
-              <input type="search" name="q" value="<?= sched_e($search) ?>" placeholder="Search block (e.g., BSCS 1A)" aria-label="Search block">
-            </label>
-            <button type="submit" class="sp-btn sp-btn--primary">Search</button>
-          </form>
           <?php endif; ?>
 
           <?php if (!$rows): ?>
@@ -612,6 +604,9 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
                     <p class="tile-row"><strong>Room:</strong> <?= sched_e($it['roomID']) ?></p>
                     <?php if ($group === 'faculty'): ?>
                       <p class="tile-row"><strong>Grade &amp; Section:</strong> <?= sched_e($it['block_label']) ?></p>
+                    <?php elseif ($isCoord): ?>
+                      <p class="tile-row"><strong>Block:</strong> <?= sched_e($it['block_label']) ?></p>
+                      <p class="tile-row"><strong>Prof:</strong> <?= sched_e($it['faculty_name']) ?></p>
                     <?php else: ?>
                       <p class="tile-row"><strong>Prof:</strong> <?= sched_e($it['faculty_name']) ?></p>
                     <?php endif; ?>
@@ -624,7 +619,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
 <?php /* =============================== FACULTY / STUDENT: WEEK =============================== */ ?>
 <?php else: ?>
           <div class="sched-toolbar">
-            <h2 class="sched-title">My Schedule</h2>
+            <h2 class="sched-title"><?= $isCoord ? 'Class Schedule' . ($scopeLabel !== '' ? ' - ' . sched_e($scopeLabel) : '') : 'My Schedule' ?></h2>
             <form class="sched-sem" method="get" action="<?= sched_e($self) ?>">
               <?php if ($search !== ''): ?><input type="hidden" name="q" value="<?= sched_e($search) ?>"><?php endif; ?>
               <select name="sem" aria-label="Semester" onchange="this.form.submit()">
@@ -638,7 +633,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             <input type="hidden" name="sem" value="<?= sched_e($semKey) ?>">
             <label class="sched-search__box">
               <?= sched_icon('search') ?>
-              <input type="search" name="q" value="<?= sched_e($search) ?>" placeholder="Search subject, room or instructor" aria-label="Search schedule">
+              <input type="search" name="q" value="<?= sched_e($search) ?>" placeholder="<?= $isCoord ? 'Search block, subject,instructor or room ' : 'Search subject, room or instructor' ?>" aria-label="Search schedule">
             </label>
             <button type="submit" class="sp-btn sp-btn--primary">Search</button>
             <?php if ($search !== ''): ?><a class="sp-btn" href="<?= sched_e(sched_url(['sem' => $semKey])) ?>">Clear</a><?php endif; ?>
@@ -664,7 +659,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
                     <p class="day-card__time"><?= sched_icon('clock') ?> <?= sched_e(ScheduleLogic::fmtRange($first, $last)) ?></p>
                     <ul class="day-card__list">
                       <?php foreach ($items as $it): ?>
-                        <li><?= sched_icon('book') ?> <span><?= sched_e($it['subject_name']) ?></span></li>
+                        <li><?= sched_icon('book') ?> <span><?= sched_e($it['subject_name']) ?><?= $isCoord ? ' • ' . sched_e($it['block_label']) : '' ?></span></li>
                       <?php endforeach; ?>
                     </ul>
                   <?php endif; ?>

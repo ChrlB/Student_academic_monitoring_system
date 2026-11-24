@@ -453,8 +453,11 @@ class ScheduleLogic
 
         if ($search !== '' && !$this->isDean()) {
             if ($this->group === 'manager') {
-                $sql .= " AND CONCAT(ep.program, ss.block) LIKE :q";
-                $params[':q'] = '%' . str_replace([' ', '%', '_'], '', $search) . '%';
+                // Coordinator: block of the assigned program (e.g. "BSCS 1A"), subject, room or instructor.
+                $sql .= " AND (CONCAT(ep.program, ss.block) LIKE :qb OR ss.subjectID LIKE :q OR s.name LIKE :q
+                               OR ss.roomID LIKE :q OR CONCAT(f.first_name, ' ', f.last_name) LIKE :q)";
+                $params[':q']  = '%' . str_replace(['%', '_'], '', $search) . '%';
+                $params[':qb'] = '%' . str_replace([' ', '%', '_'], '', $search) . '%';
             } else {
                 $sql .= " AND (ss.subjectID LIKE :q OR s.name LIKE :q OR ss.roomID LIKE :q OR ss.block LIKE :q
                                OR CONCAT(f.first_name, ' ', f.last_name) LIKE :q)";
