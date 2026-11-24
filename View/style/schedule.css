@@ -3,21 +3,6 @@
 .sched-page,
 .sched-modal,
 .sched-alert {
-<<<<<<< HEAD
-  --sp-ink: #fff;
-  --sp-muted: rgba(255, 255, 255, 0.75);
-  --sp-line: rgba(255, 255, 255, 0.6);
-  --sp-line-soft: rgba(255, 255, 255, 0.3);
-  --sp-glass: rgba(255, 255, 255, 0.07);
-  --sp-head: rgba(132, 84, 142, 0.65);
-  --sp-accent: #6d0bab;
-  --sp-accent-hi: #8a1fcf;
-  --sp-field: rgba(255, 255, 255, 0.1);
-  --sp-err: #ffc2cc;
-  --sp-ok: #c3f3d0;
-  color: var(--sp-ink);
-  font-family: inherit;
-=======
     --sp-ink: #fff;
     --sp-muted: rgba(255, 255, 255, .75);
     --sp-line: rgba(255, 255, 255, .6);
@@ -33,7 +18,6 @@
     color: var(--sp-ink);
     font-family: inherit;
     line-height: 1.4;
->>>>>>> e28a7b1e91fc77ac715e1bb6386ccfb15eb3889a
 }
 
 .sched-page *,
@@ -92,18 +76,11 @@
 }
 
 .sched-title {
-<<<<<<< HEAD
-  margin: 0;
-  font-size: 1.45rem;
-  font-weight: 700;
-  line-height: 1.2;
-=======
     margin: 0;
     font-size: 1.5rem;
     font-weight: 700;
     line-height: 1.2;
     letter-spacing: .01em;
->>>>>>> e28a7b1e91fc77ac715e1bb6386ccfb15eb3889a
 }
 
 /* ---------- Toolbar, search, bars ---------- */
@@ -124,27 +101,6 @@
 }
 
 .sched-search {
-<<<<<<< HEAD
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin: 14px 0 0;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--sp-line-soft);
-}
-
-.sched-search__box {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 1 360px;
-  min-width: 200px;
-  padding: 0 12px;
-  height: 38px;
-  border: 1px solid var(--sp-line);
-  border-radius: 8px;
-  background: var(--sp-field);
-=======
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -170,7 +126,6 @@
 
 .sched-search__box:hover {
     background: var(--sp-glass-hi);
->>>>>>> e28a7b1e91fc77ac715e1bb6386ccfb15eb3889a
 }
 
 .sched-page .sched-search__box input[type='search'] {
@@ -204,35 +159,6 @@
 }
 
 .sched-bar {
-<<<<<<< HEAD
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--sp-line-soft);
-  margin-bottom: 18px;
-}
-
-.sched-bar__nav {
-  display: flex;
-  gap: 8px;
-}
-
-.sched-empty {
-  margin: 36px 0;
-  text-align: center;
-  color: var(--sp-muted);
-}
-
-.sched-flash {
-  margin: 0 0 16px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid;
-  font-size: 0.92rem;
-=======
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -265,7 +191,6 @@
     border: 1px solid;
     border-radius: 10px;
     font-size: .92rem;
->>>>>>> e28a7b1e91fc77ac715e1bb6386ccfb15eb3889a
 }
 
 .sched-flash p {
@@ -291,27 +216,6 @@
 }
 
 .sp-btn {
-<<<<<<< HEAD
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid var(--sp-line);
-  border-radius: 8px;
-  background: transparent;
-  color: #fff;
-  font: inherit;
-  font-size: 0.88rem;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.sp-btn:hover {
-  background: rgba(255, 255, 255, 0.14);
-=======
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -338,7 +242,6 @@
 
 .sp-btn:active {
     transform: translateY(1px);
->>>>>>> e28a7b1e91fc77ac715e1bb6386ccfb15eb3889a
 }
 
 .sp-btn:focus-visible {
@@ -361,16 +264,8 @@
 }
 
 .sp-btn--danger:hover {
-<<<<<<< HEAD
-  background: rgba(200, 40, 75, 0.75);
-}
-
-.sp-form__actions .sp-btn--danger {
-  margin-right: auto;
-=======
     background: rgba(200, 40, 75, .8);
     border-color: #ffc2cc;
->>>>>>> e28a7b1e91fc77ac715e1bb6386ccfb15eb3889a
 }
 
 .sp-btn--block {
@@ -393,18 +288,6 @@
 
 .sched-page select,
 .sched-modal select,
-<<<<<<< HEAD
-.sched-page input[type='search'] {
-  height: 38px;
-  max-width: 100%;
-  padding: 0 12px;
-  border: 1px solid var(--sp-line);
-  border-radius: 8px;
-  background-color: var(--sp-field);
-  color: #fff;
-  font: inherit;
-  font-size: 0.9rem;
-=======
 .sched-page input[type="search"] {
     height: 38px;
     max-width: 100%;
@@ -421,7 +304,6 @@
 .sched-page select:hover,
 .sched-modal select:hover {
     background-color: var(--sp-glass-hi);
->>>>>>> e28a7b1e91fc77ac715e1bb6386ccfb15eb3889a
 }
 
 .sched-page select option,
@@ -504,24 +386,6 @@
 
 .sp-tag,
 .sp-pill {
-<<<<<<< HEAD
-  display: inline-block;
-  padding: 1px 10px;
-  border: 1px solid var(--sp-line);
-  border-radius: 999px;
-  font-size: 0.68rem;
-  color: var(--sp-muted);
-  width: fit-content;
-}
-
-.sp-pill {
-  background: rgba(255, 255, 255, 0.85);
-  border-color: transparent;
-  color: #3a1450;
-  font-weight: 700;
-  font-size: 0.72rem;
-  padding: 3px 12px;
-=======
     display: inline-block;
     width: fit-content;
     padding: 1px 10px;
@@ -540,7 +404,6 @@
     color: #3a1450;
     font-size: .72rem;
     font-weight: 700;
->>>>>>> e28a7b1e91fc77ac715e1bb6386ccfb15eb3889a
 }
 
 .sp-tag--draft {
