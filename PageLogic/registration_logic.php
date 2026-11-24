@@ -1,8 +1,5 @@
 <?php
-/**
- * Registration page (registrar only). Data for View/registration.php; the save endpoints are in
- * registration_actions.php.
- */
+
 require_once __DIR__ . '/../Services/auth.php';
 require_once __DIR__ . '/../Services/csrf.php';
 require_once __DIR__ . '/registration_actions.php';

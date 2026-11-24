@@ -7,8 +7,6 @@
  * action codes: created, updated, restricted, lifted, archived, restored, deleted, assigned, unassigned,
  *               login, login_blocked, login_failed
  */
-
-/** "Last, M., First" for a school ID (students: YYYY+5 digits, faculty: F+YYYY+5 digits), or '' if not found. */
 function accountLogName(PDO $pdo, string $id): string {
     $id = strtoupper(trim($id));
     if (!preg_match('/^(F?)(\d{4})(\d{5})$/', $id, $m)) return '';
