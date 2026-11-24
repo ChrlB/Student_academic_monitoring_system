@@ -19,11 +19,11 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
     <?php require_once __DIR__ . "/components/navigation.php"; ?>
     <div class="column" style="flex: 1;">
       <?php require_once __DIR__ . "/components/header.php"; ?>
-      <main class="column scrollbar" style="gap:20px">
+      <main class="column scrollbar" style="gap:20px; ">
         
         <?php if ($_SESSION["role"] == "student"): ?>
           <?php if ($student_view == "MAIN"): ?>
-            <div class="row" style=" gap:20px">
+            <div class="row" style=" gap:20px;">
               <form method="get" action="<?= BASE_PATH ?>/clearance" class="clearance_categ_box drop_shadow" onclick="this.submit()">
                 <img src="<?= BASE_PATH ?>/View/resources/image1.png" class="clearance_categ_box_upper_part">
                 
@@ -49,7 +49,14 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 <input type="hidden" name="view" value="OFFICE">
               </form>
 
-              <?php if ($acadyear !== 'ALL'): ?>
+              
+            </div>
+
+            <div class="row" style="gap:20px ;">
+              <div class="column" style="gap:20px; max-width:1000px">
+                <div class="row" style="justify-content:space-between; align-items:center; color:white; ">
+                  <b style=" font-size:30px; padding-left:20px">UPDATES</b>
+                  <?php if ($acadyear !== 'ALL'): ?>
                 <form method="post" action="<?= BASE_PATH ?>/file-maker" style="min-width: max-content;">
                   <input type="hidden" name="acad_year_sem" value="<?= e($acadyear) ?>">
                   
@@ -59,12 +66,6 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   
                 </form>
               <?php endif ?>
-            </div>
-
-            <div class="row" style="gap:20px">
-              <div class="column" style="gap:20px">
-                <div class="row" style="justify-content:space-between; align-items:center; color:white; ">
-                  <b style=" font-size:30px; padding-left:20px">UPDATES</b>
                   <a class="row" href="<?= BASE_PATH ?>/clearance?view=UPDATES" style="padding-right:20px ; align-items:center; text-decoration: none; gap:10px">
                     <b style=" font-size:25px">View All Updates</b>
                     <div><img src="<?= BASE_PATH ?>/View/resources/arrow.png" alt="" style="width:40px"></div>
