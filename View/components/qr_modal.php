@@ -48,7 +48,7 @@
         </div>
 
       <?php elseif (!empty($attCanScan)): ?>
-        <!-- =============== FACULTY VIEW: Camera Scanner & Database Form =============== -->
+        <!-- =============== SCANNER VIEW (faculty, coordinator, dean): Camera Scanner & Database Form =============== -->
         <form id="qrAttendanceForm" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
         <input type="hidden" name="att_action" value="scan">
 

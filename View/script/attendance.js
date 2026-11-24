@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const modal  = document.getElementById('qrModal');
 
   /* Create and insert QR Code button next to user profile header icon */
-  // data-can-qr is "0" when the role may not scan (dean, registrar); students and scanners get "1"
+  // data-can-qr is "0" when the role may not scan (registrar); students, faculty, coordinators and deans get "1"
   const profile = header && header.querySelector('.profile_icon')?.closest('.column');
   const canQr   = !att || att.dataset.canQr !== '0';
 
@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
       f('ev-program').value = mode === 'add' ? (evDlg.dataset.myProgram || '') : (d.program || '');
       const locked = mode === 'view' || mode === 'review';
       fields.forEach(x => { x.disabled = locked; });
-      /* Remark: coordinators/faculty must explain an edit; everyone else just reads it */
+      /* Remark: a coordinator must explain an edit; everyone else just reads it */
       const rm = f('ev-remark'), rmWrap = f('ev-remark-wrap');
       if (rm && rmWrap) {
         const asking = mode === 'edit' && !isDean;
