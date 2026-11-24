@@ -622,7 +622,7 @@ $userDAO->prepareStatement("updateStudentProfileFull",
                 ON FCR.faculty_clearanceID = FC.faculty_clearanceID
                 AND FCR.uploaded_by <> ?
         WHERE FC.facultyID = ?
-            AND CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ?
+            AND (CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ? )
             AND ('ALL' = ? OR CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ?)
         ORDER BY EP.acad_year DESC, EP.sem DESC, FCR.uploaded_at DESC;
     ");

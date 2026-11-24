@@ -23,11 +23,11 @@ require_once __DIR__ . "/../PageLogic/dashboard_logic.php";
     <?php require_once __DIR__ . "/components/navigation.php"; ?>
     <div class="column" style="flex: 1;">
       <?php require_once __DIR__ . "/components/header.php"; ?>
-      <main class="column scrollbar" style="gap:20px" >
+      <main class="column scrollbar" style="gap:20px; " >
 
         <?php if(strtoupper($_SESSION['role']) == 'STUDENT'): ?>
           <?php $projects = getAllProjectStatus()?>
-          <div class="row" style="gap:20px" >
+          <div class="row" style="gap:20px; flex-wrap:wrap;" >
             <div style="gap:20px" class="column">
               <div class="column drop_shadow" style="padding: 30px; border-radius:30px; width:500px; max-height:400px; background: rgba(40, 40, 40, 0.3);">
                 <div class="row" style="align-items:center; text-decoration:none; justify-content:space-between">
@@ -151,7 +151,11 @@ require_once __DIR__ . "/../PageLogic/dashboard_logic.php";
                       <b><?= htmlspecialchars($c['subjectID']) ?> - <?= htmlspecialchars($c['name']) ?></b>
                       <span><?= htmlspecialchars($c['prof_name'] ?? 'TBA') ?> · Room <?= htmlspecialchars($c['roomID']) ?></span>
                     </div>
-                    <b><?= date('g:i A', strtotime($c['time_start'])) ?> - <?= date('g:i A', strtotime($c['time_end'])) ?></b>
+                    <div class="column">
+                      <b><?= htmlspecialchars($c['class_format'] ?? '')?></b>
+                      <b><?= date('g:i A', strtotime($c['time_start'])) ?> - <?= date('g:i A', strtotime($c['time_end'])) ?></b>
+                    </div>
+                   
                   </div>
                 <?php endforeach; endif ?>
               </div> 
