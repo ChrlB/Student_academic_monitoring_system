@@ -72,6 +72,7 @@ $eventPrograms   = $ATT_PROGRAMS ?? [];
                      data-status="<?= e($ev['status']) ?>"
                      data-program="<?= e($ev['program']) ?>"
                      data-coord="<?= e($ev['coord']) ?>"
+                     data-remark="<?= e($ev['remark'] ?? '') ?>"
                      data-att="<?= (int)$ev['att'] ?>"
                      data-edit="<?= $ev['canEdit'] ? '1' : '0' ?>"
                      data-review="<?= !empty($ev['review']) ? '1' : '0' ?>">
@@ -135,6 +136,15 @@ $eventPrograms   = $ATT_PROGRAMS ?? [];
                     <?php foreach (($ATT_FACULTY_NAMES ?? []) as $fn): ?><li role="option" data-v="<?= e($fn) ?>"><?= e($fn) ?></li><?php endforeach; ?>
                   </ul>
                 </div></div>
+
+              <!-- Remark: required when a coordinator/faculty changes an event; shown read-only to the dean when reviewing -->
+              <style>
+                #ev-remark { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; font: inherit; resize: vertical;
+                             color: inherit; background: transparent; border: 1px solid rgba(128,128,128,.45); }
+                #ev-remark[readonly] { opacity: .85; resize: none; }
+              </style>
+              <label class="ev-field" id="ev-remark-wrap" hidden><span>REMARK (WHY IS THIS EVENT BEING CHANGED?)</span>
+                <textarea name="remark" id="ev-remark" rows="3" maxlength="500" placeholder="eg. Venue is not available, moved to the next day"></textarea></label>
 
               <!-- Dean approval notice for non-dean submissions -->
               <p class="ev-note" id="ev-note" hidden>This event will be sent to the dean for approval.</p>

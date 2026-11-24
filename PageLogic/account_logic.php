@@ -62,7 +62,8 @@ function att_sync_elapsed_events(PDO $db): void {
       SET status = CASE
         WHEN datetime_End IS NOT NULL AND datetime_End < NOW() THEN 'FINISHED'
         ELSE status
-      END
+      END,
+      datetime_Start = datetime_Start  -- keep: column has ON UPDATE current_timestamp()
       WHERE status = 'ACTIVE'
         AND datetime_End IS NOT NULL AND datetime_End < NOW()
     ");
@@ -134,6 +135,7 @@ $GLOBALS['evpage']                 = $evpage;
 $GLOBALS['attCanScan']             = $attCanScan;
 $GLOBALS['attIsDean']              = $attIsDean;
 $GLOBALS['attDeptScoped']          = $attDeptScoped;
+echo '<pre>'; var_dump(__FILE__, $attRole, $attPos, $attFacultyID, $attMyDept, $attDeptScoped); exit;
 $GLOBALS['attFacultyID']           = $attFacultyID;
 $GLOBALS['isAuthorizedDepartment'] = $isAuthorizedDepartment;
 
@@ -606,7 +608,7 @@ function att_handle_event_action(PDO $db, string $act): void {
       if ($deptScoped && $evDeptRow !== '' && $evDeptRow !== $myDept) { $_SESSION['error'] = 'That event belongs to another department.'; return; }
       if (strtoupper((string)$cur) !== 'PENDING') { $_SESSION['error'] = 'This event is not waiting for approval.'; return; }
       if ($act === 'approve_event') {
-        $db->prepare("UPDATE events SET status = 'ACTIVE' WHERE eventID = ? AND status = 'PENDING'")->execute([$id]);
+        $db->prepare("UPDATE events SET status = 'ACTIVE', datetime_Start = datetime_Start WHERE eventID = ? AND status = 'PENDING'")->execute([$id]);
         $_SESSION['message'] = 'Event approved.';
       } else {
         $db->prepare("DELETE FROM events WHERE eventID = ? AND status = 'PENDING'")->execute([$id]);
