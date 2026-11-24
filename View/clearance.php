@@ -50,7 +50,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               </form>
 
               <?php if ($acadyear !== 'ALL'): ?>
-                <form method="post" action="<?= BASE_PATH ?>/file-maker">
+                <form method="post" action="<?= BASE_PATH ?>/file-maker" style="min-width: max-content;">
                   <input type="hidden" name="acad_year_sem" value="<?= e($acadyear) ?>">
                   
                   <button type="submit" class="row" style="align-items:center">Download clearance form 
@@ -791,7 +791,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           
           
 
-        <?php elseif (in_array($_SESSION["role"], ["prof","dean","program coordinator","registrar"])):?>
+        <?php elseif (!in_array($_SESSION["role"], ["student"])):?>
           <?php if($student_view == "MAIN"): ?>
 
             
@@ -1152,6 +1152,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                         <input type="hidden" name="clearanceID" value="<?= $students_for_clearance['office_clearanceID'] ?? '' ?>">
                         <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">          
                         <button type="submit">SAVE</button>
+                        <input type="hidden" name="studentID" value="<?= e($students_for_clearance['real_studentID']) ?>">
+                        <input type="hidden" name="enrollmentID" value="<?= e($students_for_clearance['enrollmentID']) ?>">
                       </form>
                       <div class="student_clearance_panel">
                         <div class="row" style="justify-content: space-between;">
@@ -1259,7 +1261,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
               <div class="row" style="justify-content: space-between; align-items:center">
                 <b class="view_title"><?= $_GET['subjectID'].' - '.$_GET['name'] ?>  </b>
 
-                <form method="post" action="<?= BASE_PATH ?>/class-list-maker">
+                <form method="post" action="<?= BASE_PATH ?>/class-list-maker" style="min-width: max-content;">
                   <input type="hidden" name="subjectID" value="<?= e($_GET['subjectID']) ?>">
                   <input type="hidden" name="block" value="<?= e($block) ?>">
                   <input type="hidden" name="acad_year_sem" value="<?= e($acadyear) ?>">
@@ -1267,7 +1269,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                     <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons" style="width:40px">
                   </button>
                 </form>
-                
+
                 <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
               </div>
               <div>

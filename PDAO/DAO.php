@@ -1456,14 +1456,23 @@ $userDAO->prepareStatement("updateStudentProfileFull",
         ) VALUES (?,?,? );
     ");
 
-    $clearanceDAO->prepareStatement("addOfficeClearance","INSERT INTO `office_clearance` (
-            `officeID`, 
-            `studentID`, 
-            `remarks`, 
-            `enrollmentID`
-        ) VALUES (?, ?, ?, ?);
+    // $clearanceDAO->prepareStatement("addOfficeClearance","INSERT INTO `office_clearance` (
+    //         `officeID`, 
+    //         `studentID`, 
+    //         `remarks`, 
+    //         `enrollmentID`
+    //     ) VALUES (?, ?, ?, ?);
 
-    ");
+    // ");
+
+    $clearanceDAO->prepareStatement("addOfficeClearance","INSERT INTO `office_clearance` (
+        `officeID`,
+        `studentID`,
+        `remarks`,
+        `status`,
+        `enrollmentID`
+    ) VALUES (?, ?, ?, ?, ?);
+");
 
     $clearanceDAO->prepareStatement("addFacultyClearance","INSERT INTO `faculty_clearance` (
             `facultyID`, 
