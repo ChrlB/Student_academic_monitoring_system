@@ -69,9 +69,27 @@ $router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.ph
 $router->post('/class-sched', fn() => require __DIR__ . '/../View/class_sched.php');
 $router->get('/clearance',  fn() => require __DIR__ . '/../View/clearance.php');
 // $router->post('/update_clearance',  fn($request) => updateClearance($request));
+// $router->post('/update_clearance', function ($request) {
+//     require_once __DIR__ . '/../PageLogic/clearance_logic.php';
+//     $result =  updateClearance($request);
+
+//     if($request['isnew']) return $result;
+
+//     header('Location: '.BASE_PATH.'/'.$request["page_uploader"]); exit;
+// });
+
 $router->post('/update_clearance', function ($request) {
     require_once __DIR__ . '/../PageLogic/clearance_logic.php';
-    return updateClearance($request);
+    $result = updateClearance($request);
+
+    if (!empty($request['isnew'])) return $result;
+
+    $back = $request['page_uploader'] ?? '';
+    if ($back === '' || $back[0] !== '/' || strpos($back, '//') === 0) {
+        $back = rtrim(BASE_PATH, '/') . '/clearance';   // safe fallback
+    }
+    header('Location: ' . $back);
+    exit;
 });
 
 // $router->post('/clearance',  fn($request) => require __DIR__ . '/../View/clearance.php');
@@ -113,7 +131,8 @@ $router->get('/get-profile', fn() => getProfilePic());
 
 $router->post('/upload-document', function ($request) { 
     require_once __DIR__ . '/../PageLogic/clearance_logic.php';
-    if($request['ID'] === 'none') updateClearance($request);
+    $request['isnew'] = false;
+    if($request['ID'] === 'none') {$request['isnew'] = true; updateClearance($request);}
     if($request['ID'] === 'none' && $request['clearance_categ'] === 'FACULTY') $request['ID'] =  getFacultyClearanceID($request);
     if($request['ID'] === 'none' && $request['clearance_categ'] === 'OFFICE') $request['ID'] =  getOfficeClearanceID($request);
     uploadDocument($request);
@@ -123,6 +142,6 @@ $router->get('/download-document', fn() => downloadDocument());
 $router->get('/view-document', fn() => require __DIR__ . '/../View/document.php');
 
 $router->post('/file-maker', fn($request) => require __DIR__ . '/../View/file_maker.php');
-
+$router->post('/class-list-maker', fn($request) => require __DIR__ . '/../View/class_list_maker.php');
 
 $router->dispatch();
