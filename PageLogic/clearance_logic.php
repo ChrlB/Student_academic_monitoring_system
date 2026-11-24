@@ -30,7 +30,7 @@ $FstudentID  = 'ALL';
 $Oblock= 'ALL';
 $Oacadyear= $currentAY ;
 $OstudentID= 'ALL';
-
+function e($v) { return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 
 
 $allowedViews = ($_SESSION["role"] == 'student')
@@ -381,24 +381,59 @@ function updateClearance($request){
         }
         
 
-    }elseif($request['clearance_categ'] === "OFFICE"){
-        if($request['clearanceID'] == ''){
-            $records = $clearanceDAO->executeQuery("addOfficeClearance",[
-                $_SESSION["real_userID"],
-                $request['studentID'],
-                $remarks,
-                $request['enrollmentID']
-            ]);
-        }else{
-           $records = $clearanceDAO->executeQuery("updateOfficeClearance",[
-                $remarks,
-                $status,
-                $request['clearanceID']
-           ]);
+    }
+    // elseif($request['clearance_categ'] === "OFFICE"){
+    //     if($request['clearanceID'] == ''){
+    //         $records = $clearanceDAO->executeQuery("addOfficeClearance",[
+    //             $_SESSION["real_userID"],
+    //             $request['studentID'],
+    //             $remarks,
+    //             $request['enrollmentID']
+    //         ]);
+    //     }else{
+    //        $records = $clearanceDAO->executeQuery("updateOfficeClearance",[
+    //             $remarks,
+    //             $status,
+    //             $request['clearanceID']
+    //        ]);
 
+    //     }
+
+    // }
+    elseif($request['clearance_categ'] === "OFFICE"){
+        $officeID = $_SESSION['officeID'] ?? null;
+        if (!$officeID) {
+            http_response_code(403);
+            exit('No office is assigned to this account.');
         }
 
-    }elseif($request['clearance_categ'] === "FACULTY"){
+        $clearanceID = $request['clearanceID'] ?? '';
+
+        if ($clearanceID === '') {
+            $studentID    = filter_var($request['studentID'] ?? null, FILTER_VALIDATE_INT);
+            $enrollmentID = filter_var($request['enrollmentID'] ?? null, FILTER_VALIDATE_INT);
+            if (!$studentID || !$enrollmentID) {
+                http_response_code(400);
+                exit('Missing student or term.');
+            }
+
+            // a row may already exist for this student, office and term
+            $existing = $clearanceDAO->executeQuery("getOfficeClearanceID",
+                [$enrollmentID, $studentID, $officeID]);
+
+            if ($existing) {
+                $records = $clearanceDAO->executeQuery("updateOfficeClearance",
+                    [$remarks, $status, $existing[0]['office_clearanceID']]);
+            } else {
+                $records = $clearanceDAO->executeQuery("addOfficeClearance",
+                    [$officeID, $studentID, $remarks, $status, $enrollmentID]);
+            }
+        } else {
+            $records = $clearanceDAO->executeQuery("updateOfficeClearance",
+                [$remarks, $status, $clearanceID]);
+        }
+    }
+    elseif($request['clearance_categ'] === "FACULTY"){
         if($request['clearanceID'] == ''){var_dump($request['clearanceID'] == '');
             $records = $clearanceDAO->executeQuery("addFacultyClearance",[
                 $_SESSION["real_userID"],

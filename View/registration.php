@@ -1,5 +1,6 @@
 <?php
-require_once __DIR__ . '/../PageLogic/registration_logic.php';  
+require_once __DIR__ . '/../PageLogic/registration_logic.php';   // registrar check, $regAccounts, $regDepartments, e()
+
 $filters = [
     'all'                 => 'All Accounts',
     'student'             => 'Students',
@@ -7,6 +8,7 @@ $filters = [
     'dean'                => 'Dean',
     'program coordinator' => 'Program Coordinator',
     'prof'                => 'Professor',
+    'archived'            => 'Archived',
 ];
 $defaultDept = $regDepartments[0]['department'] ?? '';
 $total = count($regAccounts);
@@ -38,14 +40,13 @@ $total = count($regAccounts);
             data-restrict-url="<?= e(BASE_PATH . '/registration-restrict') ?>"
             data-update-url="<?= e(BASE_PATH . '/registration-update') ?>"
             data-delete-url="<?= e(BASE_PATH . '/registration-delete') ?>"
-            data-assign-url="<?= e(BASE_PATH . '/registration-assign') ?>"
-            data-unassign-url="<?= e(BASE_PATH . '/registration-unassign') ?>"
-            data-asg-ready="<?= $regAsgReady ? '1' : '0' ?>"
+            data-archive-url="<?= e(BASE_PATH . '/registration-archive') ?>"
+            data-logs-url="<?= e(BASE_PATH . '/registration-logs') ?>"
             data-csrf="<?= e(csrfToken()) ?>"
-            data-default-dept="<?= e($defaultDept) ?>">
+            data-default-dept="<?= e($defaultDept) ?>"
+            data-programs="<?= e(json_encode($regProgramDepts ?? [], JSON_UNESCAPED_UNICODE)) ?>">
 
         <?php if ($regLoadError): ?><p class="reg-warning" role="alert"><?= e($regLoadError) ?></p><?php endif; ?>
-        <?php if (!$regAsgReady): ?><p class="reg-warning" role="status">Assigning professors needs a one-time database update: run <b>assignment_migration.sql</b> in phpMyAdmin, then reload.</p><?php endif; ?>
 
         <div class="reg-tools">
           <form class="reg-search" role="search" id="reg-search-form">
@@ -57,8 +58,8 @@ $total = count($regAccounts);
             <button type="submit" class="reg-btn reg-btn-light">Search</button>
           </form>
           <div class="reg-actions">
-            <button type="button" class="reg-btn reg-btn-light" data-action="open-assign">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9.5" cy="8" r="3.6"/><path d="M3 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 11.5l2 2 3.5-4"/></svg>Assign Prof
+            <button type="button" class="reg-btn reg-btn-light" data-action="open-logs">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12h5M9.5 16h5"/></svg>Logs
             </button>
             <button type="button" class="reg-btn reg-btn-light" data-action="open-restrict">
               <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2.2"/><path d="M8.5 10.5V8a3.5 3.5 0 017 0v2.5"/></svg>Restrict
@@ -91,7 +92,6 @@ $total = count($regAccounts);
                   <th scope="col">Department</th>
                   <th scope="col">Program / Block</th>
                   <th scope="col">Roles:</th>
-                  <th scope="col">Assigned Professors</th>
                   <th scope="col">Account Status</th>
                   <th scope="col">Actions</th>
                 </tr>
@@ -99,21 +99,20 @@ $total = count($regAccounts);
               <tbody id="reg-body">
                 <?php foreach ($regAccounts as $a): ?>
                 <tr tabindex="0" data-account="<?= e(json_encode($a, JSON_UNESCAPED_UNICODE)) ?>"
-                    data-kind="<?= e($a['kind']) ?>" data-role="<?= e($a['role']) ?>"
+                    data-archived="<?= !empty($a['archived']) ? '1' : '0' ?>" data-kind="<?= e($a['kind']) ?>" data-role="<?= e($a['role']) ?>"
                     data-search="<?= e(strtolower($a['name'] . ' ' . $a['id'] . ' ' . $a['dept'] . ' ' . $a['programBlock'] . ' ' . $a['roleLabel'])) ?>">
                   <th scope="row"><?= e($a['name']) ?></th>
                   <td class="mono"><?= e($a['id']) ?></td>
                   <td><?= e($a['dept'] ?: '—') ?></td>
                   <td><?= e($a['programBlock']) ?></td>
                   <td><span class="role-name"><?= e($a['roleLabel']) ?></span><?php if ($a['kind'] === 'faculty'): ?> <span class="tag">Faculty</span><?php endif; ?></td>
-                  <td class="reg-asg"></td><?php /* drawn by registration.js (fillRow) so the page and later updates share one renderer */ ?>
-                  <td><span class="status status-<?= e($a['status']) ?>"><?= $a['status'] === 'restricted' ? 'Restricted' : 'Active' ?></span></td>
+                  <td><?php if (!empty($a['archived'])): ?><span class="status status-archived">Archived</span><?php else: ?><span class="status status-<?= e($a['status']) ?>"><?= $a['status'] === 'restricted' ? 'Restricted' : 'Active' ?></span><?php endif; ?></td>
                   <td class="reg-row-actions">
                     <button type="button" class="row-btn row-btn-edit" data-row-action="edit"<?= $a['locked'] ? ' disabled title="This account cannot be edited here"' : '' ?> aria-label="Edit <?= e($a['name']) ?>">
                       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M13 7l4 4"/></svg>Edit
                     </button>
-                    <button type="button" class="row-btn row-btn-delete" data-row-action="delete"<?= $a['locked'] ? ' disabled title="This account cannot be deleted here"' : '' ?> aria-label="Delete <?= e($a['name']) ?>">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10.5 11v5M13.5 11v5"/></svg>Delete
+                    <button type="button" class="row-btn row-btn-archive" data-row-action="archive"<?= $a['locked'] ? ' disabled title="This account cannot be archived here"' : '' ?> aria-label="Archive <?= e($a['name']) ?>">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v3H4zM6 10v9h12v-9M10 14h4"/></svg>Archive
                     </button>
                   </td>
                 </tr>
@@ -127,6 +126,7 @@ $total = count($regAccounts);
     </div>
   </div>
 
+  <!-- Register Student / Faculty -->
   <dialog id="add-dialog" class="dlg dlg-light reg-dlg" aria-labelledby="add-title">
     <form id="add-form" novalidate autocomplete="off">
       <div class="reg-dlg-head">
@@ -135,8 +135,14 @@ $total = count($regAccounts);
       </div>
       <label class="rf">
         <span>Full Name</span>
-        <input type="text" name="full_name" placeholder="First Name, Middle Initial, Last Name" maxlength="150" required aria-describedby="add-full_name-err">
+        <input type="text" name="full_name" placeholder="Last Name, Middle Initial, First Name" maxlength="150" required aria-describedby="add-full_name-err">
         <em class="rf-err" id="add-full_name-err" data-err="full_name" hidden></em>
+        <small class="rf-preview" id="add-name-preview" aria-live="polite"></small>
+      </label>
+      <label class="rf">
+        <span>Email <small>(optional, e.g. name@gmail.com)</small></span>
+        <input type="email" name="email" placeholder="name@gmail.com" maxlength="100" autocomplete="off" aria-describedby="add-email-err">
+        <em class="rf-err" id="add-email-err" data-err="email" hidden></em>
       </label>
       <label class="rf">
         <span>School / Employee ID <small>(optional)</small></span>
@@ -145,8 +151,9 @@ $total = count($regAccounts);
       </label>
       <div class="rf-row">
         <label class="rf">
-          <span>Department</span>
-          <select name="department" required aria-describedby="add-department-err">
+          <span>Department <small>(set by the program)</small></span>
+          <select name="department" aria-describedby="add-department-err">
+            <option value="">Filled in from the program</option>
             <?php foreach ($regDepartments as $d): ?>
               <option value="<?= e($d['department']) ?>"><?= e($d['department']) ?></option>
             <?php endforeach; ?>
@@ -214,58 +221,6 @@ $total = count($regAccounts);
     </form>
   </dialog>
 
-  <!-- Assign professors to a student -->
-  <dialog id="assign-dialog" class="dlg dlg-light reg-dlg" aria-labelledby="assign-title">
-    <form id="assign-form" novalidate autocomplete="off">
-      <div class="reg-dlg-head">
-        <h2 id="assign-title">
-          <svg class="reg-h2-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9.5" cy="8" r="3.6"/><path d="M3 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><path d="M16.5 11.5l2 2 3.5-4"/></svg>
-          Assign Professors to Student
-        </h2>
-        <button type="button" class="reg-x" data-close aria-label="Close">&times;</button>
-      </div>
-
-      <label class="rf">
-        <span>Select Student</span>
-        <select name="school_id" required aria-describedby="assign-school_id-err"></select>
-        <em class="rf-err" id="assign-school_id-err" data-err="school_id" hidden></em>
-      </label>
-      <p class="asg-info" id="assign-info" aria-live="polite"></p>
-
-      <div class="asg-listhead">
-        <span id="assign-list-title">Currently Assigned Professors</span>
-        <b id="assign-count" class="asg-count"></b>
-      </div>
-      <ul class="asg-list" id="assign-list" aria-labelledby="assign-list-title"></ul>
-
-      <p class="asg-sub">+ Add Another Professor</p>
-      <label class="rf">
-        <span>Select Professor / Faculty</span>
-        <select name="faculty_id" required aria-describedby="assign-faculty_id-err"></select>
-        <em class="rf-err" id="assign-faculty_id-err" data-err="faculty_id" hidden></em>
-      </label>
-      <label class="rf">
-        <span>Assignment Type</span>
-        <select name="type" aria-describedby="assign-type-err">
-          <option value="subject">Subject professor (teaches a subject)</option>
-          <option value="adviser">Academic adviser (reviews enrollment)</option>
-        </select>
-        <em class="rf-err" id="assign-type-err" data-err="type" hidden></em>
-      </label>
-      <label class="rf">
-        <span>Course / Subject or Advising Role</span>
-        <input type="text" name="assignment" maxlength="100" placeholder="e.g. CS 202 — Object-Oriented Programming" aria-describedby="assign-assignment-err">
-        <em class="rf-err" id="assign-assignment-err" data-err="assignment" hidden></em>
-      </label>
-      <p class="rf-hint" id="assign-hint"></p>
-      <p class="rf-err rf-formerr" id="assign-formerr" role="alert" hidden></p>
-      <div class="dlg-actions">
-        <button type="button" class="pill pill-grey" data-close>Done</button>
-        <button type="submit" class="pill" id="assign-submit">+ Add Assignment</button>
-      </div>
-    </form>
-  </dialog>
-
   <!-- Edit account -->
   <dialog id="edit-dialog" class="dlg dlg-light reg-dlg" aria-labelledby="edit-title">
     <form id="edit-form" novalidate autocomplete="off">
@@ -279,13 +234,20 @@ $total = count($regAccounts);
       </label>
       <label class="rf">
         <span>Full Name</span>
-        <input type="text" name="full_name" placeholder="First Name, Middle Initial, Last Name" maxlength="150" required aria-describedby="edit-full_name-err">
+        <input type="text" name="full_name" placeholder="Last Name, Middle Initial, First Name" maxlength="150" required aria-describedby="edit-full_name-err">
         <em class="rf-err" id="edit-full_name-err" data-err="full_name" hidden></em>
+        <small class="rf-preview" id="edit-name-preview" aria-live="polite"></small>
+      </label>
+      <label class="rf">
+        <span>Email <small>(optional, e.g. name@gmail.com)</small></span>
+        <input type="email" name="email" placeholder="name@gmail.com" maxlength="100" autocomplete="off" aria-describedby="edit-email-err">
+        <em class="rf-err" id="edit-email-err" data-err="email" hidden></em>
       </label>
       <div class="rf-row">
         <label class="rf">
-          <span>Department</span>
-          <select name="department" required aria-describedby="edit-department-err">
+          <span>Department <small>(set by the program)</small></span>
+          <select name="department" aria-describedby="edit-department-err">
+            <option value="">Filled in from the program</option>
             <?php foreach ($regDepartments as $d): ?>
               <option value="<?= e($d['department']) ?>"><?= e($d['department']) ?></option>
             <?php endforeach; ?>
@@ -317,11 +279,32 @@ $total = count($regAccounts);
     </form>
   </dialog>
 
+  <!-- Archive account -->
+  <dialog id="archive-dialog" class="dlg dlg-light reg-dlg" aria-labelledby="archive-title">
+    <form id="archive-form" novalidate>
+      <div class="reg-dlg-head">
+        <h2 id="archive-title">Archive Account</h2>
+        <button type="button" class="reg-x" data-close aria-label="Close">&times;</button>
+      </div>
+      <p class="reg-confirm" id="archive-text"></p>
+      <dl class="reg-cred">
+        <div><dt>Name</dt><dd id="archive-name"></dd></div>
+        <div><dt>School / Employee ID</dt><dd id="archive-id" class="mono"></dd></div>
+      </dl>
+      <p class="rf-hint">The account moves to the Archived tab and can no longer log in. Nothing is deleted: its information and records are kept, and you can restore it at any time.</p>
+      <p class="rf-err rf-formerr" id="archive-formerr" role="alert" hidden></p>
+      <div class="dlg-actions">
+        <button type="button" class="pill pill-grey" data-close>Cancel</button>
+        <button type="submit" class="pill" id="archive-submit">Archive</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Delete account -->
   <dialog id="delete-dialog" class="dlg dlg-light reg-dlg" aria-labelledby="delete-title">
     <form id="delete-form" novalidate>
       <div class="reg-dlg-head">
-        <h2 id="delete-title">Delete Account</h2>
+        <h2 id="delete-title">Delete Account Permanently</h2>
         <button type="button" class="reg-x" data-close aria-label="Close">&times;</button>
       </div>
       <p class="reg-confirm" id="delete-text"></p>
@@ -329,13 +312,59 @@ $total = count($regAccounts);
         <div><dt>Name</dt><dd id="delete-name"></dd></div>
         <div><dt>School / Employee ID</dt><dd id="delete-id" class="mono"></dd></div>
       </dl>
-      <p class="rf-hint">This cannot be undone. An account that already has records (enrollment, attendance, clearance) cannot be deleted: restrict it instead.</p>
+      <p class="rf-hint"><b>This cannot be undone.</b> All of this account's information will be removed for good. An account that already has records (enrollment, attendance, clearance) cannot be deleted: leave it in the archive instead.</p>
       <p class="rf-err rf-formerr" id="delete-formerr" role="alert" hidden></p>
       <div class="dlg-actions">
         <button type="button" class="pill pill-grey" data-close>Cancel</button>
         <button type="submit" class="pill pill-danger" id="delete-submit">Delete</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Account activity logs -->
+  <dialog id="logs-dialog" class="dlg dlg-light reg-dlg reg-dlg-wide" aria-labelledby="logs-title">
+    <div class="reg-logs">
+      <div class="reg-dlg-head">
+        <h2 id="logs-title">Account Activity Logs</h2>
+        <button type="button" class="reg-x" data-close aria-label="Close">&times;</button>
+      </div>
+      <div class="reg-logs-tools">
+        <label class="rf">
+          <span>Search <small>(name, ID, or details)</small></span>
+          <input type="search" id="logs-q" placeholder="e.g. 202600045 or Bautista" maxlength="60" autocomplete="off">
+        </label>
+        <label class="rf">
+          <span>Activity</span>
+          <select id="logs-action">
+            <option value="">All activity</option>
+            <option value="created">Registered</option>
+            <option value="updated">Edited</option>
+            <option value="restricted">Restricted</option>
+            <option value="lifted">Restriction lifted</option>
+            <option value="archived">Archived</option>
+            <option value="restored">Restored</option>
+            <option value="deleted">Deleted</option>
+            <option value="login">Logged in</option>
+            <option value="login_blocked">Login blocked</option>
+            <option value="login_failed">Failed login</option>
+          </select>
+        </label>
+      </div>
+      <div class="reg-logs-wrap" tabindex="0" role="region" aria-label="Activity log entries">
+        <table class="reg-logs-table">
+          <thead>
+            <tr><th scope="col">Date &amp; Time</th><th scope="col">Account</th><th scope="col">Activity</th><th scope="col">Details</th><th scope="col">By</th></tr>
+          </thead>
+          <tbody id="logs-body"></tbody>
+        </table>
+        <p class="reg-logs-empty" id="logs-empty" hidden></p>
+      </div>
+      <div class="reg-logs-foot">
+        <span id="logs-count" role="status" aria-live="polite"></span>
+        <button type="button" class="pill pill-grey" id="logs-more" hidden>Load more</button>
+        <button type="button" class="pill" data-close>Close</button>
+      </div>
+    </div>
   </dialog>
 
   <!-- shown once after a successful registration -->
@@ -347,18 +376,17 @@ $total = count($regAccounts);
         <div><dt>School / Employee ID</dt><dd id="done-id" class="mono"></dd></div>
         <div><dt>Temporary password</dt><dd id="done-pw" class="mono"></dd></div>
       </dl>
-      <p class="rf-hint">Write this password down now: it is not stored anywhere and cannot be shown again. The person should change it after their first login.</p>
+      <p class="rf-hint">Write this password down now: it is not stored anywhere and cannot be shown again. The person should change it after their first login. <span id="done-mailnote"></span></p>
       <div class="dlg-actions">
         <button type="button" class="pill pill-grey" id="done-copy">Copy</button>
+        <a class="pill pill-grey" id="done-mail" href="#" hidden>Email to student</a>
         <button type="button" class="pill" data-close>Done</button>
       </div>
     </div>
   </dialog>
-
   <div class="reg-toast" id="reg-toast" role="status" aria-live="polite" hidden></div>
 
   <script src="<?= BASE_PATH ?>/View/script/registration.js"></script>
   <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
-
 </html>

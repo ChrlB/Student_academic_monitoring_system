@@ -48,6 +48,17 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                 </div>
                 <input type="hidden" name="view" value="OFFICE">
               </form>
+
+              <?php if ($acadyear !== 'ALL'): ?>
+                <form method="post" action="<?= BASE_PATH ?>/file-maker" style="min-width: max-content;">
+                  <input type="hidden" name="acad_year_sem" value="<?= e($acadyear) ?>">
+                  
+                  <button type="submit" class="row" style="align-items:center">Download clearance form 
+                    <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons" style="width:40px">
+                  </button>
+                  
+                </form>
+              <?php endif ?>
             </div>
 
             <div class="row" style="gap:20px">
@@ -780,7 +791,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
           
           
 
-        <?php elseif (in_array($_SESSION["role"], ["prof","dean","program coordinator","registrar"])):?>
+        <?php elseif (!in_array($_SESSION["role"], ["student"])):?>
           <?php if($student_view == "MAIN"): ?>
 
             
@@ -808,7 +819,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
 
             <?php endif ?>
 
-            <?php if(!in_array($_SESSION["role"],["student"])): ?>
+            <?php if(in_array($_SESSION["role"],["dean","program coordinator"]) ): ?>
               <div>
                 <hr>
               </div>
@@ -1141,6 +1152,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                         <input type="hidden" name="clearanceID" value="<?= $students_for_clearance['office_clearanceID'] ?? '' ?>">
                         <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">          
                         <button type="submit">SAVE</button>
+                        <input type="hidden" name="studentID" value="<?= e($students_for_clearance['real_studentID']) ?>">
+                        <input type="hidden" name="enrollmentID" value="<?= e($students_for_clearance['enrollmentID']) ?>">
                       </form>
                       <div class="student_clearance_panel">
                         <div class="row" style="justify-content: space-between;">
@@ -1247,6 +1260,16 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
             <?php if(!isset($_GET['edit'])): ?><?php  //var_dump($department.$search.$block.$year.$acadyear) ?>
               <div class="row" style="justify-content: space-between; align-items:center">
                 <b class="view_title"><?= $_GET['subjectID'].' - '.$_GET['name'] ?>  </b>
+
+                <form method="post" action="<?= BASE_PATH ?>/class-list-maker" style="min-width: max-content;">
+                  <input type="hidden" name="subjectID" value="<?= e($_GET['subjectID']) ?>">
+                  <input type="hidden" name="block" value="<?= e($block) ?>">
+                  <input type="hidden" name="acad_year_sem" value="<?= e($acadyear) ?>">
+                  <button type="submit" class="row" style="align-items:center">Download class list 
+                    <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons" style="width:40px">
+                  </button>
+                </form>
+
                 <a href="<?= BASE_PATH ?>/clearance" ><img src="<?= BASE_PATH?>/View/resources/return.png" alt="← back" class="back_buttons"></a>
               </div>
               <div>
@@ -1485,7 +1508,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                           
                           
                         </div>                    
-                      </div>
+                      </div>  
+                      
                       <form method="post" action="<?= BASE_PATH ?>/update_clearance"   class="column student_clearance_panel" style="gap: 20px; ">
                         REMARKS:
                         <textarea name="remarks" id="" style="min-width:500px; max-width:650px; height:150px; padding:20px" class="filter" ><?= htmlspecialchars($students_for_clearance['remarks'] ?? '')?>
@@ -1730,7 +1754,7 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                               </div> -->
                               <div class="row" style="align-items:center;">
                                 <?php if ($requirement['mime_type'] === 'application/pdf'): ?>
-                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearanceSigning&amp;categ=S&amp;studentID=<?= $students_for_clearance['studentID'] ?>" target="_blank">
+                                  <a href="<?= BASE_PATH ?>/view-document?id=<?= (int)$requirement['ID'] ?>&amp;docfor=clearanceSigning&amp;categ=F&amp;studentID=<?= $students_for_clearance['studentID'] ?>" target="_blank">
                                     <img src="<?= BASE_PATH ?>/View/resources/Eye.png" alt="View" class="file_icons">
                                   </a>
                                 <?php endif ?>

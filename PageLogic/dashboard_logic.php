@@ -25,20 +25,48 @@ $colors  = ['cleared' => 'green', 'reject' => 'red'];
 
 date_default_timezone_set('Asia/Manila');   
 
-function parseDays($code) {
-    preg_match_all('/TH|M|T|W|F|S/', strtoupper($code), $m);
-    return $m[0];
-}
-
-$dayCode = ['Mon' => 'M', 'Tue' => 'T', 'Wed' => 'W', 'Thu' => 'TH', 'Fri' => 'F', 'Sat' => 'S'];
-$today   = $dayCode[date('D')] ?? null;
 
 
 $schedule = getFacultySchedule($currentAY);
-$todays   = array_filter($schedule, fn($r) => $today && in_array($today, parseDays($r['day']), true));
+
+date_default_timezone_set('Asia/Manila');
+
+$currentAY = $clearanceDAO->executeQuery('getCurrentAcadYear')[0]['acad_year_sem'] ?? 'ALL';
+$term      = $currentAY;
+$isStudent = strtoupper($_SESSION['role'] ?? '') === 'STUDENT';
+$colors    = ['cleared' => 'green', 'reject' => 'red'];
+
+function parseDays($code) {
+    preg_match_all('/SU|SA|TH|M|T|W|F/', strtoupper($code), $m);
+    return $m[0];
+}
+
+$dayCode = ['Mon' => 'M', 'Tue' => 'T', 'Wed' => 'W', 'Thu' => 'TH', 'Fri' => 'F', 'Sat' => 'SA', 'Sun' => 'SU'];
+$today   = $dayCode[date('D')] ?? null;
+
+if ($isStudent) {
+    $clr     = getClearanceSummary($term);
+    $cleared = (int)$clr['cleared'];
+    $reject  = (int)$clr['rejected'];
+    $pending = (int)$clr['not_yet_cleared'];
+    $total   = $cleared + $reject + $pending;
+
+    $a = $total ? $cleared / $total * 100 : 0;
+    $b = $total ? ($cleared + $reject) / $total * 100 : 0;
+    $ring = $total
+        ? "conic-gradient(green 0 {$a}%, red {$a}% {$b}%, #e6c200 {$b}% 100%)"
+        : "conic-gradient(#666 0 100%)";
+
+    $updates  = array_slice(getRecentClearanceUpdates($term), 0, 5);
+    $schedule = getStudentSchedule($term);
+} else {
+    $schedule = getFacultySchedule($term);
+    $toClear  = getFacultyClearanceCounts($term);
+    $proj     = getFacultyProjectCounts($term);
+}
+
+$todays = array_filter($schedule, fn($r) => $today && in_array($today, parseDays($r['day']), true));
 usort($todays, fn($a, $b) => strcmp($a['time_start'], $b['time_start']));
-$toClear  = getFacultyClearanceCounts($currentAY);
-$proj     = getFacultyProjectCounts($currentAY);
 
 function getAllProjectStatus($acad_year = 'now',$userID = 'self' ){
   global $clearanceDAO;
@@ -68,10 +96,11 @@ function getRecentClearanceUpdates($acad_year_sem = 'ALL', $category = 'ALL') {
         [$id, $id, $id, $acad_year_sem, $acad_year_sem, $category, $category]);
 }
 
-function getStudentSchedule($acad_year_sem) {
+function getStudentSchedule( $acad_year_sem, $studentID = 'self') {
     global $clearanceDAO;
+    if($studentID == 'self') $studentID = $_SESSION['userID'];
     return $clearanceDAO->executeQuery("getStudentSchedule",
-        [$_SESSION['userID'], $acad_year_sem, $acad_year_sem]);
+        [$studentID, $acad_year_sem, $acad_year_sem]);
 }
 
 function getOpenEnrollments() {
@@ -86,7 +115,6 @@ function getFacultySchedule($term) {
         $term, $term,
         $_SESSION['userID']          // formatted faculty code, F2026...
     ]);
-    // getSubjects repeats a schedule once per syllabus row, so dedupe by schedID
     $seen = [];
     foreach ($rows as $r) { $seen[$r['schedID']] = $r; }
     return array_values($seen);

@@ -811,3 +811,11 @@
         display: none;
     }
 }
+.sched-page select:disabled {
+    opacity: .65;
+    cursor: not-allowed;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: none;
+}

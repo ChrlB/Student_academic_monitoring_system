@@ -12,23 +12,53 @@ class GradesLogic
 
         if (isset($db_connection) && $db_connection instanceof PDO) {
             $this->pdo = $db_connection;
-            return;
+        } else {
+            try {
+                $this->pdo = new PDO(
+                    "mysql:host=localhost;port=3306;dbname=ams_db;charset=utf8mb4",
+                    "root",
+                    "",
+                    [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    ]
+                );
+            } catch (PDOException $e) {
+                error_log('Grades DB connection failed: ' . $e->getMessage());
+                throw new RuntimeException('Unable to connect to the grades database.', 0, $e);
+            }
         }
 
-        try {
-            $this->pdo = new PDO(
-                "mysql:host=localhost;port=3306;dbname=ams_db;charset=utf8mb4",
-                "root",
-                "",
-                [
-                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                ]
-            );
-        } catch (PDOException $e) {
-            error_log('Grades DB connection failed: ' . $e->getMessage());
-            throw new RuntimeException('Unable to connect to the grades database.', 0, $e);
-        }
+        $this->ensureVerificationTable();
+    }
+
+    private function ensureVerificationTable(): void
+    {
+        $this->pdo->exec(
+            "CREATE TABLE IF NOT EXISTS grade_submissions (
+                submissionID INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                schedID INT UNSIGNED NOT NULL,
+                enrollmentID INT UNSIGNED NOT NULL,
+                subjectID VARCHAR(100) NOT NULL,
+                program VARCHAR(50) NOT NULL,
+                block VARCHAR(50) NOT NULL,
+                acad_year VARCHAR(20) NOT NULL,
+                sem TINYINT NOT NULL,
+                submitted_by INT UNSIGNED NOT NULL,
+                grade_data LONGTEXT NOT NULL,
+                status VARCHAR(30) NOT NULL DEFAULT 'pending_coordinator',
+                coordinatorID INT UNSIGNED DEFAULT NULL,
+                coordinator_remark TEXT DEFAULT NULL,
+                coordinator_verified_at DATETIME DEFAULT NULL,
+                registrarID INT UNSIGNED DEFAULT NULL,
+                registrar_remark TEXT DEFAULT NULL,
+                registrar_verified_at DATETIME DEFAULT NULL,
+                submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (submissionID),
+                KEY grade_submission_status (status),
+                KEY grade_submission_class (schedID, enrollmentID, subjectID)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+        );
     }
 
     private function all($sql, array $params = [])
@@ -453,19 +483,27 @@ class GradesLogic
 
     public function classStudents(array $class, $page, $perPage = 10)
     {
-        $where = "es.enrollmentID = :enrollmentID
+        $where = "ss.schedID = :scheduleID
+                  AND ss.facultyID = :facultyID
+                  AND es.enrollmentID = :enrollmentID
                   AND TRIM(es.subjectID) = :subjectID
                   AND es.status = 'approved'
-                  AND st.program = :program
-                  AND st.block = :block";
+                  AND ep.program = :program
+                  AND st.program = ep.program
+                  AND st.block = ss.block";
         $params = [
+            ':scheduleID' => (int)$class['schedID'],
+            ':facultyID' => $this->currentUserID(),
             ':enrollmentID' => $class['enrollmentID'],
             ':subjectID' => $class['subject_code'],
             ':program' => $class['program'],
-            ':block' => $class['block'],
         ];
         $from = "FROM enrolled_subjects es
                  JOIN students st ON st.studentID = es.studentID
+                 JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
+                 JOIN subject_schedules ss
+                   ON ss.enrollmentID = es.enrollmentID
+                  AND TRIM(ss.subjectID) = TRIM(es.subjectID)
                  WHERE $where";
 
         $countRows = $this->all("SELECT COUNT(*) AS total $from", $params);
@@ -499,6 +537,66 @@ class GradesLogic
         ];
     }
 
+    public function gradeSubmissionStates(array $class): array
+    {
+        $rows = $this->all(
+            "SELECT status, grade_data
+             FROM grade_submissions
+             WHERE schedID = :schedID
+               AND enrollmentID = :enrollmentID
+               AND TRIM(subjectID) = :subjectID
+             ORDER BY submissionID DESC",
+            [
+                ':schedID' => (int)$class['schedID'],
+                ':enrollmentID' => (int)$class['enrollmentID'],
+                ':subjectID' => $class['subject_code'],
+            ]
+        );
+
+        $states = [];
+        foreach ($rows as $row) {
+            $grades = json_decode((string)$row['grade_data'], true);
+            if (!is_array($grades)) {
+                throw new RuntimeException('The saved grade submission is invalid.');
+            }
+
+            foreach ($grades as $grade) {
+                if (!is_array($grade) || empty($grade['enrolled_subjectID'])) {
+                    throw new RuntimeException('The saved grade submission is invalid.');
+                }
+
+                $enrolledSubjectID = (string)$grade['enrolled_subjectID'];
+                if (!isset($states[$enrolledSubjectID])) {
+                    $states[$enrolledSubjectID] = [
+                        'status' => (string)$row['status'],
+                        'edit_allowed' => false,
+                        'midterm' => $grade['midterm'] ?? null,
+                        'final' => $grade['final'] ?? null,
+                    ];
+                }
+
+                if ($row['status'] === 'edit_allowed') {
+                    $states[$enrolledSubjectID]['has_edit_permission'] = true;
+                }
+            }
+        }
+
+        foreach ($states as &$state) {
+            $state['locked'] = in_array($state['status'], ['pending_coordinator', 'pending_registrar'], true)
+                || ($state['status'] === 'approved' && empty($state['has_edit_permission']));
+            $state['edit_allowed'] = in_array($state['status'], ['approved', 'edit_allowed'], true)
+                && !empty($state['has_edit_permission']);
+            if (!$state['locked']) {
+                $state['midterm'] = null;
+                $state['final'] = null;
+            }
+            unset($state['status'], $state['has_edit_permission']);
+        }
+        unset($state);
+
+        return $states;
+    }
+
     private function normalizedGrade($value, $field, $studentID)
     {
         if ($value === null || $value === '') {
@@ -508,6 +606,716 @@ class GradesLogic
             throw new InvalidArgumentException("$field grade for student $studentID must be a number from 0 to 100, or blank.");
         }
         return number_format((float)$value, 2, '.', '');
+    }
+
+    public function submitGradesForVerification(array $class, array $gradeInputs): int
+    {
+        if (!$gradeInputs) {
+            throw new InvalidArgumentException('There are no new grades to submit.');
+        }
+
+        $page = max(1, (int)($_POST['page'] ?? 1));
+        $roster = $this->classStudents($class, $page);
+        $allowedRows = [];
+        foreach ($roster['rows'] as $student) {
+            $allowedRows[(string)$student['enrolled_subjectID']] = $student;
+        }
+
+        $submissionStates = $this->gradeSubmissionStates($class);
+        foreach ($gradeInputs as $enrolledSubjectID => $grades) {
+            if (!isset($allowedRows[(string)$enrolledSubjectID]) || !is_array($grades)) {
+                throw new InvalidArgumentException('The submitted grade list does not match this class roster.');
+            }
+            if (!empty($submissionStates[(string)$enrolledSubjectID]['locked'])) {
+                throw new InvalidArgumentException('A submitted grade cannot be changed unless the submission is rejected.');
+            }
+        }
+
+        $gradeData = [];
+        foreach ($gradeInputs as $enrolledSubjectID => $grades) {
+            $student = $allowedRows[(string)$enrolledSubjectID];
+            $gradeData[] = [
+                'enrolled_subjectID' => (int)$enrolledSubjectID,
+                'studentID' => (int)$student['studentID'],
+                'display_student_id' => (string)$student['display_student_id'],
+                'student_name' => (string)$student['name'],
+                'midterm' => $this->normalizedGrade($grades['midterm'] ?? '', 'Midterm', $student['display_student_id']),
+                'final' => $this->normalizedGrade($grades['final'] ?? '', 'Final', $student['display_student_id']),
+            ];
+        }
+
+        $facultyID = $this->currentUserID();
+        if ($facultyID <= 0) {
+            throw new RuntimeException('Unable to identify the professor account.');
+        }
+
+        $existing = $this->all(
+            "SELECT submissionID
+             FROM grade_submissions
+             WHERE schedID = :schedID
+               AND enrollmentID = :enrollmentID
+               AND TRIM(subjectID) = :subjectID
+               AND status IN ('pending_coordinator', 'pending_registrar')
+             LIMIT 1",
+            [
+                ':schedID' => (int)$class['schedID'],
+                ':enrollmentID' => (int)$class['enrollmentID'],
+                ':subjectID' => $class['subject_code'],
+            ]
+        );
+        if ($existing) {
+            throw new InvalidArgumentException('This class already has grades awaiting verification.');
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $submittedIDs = array_fill_keys(array_map('strval', array_keys($gradeInputs)), true);
+            $editGrants = $this->all(
+                "SELECT submissionID, grade_data
+                 FROM grade_submissions
+                 WHERE schedID = :schedID
+                   AND enrollmentID = :enrollmentID
+                   AND TRIM(subjectID) = :subjectID
+                   AND status = 'edit_allowed'
+                 FOR UPDATE",
+                [
+                    ':schedID' => (int)$class['schedID'],
+                    ':enrollmentID' => (int)$class['enrollmentID'],
+                    ':subjectID' => $class['subject_code'],
+                ]
+            );
+            $consumeEditGrant = $this->pdo->prepare(
+                "UPDATE grade_submissions
+                 SET status = 'edit_used'
+                 WHERE submissionID = :submissionID
+                   AND status = 'edit_allowed'"
+            );
+            foreach ($editGrants as $editGrant) {
+                $grantGrades = json_decode((string)$editGrant['grade_data'], true);
+                if (!is_array($grantGrades)) {
+                    throw new RuntimeException('The saved grade submission is invalid.');
+                }
+                $allGrantedGradesSubmitted = true;
+                foreach ($grantGrades as $grantGrade) {
+                    if (!is_array($grantGrade) || empty($grantGrade['enrolled_subjectID'])) {
+                        throw new RuntimeException('The saved grade submission is invalid.');
+                    }
+                    if (!isset($submittedIDs[(string)$grantGrade['enrolled_subjectID']])) {
+                        $allGrantedGradesSubmitted = false;
+                        break;
+                    }
+                }
+                if ($allGrantedGradesSubmitted) {
+                    $consumeEditGrant->execute([':submissionID' => (int)$editGrant['submissionID']]);
+                }
+            }
+
+            $stmt = $this->pdo->prepare(
+                "INSERT INTO grade_submissions
+                    (schedID, enrollmentID, subjectID, program, block, acad_year, sem,
+                     submitted_by, grade_data, status, submitted_at)
+                 VALUES
+                    (:schedID, :enrollmentID, :subjectID, :program, :block, :acadYear, :sem,
+                     :facultyID, :gradeData, 'pending_coordinator', CURRENT_TIMESTAMP)"
+            );
+            $stmt->execute([
+                ':schedID' => $class['schedID'],
+                ':enrollmentID' => $class['enrollmentID'],
+                ':subjectID' => $class['subject_code'],
+                ':program' => $class['program'],
+                ':block' => $class['block'],
+                ':acadYear' => $class['acad_year'],
+                ':sem' => (int)$class['sem'],
+                ':facultyID' => $facultyID,
+                ':gradeData' => json_encode($gradeData, JSON_UNESCAPED_UNICODE),
+            ]);
+            $submissionID = (int)$this->pdo->lastInsertId();
+            $this->pdo->commit();
+            return $roster['page'];
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    private function enrichGradeStudentIds(array $grades): array
+    {
+        $studentIds = [];
+        foreach ($grades as $grade) {
+            if (isset($grade['studentID']) && empty($grade['display_student_id'])) {
+                $studentIds[] = (int)$grade['studentID'];
+            }
+        }
+        $studentIds = array_values(array_unique(array_filter($studentIds)));
+        if (!$studentIds) {
+            return $grades;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($studentIds), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT studentID,
+                    CONCAT(YEAR(date_created), LPAD(studentID, 5, '0')) AS display_student_id
+             FROM students
+             WHERE studentID IN ($placeholders)"
+        );
+        $stmt->execute($studentIds);
+        $idsByStudent = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $student) {
+            $idsByStudent[(int)$student['studentID']] = (string)$student['display_student_id'];
+        }
+
+        foreach ($grades as &$grade) {
+            if (empty($grade['display_student_id'])) {
+                $studentID = (int)($grade['studentID'] ?? 0);
+                $grade['display_student_id'] = $idsByStudent[$studentID] ?? (string)$studentID;
+            }
+        }
+        unset($grade);
+        return $grades;
+    }
+
+    public function coordinatorSubmissions(): array
+    {
+        $role = strtolower(trim((string)($_SESSION['role'] ?? '')));
+        $params = [];
+        $where = "gs.status = 'pending_coordinator'";
+
+        if ($role === 'program coordinator') {
+            $program = trim((string)($_SESSION['program'] ?? ''));
+            if ($program === '') {
+                return [];
+            }
+            $where .= " AND gs.program = :program";
+            $params[':program'] = $program;
+        }
+
+        $rows = $this->all(
+            "SELECT gs.*, TRIM(s.name) AS subject_name,
+                    CONCAT(f.first_name, ' ', f.last_name) AS submitted_by_name
+             FROM grade_submissions gs
+             LEFT JOIN subjects s ON TRIM(s.subjectID) = TRIM(gs.subjectID)
+             LEFT JOIN faculty f ON f.facultyID = gs.submitted_by
+             WHERE $where
+             ORDER BY gs.submitted_at DESC",
+            $params
+        );
+
+        foreach ($rows as &$row) {
+            $row['submissionID'] = (int)$row['submissionID'];
+            $row['grades'] = json_decode((string)$row['grade_data'], true);
+            if (!is_array($row['grades'])) {
+                $row['grades'] = [];
+            }
+            $row['grades'] = $this->enrichGradeStudentIds($row['grades']);
+        }
+        unset($row);
+        return $rows;
+    }
+
+    public function coordinatorSubmission(int $submissionID): array
+    {
+        $role = strtolower(trim((string)($_SESSION['role'] ?? '')));
+        if (!in_array($role, ['program coordinator', 'dean'], true)) {
+            throw new RuntimeException('This account cannot verify grades.');
+        }
+
+        $params = [':submissionID' => $submissionID];
+        $programFilter = '';
+        if ($role === 'program coordinator') {
+            $program = trim((string)($_SESSION['program'] ?? ''));
+            if ($program === '') {
+                throw new RuntimeException('The coordinator account is not assigned to a program.');
+            }
+            $programFilter = ' AND gs.program = :program';
+            $params[':program'] = $program;
+        }
+
+        $rows = $this->all(
+            "SELECT gs.*, TRIM(s.name) AS subject_name,
+                    CONCAT(f.first_name, ' ', f.last_name) AS submitted_by_name
+             FROM grade_submissions gs
+             LEFT JOIN subjects s ON TRIM(s.subjectID) = TRIM(gs.subjectID)
+             LEFT JOIN faculty f ON f.facultyID = gs.submitted_by
+             WHERE gs.submissionID = :submissionID
+               AND gs.status = 'pending_coordinator'
+               $programFilter
+             LIMIT 1",
+            $params
+        );
+        if (!$rows) {
+            throw new RuntimeException('This submission is unavailable or has already been reviewed.');
+        }
+
+        $submission = $rows[0];
+        $submission['submissionID'] = (int)$submission['submissionID'];
+        $submission['grades'] = json_decode((string)$submission['grade_data'], true);
+        if (!is_array($submission['grades'])) {
+            throw new RuntimeException('The saved grade submission is invalid.');
+        }
+        $submission['grades'] = $this->enrichGradeStudentIds($submission['grades']);
+        return $submission;
+    }
+
+    public function registrarSubmissions(): array
+    {
+        $rows = $this->all(
+            "SELECT gs.*, TRIM(s.name) AS subject_name,
+                    CONCAT(f.first_name, ' ', f.last_name) AS submitted_by_name
+             FROM grade_submissions gs
+             LEFT JOIN subjects s ON TRIM(s.subjectID) = TRIM(gs.subjectID)
+             LEFT JOIN faculty f ON f.facultyID = gs.submitted_by
+             WHERE gs.status = 'pending_registrar'
+             ORDER BY gs.coordinator_verified_at DESC, gs.submitted_at DESC"
+        );
+
+        foreach ($rows as &$row) {
+            $row['submissionID'] = (int)$row['submissionID'];
+            $row['grades'] = json_decode((string)$row['grade_data'], true);
+            if (!is_array($row['grades'])) {
+                $row['grades'] = [];
+            }
+            $row['grades'] = $this->enrichGradeStudentIds($row['grades']);
+        }
+        unset($row);
+        return $rows;
+    }
+
+    public function registrarApprovedSubmissions(): array
+    {
+        if (strtolower(trim((string)($_SESSION['role'] ?? ''))) !== 'registrar') {
+            throw new RuntimeException('Only the registrar can manage approved grade submissions.');
+        }
+
+        $rows = $this->all(
+            "SELECT gs.*, TRIM(s.name) AS subject_name,
+                    CONCAT(f.first_name, ' ', f.last_name) AS submitted_by_name
+             FROM grade_submissions gs
+             LEFT JOIN subjects s ON TRIM(s.subjectID) = TRIM(gs.subjectID)
+             LEFT JOIN faculty f ON f.facultyID = gs.submitted_by
+             WHERE gs.status = 'approved'
+             ORDER BY gs.registrar_verified_at DESC, gs.submitted_at DESC"
+        );
+
+        foreach ($rows as &$row) {
+            $row['submissionID'] = (int)$row['submissionID'];
+            $row['grades'] = json_decode((string)$row['grade_data'], true);
+            if (!is_array($row['grades'])) {
+                throw new RuntimeException('The saved grade submission is invalid.');
+            }
+            $row['grades'] = $this->enrichGradeStudentIds($row['grades']);
+        }
+        unset($row);
+        return $rows;
+    }
+
+    public function registrarStudentList(array $filters = []): array
+    {
+        $department = trim((string)($filters['department'] ?? ''));
+        $program = trim((string)($filters['program'] ?? ''));
+        $facultyID = (int)($filters['faculty'] ?? 0);
+        $academicYear = trim((string)($filters['acad_year'] ?? ''));
+        $semester = (int)($filters['sem'] ?? 0);
+        $showStudents = !empty($filters['show_students']);
+        $departmentOptions = $this->all(
+            "SELECT department, name FROM departments ORDER BY name, department"
+        );
+        $validDepartment = in_array($department, array_column($departmentOptions, 'department'), true);
+        $eligibility = "
+            FROM subject_schedules ss
+            JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
+            JOIN programs p ON TRIM(p.program) = TRIM(ep.program)
+            JOIN enrolled_subjects es
+              ON es.enrollmentID = ss.enrollmentID
+             AND TRIM(es.subjectID) = TRIM(ss.subjectID)
+             AND es.status = 'approved'
+            JOIN students st
+              ON st.studentID = es.studentID
+             AND st.program = ep.program
+             AND st.block = ss.block
+             AND st.status = 'active'";
+
+        $programOptions = $validDepartment
+            ? $this->all(
+                "SELECT DISTINCT ep.program
+                 $eligibility
+                 WHERE p.department = :department
+                 ORDER BY ep.program",
+                [':department' => $department]
+            )
+            : [];
+        $validProgram = in_array($program, array_column($programOptions, 'program'), true);
+
+        $facultyOptions = $validProgram
+            ? $this->all(
+                "SELECT DISTINCT f.facultyID,
+                        CONCAT(f.first_name, ' ', f.last_name) AS faculty_name
+                 $eligibility
+                 JOIN faculty f ON f.facultyID = ss.facultyID
+                 WHERE p.department = :department
+                   AND ep.program = :program
+                 ORDER BY faculty_name",
+                [':department' => $department, ':program' => $program]
+            )
+            : [];
+
+        $yearParams = [
+            ':department' => $department,
+            ':program' => $program,
+            ':facultyID' => $facultyID,
+        ];
+        $academicYearOptions = $validProgram && $facultyID > 0
+            ? $this->all(
+                "SELECT DISTINCT ep.acad_year
+                 $eligibility
+                 WHERE p.department = :department
+                   AND ep.program = :program
+                   AND ss.facultyID = :facultyID
+                 ORDER BY ep.acad_year DESC",
+                $yearParams
+            )
+            : [];
+
+        $validAcademicYear = in_array($academicYear, array_column($academicYearOptions, 'acad_year'), true);
+        $semesterOptions = $validProgram && $facultyID > 0 && $validAcademicYear
+            ? $this->all(
+                "SELECT DISTINCT ep.sem
+                 $eligibility
+                 WHERE p.department = :department
+                   AND ep.program = :program
+                   AND ss.facultyID = :facultyID
+                   AND ep.acad_year = :acadYear
+                 ORDER BY ep.sem",
+                [
+                    ':department' => $department,
+                    ':program' => $program,
+                    ':facultyID' => $facultyID,
+                    ':acadYear' => $academicYear,
+                ]
+            )
+            : [];
+        $semesterOptions = array_map(static fn(array $row): int => (int)$row['sem'], $semesterOptions);
+        $validSemester = in_array($semester, $semesterOptions, true);
+
+        $validFaculty = false;
+        foreach ($facultyOptions as $faculty) {
+            if ((int)$faculty['facultyID'] === $facultyID) {
+                $validFaculty = true;
+                break;
+            }
+        }
+        $hasCompleteFilters = $validDepartment && $validProgram && $validFaculty && $validAcademicYear && $validSemester;
+        $scheduleID = (int)($filters['schedule'] ?? 0);
+        $scheduleOptions = [];
+        $selectedSchedule = null;
+        $rows = [];
+        if ($hasCompleteFilters) {
+            $scheduleOptions = $this->all(
+                "SELECT ss.schedID, TRIM(ss.subjectID) AS subject_code,
+                        TRIM(s.name) AS subject_name, ss.block,
+                        ep.program, ep.acad_year, ep.sem,
+                        ss.day, ss.time_start, ss.time_end, ss.roomID,
+                        COUNT(DISTINCT st.studentID) AS student_count
+                 FROM subject_schedules ss
+                 JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
+                 JOIN subjects s ON TRIM(s.subjectID) = TRIM(ss.subjectID)
+                 LEFT JOIN enrolled_subjects es
+                   ON es.enrollmentID = ss.enrollmentID
+                  AND TRIM(es.subjectID) = TRIM(ss.subjectID)
+                  AND es.status = 'approved'
+                 LEFT JOIN students st
+                   ON st.studentID = es.studentID
+                  AND st.program = ep.program
+                  AND st.block = ss.block
+                  AND st.status = 'active'
+                 WHERE ep.program = :program
+                   AND ss.facultyID = :facultyID
+                   AND ep.acad_year = :acadYear
+                   AND ep.sem = :semester
+                 GROUP BY ss.schedID, ss.subjectID, s.name, ss.block,
+                          ep.program, ep.acad_year, ep.sem, ss.day,
+                          ss.time_start, ss.time_end, ss.roomID
+                 ORDER BY ep.sem, ep.program, ss.block, subject_code, ss.day, ss.time_start",
+                [
+                    ':program' => $program,
+                    ':facultyID' => $facultyID,
+                    ':acadYear' => $academicYear,
+                    ':semester' => $semester,
+                ]
+            );
+            foreach ($scheduleOptions as &$schedule) {
+                $schedule['schedID'] = (int)$schedule['schedID'];
+                $schedule['student_count'] = (int)$schedule['student_count'];
+            }
+            unset($schedule);
+
+            $validSchedule = false;
+            foreach ($scheduleOptions as $schedule) {
+                if ($schedule['schedID'] === $scheduleID) {
+                    $validSchedule = true;
+                    $selectedSchedule = $schedule;
+                    break;
+                }
+            }
+
+            if ($showStudents && $validSchedule) {
+                $filterParams = [
+                    ':program' => $program,
+                    ':facultyID' => $facultyID,
+                    ':acadYear' => $academicYear,
+                    ':semester' => $semester,
+                    ':scheduleID' => $scheduleID,
+                ];
+                $matchingConditions = "
+                    es.status = 'approved'
+                    AND st.status = 'active'
+                    AND st.program = :program
+                    AND ep.program = st.program
+                    AND ep.acad_year = :acadYear
+                    AND ep.sem = :semester
+                    AND EXISTS (
+                        SELECT 1
+                        FROM subject_schedules ss
+                        WHERE ss.enrollmentID = es.enrollmentID
+                          AND TRIM(ss.subjectID) = TRIM(es.subjectID)
+                          AND ss.block = st.block
+                          AND ss.facultyID = :facultyID
+                          AND ss.schedID = :scheduleID
+                    )";
+                $rows = $this->all(
+                    "SELECT DISTINCT st.studentID,
+                            CONCAT(YEAR(st.date_created), LPAD(st.studentID, 5, '0')) AS display_student_id,
+                            st.first_name, st.middle_name, st.last_name,
+                            st.program, st.year_level, st.block, ep.acad_year
+                     FROM enrolled_subjects es
+                     JOIN students st ON st.studentID = es.studentID
+                     JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
+                     WHERE $matchingConditions
+                     ORDER BY st.program, st.year_level, st.block,
+                              st.last_name, st.first_name, st.studentID",
+                    $filterParams
+                );
+
+                foreach ($rows as &$row) {
+                    $middle = trim((string)$row['middle_name']);
+                    $row['name'] = trim(
+                        $row['first_name'] . ' ' .
+                        ($middle !== '' ? $middle . ' ' : '') .
+                        $row['last_name']
+                    );
+                    $row['studentID'] = (int)$row['studentID'];
+                    $row['year_level'] = (int)$row['year_level'];
+                }
+                unset($row);
+            }
+        }
+
+        $selectedFacultyName = '';
+        foreach ($facultyOptions as $faculty) {
+            if ((int)$faculty['facultyID'] === $facultyID) {
+                $selectedFacultyName = (string)$faculty['faculty_name'];
+                break;
+            }
+        }
+
+        return [
+            'rows' => $rows,
+            'departments' => $departmentOptions,
+            'programs' => array_column($programOptions, 'program'),
+            'faculty' => $facultyOptions,
+            'academic_years' => array_column($academicYearOptions, 'acad_year'),
+            'semesters' => $semesterOptions,
+            'selected_faculty_name' => $selectedFacultyName,
+            'filters_complete' => $hasCompleteFilters,
+            'schedules' => $scheduleOptions,
+            'selected_schedule' => $selectedSchedule,
+        ];
+    }
+
+    public function coordinatorReview(int $submissionID, string $decision, string $remark): void
+    {
+        $role = strtolower(trim((string)($_SESSION['role'] ?? '')));
+        if (!in_array($role, ['program coordinator', 'dean'], true)) {
+            throw new RuntimeException('This account cannot verify grades.');
+        }
+        if (!in_array($decision, ['approve', 'reject'], true)) {
+            throw new InvalidArgumentException('Invalid grade verification decision.');
+        }
+
+        $submission = $this->submissionForReview($submissionID, 'pending_coordinator');
+        if ($role === 'program coordinator') {
+            $program = trim((string)($_SESSION['program'] ?? ''));
+            if ($program === '' || $submission['program'] !== $program) {
+                throw new RuntimeException('This grade submission belongs to another program.');
+            }
+        }
+
+        $facultyID = $this->currentUserID();
+        $status = $decision === 'approve' ? 'pending_registrar' : 'rejected';
+        $stmt = $this->pdo->prepare(
+            "UPDATE grade_submissions
+             SET status = :status,
+                 coordinatorID = :facultyID,
+                 coordinator_remark = :remark,
+                 coordinator_verified_at = CURRENT_TIMESTAMP
+             WHERE submissionID = :submissionID
+               AND status = 'pending_coordinator'"
+        );
+        $stmt->execute([
+            ':status' => $status,
+            ':facultyID' => $facultyID,
+            ':remark' => trim($remark) !== '' ? trim($remark) : null,
+            ':submissionID' => $submissionID,
+        ]);
+        if ($stmt->rowCount() !== 1) {
+            throw new RuntimeException('This submission was already reviewed.');
+        }
+    }
+
+    private function submissionForReview(int $submissionID, string $status): array
+    {
+        $rows = $this->all(
+            "SELECT * FROM grade_submissions
+             WHERE submissionID = :submissionID AND status = :status
+             LIMIT 1",
+            [':submissionID' => $submissionID, ':status' => $status]
+        );
+        if (!$rows) {
+            throw new RuntimeException('The grade submission is no longer awaiting review.');
+        }
+        return $rows[0];
+    }
+
+    public function registrarAllowGradeEdit(int $submissionID): void
+    {
+        if (strtolower(trim((string)($_SESSION['role'] ?? ''))) !== 'registrar') {
+            throw new RuntimeException('Only the registrar can allow grade edits.');
+        }
+
+        $submission = $this->submissionForReview($submissionID, 'approved');
+        $gradeData = json_decode((string)$submission['grade_data'], true);
+        if (!is_array($gradeData) || !$gradeData) {
+            throw new RuntimeException('The saved grade submission is invalid.');
+        }
+
+        foreach ($gradeData as $grade) {
+            if (!is_array($grade) || empty($grade['enrolled_subjectID'])) {
+                throw new RuntimeException('The saved grade submission is invalid.');
+            }
+        }
+
+        $stmt = $this->pdo->prepare(
+            "UPDATE grade_submissions
+             SET status = 'edit_allowed'
+             WHERE submissionID = :submissionID
+               AND status = 'approved'"
+        );
+        $stmt->execute([':submissionID' => $submissionID]);
+        if ($stmt->rowCount() !== 1) {
+            throw new RuntimeException('This approved grade submission is no longer available.');
+        }
+    }
+
+    public function registrarFinalReview(int $submissionID, string $decision, string $remark): void
+    {
+        if (strtolower(trim((string)($_SESSION['role'] ?? ''))) !== 'registrar') {
+            throw new RuntimeException('Only the registrar can complete final grade verification.');
+        }
+
+        $submission = $this->submissionForReview($submissionID, 'pending_registrar');
+        $registrarID = $this->currentUserID();
+
+        if ($decision === 'reject') {
+            $stmt = $this->pdo->prepare(
+                "UPDATE grade_submissions
+                 SET status = 'rejected',
+                     registrarID = :registrarID,
+                     registrar_remark = :remark,
+                     registrar_verified_at = CURRENT_TIMESTAMP
+                 WHERE submissionID = :submissionID
+                   AND status = 'pending_registrar'"
+            );
+            $stmt->execute([
+                ':registrarID' => $registrarID,
+                ':remark' => trim($remark) !== '' ? trim($remark) : null,
+                ':submissionID' => $submissionID,
+            ]);
+            return;
+        }
+        if ($decision !== 'approve') {
+            throw new InvalidArgumentException('Invalid final verification decision.');
+        }
+
+        $gradeData = json_decode((string)$submission['grade_data'], true);
+        if (!is_array($gradeData)) {
+            throw new RuntimeException('The saved grade submission is invalid.');
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            $update = $this->pdo->prepare(
+                "UPDATE enrolled_subjects
+                 SET midterm_grade = :midterm,
+                     final_grade = :final
+                 WHERE enrolled_subjectID = :enrolledSubjectID
+                   AND enrollmentID = :enrollmentID
+                   AND TRIM(subjectID) = :subjectID
+                   AND status = 'approved'"
+            );
+
+            foreach ($gradeData as $grade) {
+                $match = $this->pdo->prepare(
+                    "SELECT enrolled_subjectID
+                     FROM enrolled_subjects
+                     WHERE enrolled_subjectID = :enrolledSubjectID
+                       AND enrollmentID = :enrollmentID
+                       AND TRIM(subjectID) = :subjectID
+                       AND status = 'approved'
+                     LIMIT 1"
+                );
+                $match->execute([
+                    ':enrolledSubjectID' => (int)$grade['enrolled_subjectID'],
+                    ':enrollmentID' => (int)$submission['enrollmentID'],
+                    ':subjectID' => $submission['subjectID'],
+                ]);
+                if (!$match->fetch(PDO::FETCH_ASSOC)) {
+                    throw new RuntimeException('A student enrollment changed before final verification.');
+                }
+
+                $update->execute([
+                    ':midterm' => $grade['midterm'] !== null ? (float)$grade['midterm'] : null,
+                    ':final' => $grade['final'] !== null ? (float)$grade['final'] : null,
+                    ':enrolledSubjectID' => (int)$grade['enrolled_subjectID'],
+                    ':enrollmentID' => (int)$submission['enrollmentID'],
+                    ':subjectID' => $submission['subjectID'],
+                ]);
+            }
+
+            $approved = $this->pdo->prepare(
+                "UPDATE grade_submissions
+                 SET status = 'approved',
+                     registrarID = :registrarID,
+                     registrar_remark = :remark,
+                     registrar_verified_at = CURRENT_TIMESTAMP
+                 WHERE submissionID = :submissionID
+                   AND status = 'pending_registrar'"
+            );
+            $approved->execute([
+                ':registrarID' => $registrarID,
+                ':remark' => trim($remark) !== '' ? trim($remark) : null,
+                ':submissionID' => $submissionID,
+            ]);
+            if ($approved->rowCount() !== 1) {
+                throw new RuntimeException('This submission was already processed.');
+            }
+            $this->pdo->commit();
+        } catch (Throwable $e) {
+            if ($this->pdo->inTransaction()) {
+                $this->pdo->rollBack();
+            }
+            throw $e;
+        }
     }
 
     public function saveGrades(array $class, array $gradeInputs)

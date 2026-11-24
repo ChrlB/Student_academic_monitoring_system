@@ -7,6 +7,7 @@ require_once __DIR__."/../Services/imageHandler.php";
 require_once __DIR__ . '/../Services/ClearanceDocumentHandler.php';
 require_once __DIR__.'/../PageLogic/faculty_account_actions.php';
 require_once __DIR__.'/../PageLogic/registration_actions.php';
+require_once __DIR__.'/../PageLogic/google_link_actions.php';
 class Router {
     private array $routes = [];
 
@@ -69,9 +70,27 @@ $router->get('/class-sched',  fn() => require __DIR__ . '/../View/class_sched.ph
 $router->post('/class-sched', fn() => require __DIR__ . '/../View/class_sched.php');
 $router->get('/clearance',  fn() => require __DIR__ . '/../View/clearance.php');
 // $router->post('/update_clearance',  fn($request) => updateClearance($request));
+// $router->post('/update_clearance', function ($request) {
+//     require_once __DIR__ . '/../PageLogic/clearance_logic.php';
+//     $result =  updateClearance($request);
+
+//     if($request['isnew']) return $result;
+
+//     header('Location: '.BASE_PATH.'/'.$request["page_uploader"]); exit;
+// });
+
 $router->post('/update_clearance', function ($request) {
     require_once __DIR__ . '/../PageLogic/clearance_logic.php';
-    return updateClearance($request);
+    $result = updateClearance($request);
+
+    if (!empty($request['isnew'])) return $result;
+
+    $back = $request['page_uploader'] ?? '';
+    if ($back === '' || $back[0] !== '/' || strpos($back, '//') === 0) {
+        $back = rtrim(BASE_PATH, '/') . '/clearance';   // safe fallback
+    }
+    header('Location: ' . $back);
+    exit;
 });
 
 // $router->post('/clearance',  fn($request) => require __DIR__ . '/../View/clearance.php');
@@ -94,9 +113,9 @@ $router->post('/registration',  fn($request) => require __DIR__ . '/../View/regi
 $router->post('/registration-add',      fn() => registrationAdd($_POST));
 $router->post('/registration-restrict', fn() => registrationRestrict($_POST));
 $router->post('/registration-update',   fn() => registrationUpdate($_POST));
+$router->post('/registration-archive',  fn() => registrationArchive($_POST));
 $router->post('/registration-delete',   fn() => registrationDelete($_POST));
-$router->post('/registration-assign',   fn() => registrationAssign($_POST));
-$router->post('/registration-unassign', fn() => registrationUnassign($_POST));
+$router->post('/registration-logs', fn() => registrationLogs($_POST));
 
 $router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    
@@ -109,11 +128,13 @@ $router->post('/faculty-info',    fn() => saveFacultyInfo($_POST));
 $router->post('/faculty-contact', fn() => saveFacultyContact($_POST));
  
 $router->post('/upload-profile', fn() => uploadProfile());
+$router->post('/link-google', fn() => linkGoogleAccount($_POST));
 $router->get('/get-profile', fn() => getProfilePic());
 
 $router->post('/upload-document', function ($request) { 
     require_once __DIR__ . '/../PageLogic/clearance_logic.php';
-    if($request['ID'] === 'none') updateClearance($request);
+    $request['isnew'] = false;
+    if($request['ID'] === 'none') {$request['isnew'] = true; updateClearance($request);}
     if($request['ID'] === 'none' && $request['clearance_categ'] === 'FACULTY') $request['ID'] =  getFacultyClearanceID($request);
     if($request['ID'] === 'none' && $request['clearance_categ'] === 'OFFICE') $request['ID'] =  getOfficeClearanceID($request);
     uploadDocument($request);
@@ -121,5 +142,8 @@ $router->post('/upload-document', function ($request) {
 $router->post('/delete-document', fn($request) => deleteDocument($request));
 $router->get('/download-document', fn() => downloadDocument());
 $router->get('/view-document', fn() => require __DIR__ . '/../View/document.php');
+
+$router->post('/file-maker', fn($request) => require __DIR__ . '/../View/file_maker.php');
+$router->post('/class-list-maker', fn($request) => require __DIR__ . '/../View/class_list_maker.php');
 
 $router->dispatch();

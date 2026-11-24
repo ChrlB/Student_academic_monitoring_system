@@ -86,6 +86,7 @@ $icoTrash  = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Serif+Text&family=Inter:wght@400;500;600;700;800&display=swap">
+  <link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
 
   <style>
 /* ---------- tokens (modals + toast live outside <main>, so they get them too) ---------- */

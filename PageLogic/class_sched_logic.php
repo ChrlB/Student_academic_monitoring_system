@@ -26,6 +26,7 @@ class ScheduleLogic
     public $role;
     public $group;    // manager | faculty | student
     public $userID;
+    private $assigned = null;
 
     const DB_HOST = 'localhost';
     const DB_PORT = 3306;
@@ -96,6 +97,46 @@ class ScheduleLogic
         return (bool)preg_match('/coordinator|dean/', $this->role);
     }
 
+    public function isCoordinator()
+    {
+        return strpos($this->role, 'coordinator') !== false;
+    }
+
+    public function assignedProgram()
+    {
+        if ($this->assigned === null) {
+            $r = $this->all("SELECT program FROM faculty WHERE facultyID = :id", [':id' => $this->userID]);
+            $p = $r ? trim((string)$r[0]['program']) : '';
+            $this->assigned = $p !== '' ? $p : trim((string)($_SESSION['program'] ?? ''));
+        }
+        return $this->assigned;
+    }
+
+    public function canAccess(array $row)
+    {
+        if (!$this->isCoordinator()) return true;
+        return $this->assignedProgram() !== '' && $row['program'] === $this->assignedProgram();
+    }
+    public function isDean()
+   {
+    return strpos($this->role, 'dean') !== false;
+   }
+
+    public function departments()
+   {
+    return $this->all("SELECT department, name FROM departments ORDER BY name");
+   }
+
+    public function programs()
+   {
+    return $this->all("SELECT program, name, department FROM programs ORDER BY program");
+   }
+
+   public function ownDepartment()
+   {
+    $r = $this->all("SELECT department FROM faculty WHERE facultyID = :id", [':id' => $this->userID]);
+    return $r ? (string)$r[0]['department'] : '';
+   }
     // Day codes / formatting helpers
 
     // Day codes or names to a list of weekdays.
@@ -241,6 +282,12 @@ class ScheduleLogic
                JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
              ORDER BY program, block"
         );
+        if ($this->isCoordinator()) {
+            $mine = $this->assignedProgram();
+            $rows = array_values(array_filter($rows, function ($r) use ($mine) {
+                return $r['program'] === $mine;
+            }));
+        }
         foreach ($rows as &$r) {
             $r['value'] = $r['program'] . '|' . $r['block'];
             $r['label'] = $r['program'] . ' ' . $r['block'];
@@ -257,9 +304,14 @@ class ScheduleLogic
                        FROM subject_prerequisite p2 WHERE p2.subjectID = s.subjectID) AS requires
              FROM subjects s ORDER BY s.subjectID"
         );
+        $offered = [];
+        foreach ($this->all("SELECT TRIM(subjectID) AS sid, program FROM syllabus") as $o) {
+            $offered[$o['sid']][] = $o['program'];
+        }
         foreach ($rows as &$r) {
-            $r['type'] = self::classType($r['subjectID'], $r['name']);
-            $r['kind'] = $r['is_prereq'] ? 'prereq' : 'normal';
+            $r['type']     = self::classType($r['subjectID'], $r['name']);
+            $r['kind']     = $r['is_prereq'] ? 'prereq' : 'normal';
+            $r['programs'] = $offered[trim($r['subjectID'])] ?? [];
         }
         return $rows;
     }
@@ -311,7 +363,7 @@ class ScheduleLogic
     }
 
     // Schedules for one semester, filtered by role.
-    public function schedules($semKey, $search = '')
+    public function schedules($semKey, $search = '', $dept = '', $program = '')
     {
         list($acad, $sem) = self::splitSemester($semKey);
         $sql    = self::BASE_SELECT . " WHERE ep.acad_year = :ay AND ep.sem = :sem";
@@ -327,6 +379,12 @@ class ScheduleLogic
             $params[':uid'] = $this->userID;
         }
 
+        if ($this->isCoordinator()) {
+            $mine = $this->assignedProgram();
+            $sql .= " AND ep.program = :cprog";
+            $params[':cprog'] = $mine !== '' ? $mine : '__none__';
+        }
+
         if ($search !== '') {
             if ($this->group === 'manager') {
                 $sql .= " AND CONCAT(ep.program, ss.block) LIKE :q";
@@ -337,7 +395,15 @@ class ScheduleLogic
                 $params[':q'] = '%' . str_replace(['%', '_'], '', $search) . '%';
             }
         }
-
+        if ($this->group === 'manager') {
+       if ($program !== '') {
+        $sql .= " AND ep.program = :fprog";
+        $params[':fprog'] = $program;
+       } elseif ($dept !== '') {
+        $sql .= " AND ep.program IN (SELECT program FROM programs WHERE department = :fdept)";
+        $params[':fdept'] = $dept;
+       }
+       } 
         $sql .= " ORDER BY ss.time_start, ss.schedID";
         return array_map([$this, 'decorate'], $this->all($sql, $params));
     }
@@ -430,7 +496,14 @@ class ScheduleLogic
     public function save($id, array $in)
     {
         $errors = [];
-
+        if ($id) {
+        $current = $this->find($id);
+        if (!$current) return ['ok' => false, 'errors' => ['Schedule not found.']];
+        $in['instructor'] = $current['facultyID'];
+        if (!$this->canAccess($current)) {
+            return ['ok' => false, 'errors' => ['You can only manage schedules of your assigned program.']];
+        }
+    }
         $blockParts = explode('|', (string)($in['block'] ?? ''), 2);
         $program    = $blockParts[0] ?? '';
         $block      = $blockParts[1] ?? '';
@@ -441,6 +514,11 @@ class ScheduleLogic
         $start      = $this->normTime($in['start_time'] ?? '');
         $end        = $this->normTime($in['end_time'] ?? '');
         list($acad, $sem) = self::splitSemester($in['semester'] ?? '');
+
+        if ($this->isCoordinator() && $program !== $this->assignedProgram()) {
+            $mine = $this->assignedProgram();
+            return ['ok' => false, 'errors' => ['You can only schedule classes for ' . ($mine !== '' ? $mine : 'your assigned program') . '.']];
+        }
 
         if ($program === '' || $block === '') $errors[] = 'Select a block / section.';
         if ($subjectID === '')                $errors[] = 'Select a subject.';
@@ -459,6 +537,10 @@ class ScheduleLogic
         if (!$ep) return ['ok' => false, 'errors' => ["No enrollment period exists for $program in that semester."]];
 
         if (!$this->all("SELECT 1 FROM subjects WHERE subjectID = :v", [':v' => $subjectID]))  $errors[] = 'Unknown subject.';
+        $listed = $this->all("SELECT program FROM syllabus WHERE TRIM(subjectID) = TRIM(:s)", [':s' => $subjectID]);
+        if ($listed && !in_array($program, array_column($listed, 'program'), true)) {
+            $errors[] = "That subject is not offered in $program.";
+        }
         if (!$this->all("SELECT 1 FROM faculty WHERE facultyID = :v", [':v' => $faculty]))     $errors[] = 'Unknown instructor.';
         if (!$this->all("SELECT 1 FROM rooms WHERE roomID = :v", [':v' => $room]))             $errors[] = 'Unknown room.';
         if ($errors) return ['ok' => false, 'errors' => $errors];
@@ -575,7 +657,7 @@ class ScheduleLogic
 
         if ($action === 'delete' && $id > 0) {
             $row = $this->find($id);
-            $ok  = $row && $this->delete($id);
+            $ok  = $row && $this->canAccess($row) && $this->delete($id);
             $_SESSION['sched_flash'] = $ok
                 ? ['type' => 'ok', 'msgs' => ['Schedule deleted.']]
                 : ['type' => 'error', 'msgs' => ['Could not delete the schedule.']];

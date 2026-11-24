@@ -1456,14 +1456,23 @@ $userDAO->prepareStatement("updateStudentProfileFull",
         ) VALUES (?,?,? );
     ");
 
-    $clearanceDAO->prepareStatement("addOfficeClearance","INSERT INTO `office_clearance` (
-            `officeID`, 
-            `studentID`, 
-            `remarks`, 
-            `enrollmentID`
-        ) VALUES (?, ?, ?, ?);
+    // $clearanceDAO->prepareStatement("addOfficeClearance","INSERT INTO `office_clearance` (
+    //         `officeID`, 
+    //         `studentID`, 
+    //         `remarks`, 
+    //         `enrollmentID`
+    //     ) VALUES (?, ?, ?, ?);
 
-    ");
+    // ");
+
+    $clearanceDAO->prepareStatement("addOfficeClearance","INSERT INTO `office_clearance` (
+        `officeID`,
+        `studentID`,
+        `remarks`,
+        `status`,
+        `enrollmentID`
+    ) VALUES (?, ?, ?, ?, ?);
+");
 
     $clearanceDAO->prepareStatement("addFacultyClearance","INSERT INTO `faculty_clearance` (
             `facultyID`, 
@@ -1594,7 +1603,6 @@ $userDAO->prepareStatement("updateStudentProfileFull",
                 ON F.facultyID = SS.facultyID
         WHERE CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ?
             AND (CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ? OR 'ALL' = ?)
-            AND ES.status = 'approved'
         ORDER BY EP.acad_year DESC, EP.sem DESC, SS.time_start;"
     );
 
@@ -1677,3 +1685,115 @@ $userDAO->prepareStatement("updateStudentProfileFull",
         ORDER BY E.datetime_Start;
     ");
 }
+
+// ---- CLEARANCE FORM: one row per approved enrolled subject ----
+$clearanceDAO->prepareStatement("getClearanceFormSubjects", "SELECT
+        ES.enrolled_subjectID,
+        ES.subjectID,
+        S.name,
+        CONCAT_WS(' ', CONCAT(ST.last_name, ','), ST.first_name, ST.middle_name) AS student_name,
+        ST.program,
+        ST.block,
+        PR.department,
+        CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem,
+        CONCAT(F.last_name, ', ', F.first_name) AS instructor,
+        SC.status,
+        SC.date_cleared
+    FROM enrolled_subjects AS ES
+        INNER JOIN students AS ST
+            ON ST.studentID = ES.studentID
+        INNER JOIN subjects AS S
+            ON S.subjectID = ES.subjectID
+        INNER JOIN enrollment_period AS EP
+            ON EP.enrollmentID = ES.enrollmentID
+        LEFT JOIN programs AS PR
+            ON PR.program = ST.program
+        LEFT JOIN subject_clearance AS SC
+            ON SC.enrolled_subjectID = ES.enrolled_subjectID
+        LEFT JOIN subject_schedules AS SS
+            ON SS.enrollmentID = ES.enrollmentID
+            AND SS.subjectID = ES.subjectID
+            AND SS.block = ST.block
+        LEFT JOIN faculty AS F
+            ON F.facultyID = SS.facultyID
+    WHERE CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ?
+        AND CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ?
+    ORDER BY ES.subjectID;
+");
+
+// ---- CLEARANCE FORM: dean and program coordinator ----
+$clearanceDAO->prepareStatement("getClearanceFormSignatories", "SELECT
+        F.role,
+        CONCAT(F.first_name, ' ', F.last_name) AS name
+    FROM faculty AS F
+    WHERE (LOWER(F.role) LIKE '%dean%' AND F.department = ?)
+        OR (LOWER(F.role) LIKE '%coordinator%' AND F.program = ?);
+");
+
+// ---- CLEARANCE FORM: every office, with this student's status for the term ----
+$clearanceDAO->prepareStatement("getClearanceFormOffices", "SELECT
+        O.officeID,
+        UPPER(O.name) AS name,
+        CONCAT(F.last_name, ', ', F.first_name) AS office_head,
+        OC.status,
+        OC.date_cleared
+    FROM office AS O
+        INNER JOIN students AS ST
+            ON CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ?
+        INNER JOIN enrollment_period AS EP
+            ON CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ?
+            AND EP.program = ST.program
+        LEFT JOIN faculty AS F
+            ON F.facultyID = O.facultyID
+        LEFT JOIN office_clearance AS OC
+            ON OC.officeID = O.officeID
+            AND OC.studentID = ST.studentID
+            AND OC.enrollmentID = EP.enrollmentID
+    ORDER BY O.name;
+");
+
+// ---- CLASS LIST FORM: approved students of one subject + block + term ----
+$clearanceDAO->prepareStatement("getClassListForm", "SELECT
+        ES.enrolled_subjectID,
+        CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) AS studentID,
+        CONCAT_WS(' ', CONCAT(ST.last_name, ','), ST.first_name, ST.middle_name) AS student_name,
+        ST.program,
+        ST.block,
+        S.name AS subject_name,
+        CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem,
+        SC.status,
+        (SELECT COUNT(*)
+            FROM projects AS P
+            WHERE P.enrolled_subjectID = ES.enrolled_subjectID) AS total_projects,
+        (SELECT COUNT(*)
+            FROM projects AS P
+            WHERE P.enrolled_subjectID = ES.enrolled_subjectID
+                AND EXISTS (
+                    SELECT 1
+                    FROM project_submission AS PS
+                    WHERE PS.projectID = P.projectID
+                )) AS submitted_projects
+    FROM enrolled_subjects AS ES
+        INNER JOIN students AS ST
+            ON ST.studentID = ES.studentID
+        INNER JOIN subjects AS S
+            ON S.subjectID = ES.subjectID
+        INNER JOIN enrollment_period AS EP
+            ON EP.enrollmentID = ES.enrollmentID
+        LEFT JOIN subject_clearance AS SC
+            ON SC.enrolled_subjectID = ES.enrolled_subjectID
+    WHERE ES.subjectID = ?
+        AND (ST.block = ? OR 'ALL' = ?)
+        AND CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ?
+        AND EXISTS (
+            SELECT 1
+            FROM subject_schedules AS SS
+                INNER JOIN faculty AS F
+                    ON F.facultyID = SS.facultyID
+            WHERE SS.enrollmentID = ES.enrollmentID
+                AND SS.subjectID = ES.subjectID
+                AND SS.block = ST.block
+                AND CONCAT('F', YEAR(F.date_created), LPAD(SS.facultyID, 5, '0')) = ?
+        )
+    ORDER BY ST.block, ST.last_name, ST.first_name;
+");
