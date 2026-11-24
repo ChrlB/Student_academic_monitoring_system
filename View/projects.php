@@ -61,7 +61,7 @@ $reopenModal = $group === 'faculty' && $error !== '' && ($_POST['project_action'
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AMS - Projects</title>
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/general.css">
-
+<link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
   <style>
 .projects-page { padding: 30px !important; color: #fff; }
 
