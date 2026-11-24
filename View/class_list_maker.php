@@ -10,6 +10,7 @@ if (strtoupper($_SESSION['role'] ?? '') === 'STUDENT') {
 $subjectID = trim($_POST['subjectID'] ?? '');
 $block     = trim($_POST['block'] ?? '');
 $term      = trim($_POST['acad_year_sem'] ?? '');
+$page_uploader = trim($_POST['page_uploader'] ?? '');
 if ($subjectID === '' || $block === '' || $term === '' || $term === 'ALL') {
     http_response_code(400);
     exit('Pick a subject, block and term first.');
@@ -33,8 +34,11 @@ if (!$handled) {
 $students = $clearanceDAO->executeQuery('getClassListForm',
     [$subjectID, $block, $block, $term, $_SESSION['userID']]);
 if (!$students) {
-    http_response_code(404);
-    exit('No enrolled students found.');
+  $_SESSION['error'] = 'No enrolled students found.';
+  header('Location: ' . $page_uploader);
+  exit;
+    // http_response_code(404);
+    // exit('No enrolled students found.');
 }
 
 $head = $students[0];
