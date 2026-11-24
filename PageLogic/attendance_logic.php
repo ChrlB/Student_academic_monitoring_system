@@ -22,6 +22,9 @@ global $db_connection;
 
 # Send a JSON response and terminate execution immediately
 function att_json(array $payload): void {
+  while (ob_get_level() > 0) {
+    ob_end_clean();
+  }
   header('Content-Type: application/json');
   echo json_encode($payload);
   exit;
@@ -139,7 +142,14 @@ $validDepartments = array_values(array_unique(array_map(
 $attRole       = strtolower(trim($_SESSION['role'] ?? 'student'));
 $attUserRaw    = trim((string)($_SESSION['userID'] ?? ''));
 $attGroup      = att_role_group($attRole);
-$attFacultyID  = ($attGroup !== 'student') ? (int)($_SESSION['real_userID'] ?? substr($attUserRaw, 5)) : 0;
+$attFacultyID = 0;
+if ($attGroup !== 'student') {
+  if (isset($_SESSION['real_userID']) && is_numeric($_SESSION['real_userID'])) {
+    $attFacultyID = (int)$_SESSION['real_userID'];
+  } elseif (preg_match('/(\d+)$/', $attUserRaw, $idMatch)) {
+    $attFacultyID = (int)$idMatch[1];
+  }
+}
 $attStudentKey = ($attGroup === 'student' && preg_match('/^\d{9}$/', $attUserRaw)) ? $attUserRaw : null;
 
 $attPos = 'student';
