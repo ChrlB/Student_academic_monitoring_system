@@ -11,7 +11,7 @@
  * The optional reason log lives in `account_restrictions` (see registration_migration.sql).
  */
 require_once __DIR__ . '/../Services/csrf.php';
-//require_once __DIR__ . '/../Services/account_log.php';   // accountLog(): activity log
+require_once __DIR__ . '/../Services/account_log.php';   // accountLog(): activity log
 
 /** Roles the registrar may create: label shown in the page => [kind, value stored in faculty.role]. */
 const REG_ROLES = [
