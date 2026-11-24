@@ -5,6 +5,7 @@ require_once __DIR__ . "/components/qr_modal.php";
 
 # Temporary flag: reserve Department filter for Super Admin while DB setup is pending
 $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
+$eventPrograms   = $ATT_PROGRAMS ?? [];
 ?>
 
 <!DOCTYPE html>
@@ -20,7 +21,7 @@ $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/attendance.css">
-  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8" type="text/javascript"></script>
 </head>
 
 <body>
@@ -71,6 +72,7 @@ $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
                      data-status="<?= e($ev['status']) ?>"
                      data-program="<?= e($ev['program']) ?>"
                      data-coord="<?= e($ev['coord']) ?>"
+                     data-remark="<?= e($ev['remark'] ?? '') ?>"
                      data-att="<?= (int)$ev['att'] ?>"
                      data-edit="<?= $ev['canEdit'] ? '1' : '0' ?>"
                      data-review="<?= !empty($ev['review']) ? '1' : '0' ?>">
@@ -79,7 +81,7 @@ $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
                   <span><?= e($ev['date']) ?></span>
                   <span><?= e($ev['start']) ?></span>
                   <span><?= e($ev['end']) ?></span>
-                  <span class="ev-st st-<?= e(strtolower($ev['status'])) ?>"><?= e(ucfirst(strtolower($ev['status']))) ?></span>
+                  <span class="ev-st st-<?= e(strtolower($ev['shown'])) ?>"><?= e(ucfirst(strtolower($ev['shown']))) ?></span>
                 </div>
               <?php endforeach; endif; ?>
             </div></div>
@@ -90,10 +92,10 @@ $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
                   data-dean="<?= !empty($attIsDean) ? '1' : '0' ?>"
                   data-my-dept="<?= e($attMyDept ?? '') ?>"
                   data-me="<?= e($ATT_ME_NAME ?? '') ?>"
-                  data-my-program="<?= e(in_array($attMyProgram, $ATT_PROGRAMS, true) ? $attMyProgram : '') ?>">
+                  data-my-program="<?= e(in_array($attMyProgram, $eventPrograms, true) ? $attMyProgram : '') ?>">
             <form method="post" action="<?= e(att_url()) ?>" id="ev-form" autocomplete="off">
               <input type="hidden" name="att_action" id="ev-action" value="add_event">
-              <input type="hidden" name="eventID" id="ev-id" value="">  
+              <input type="hidden" name="eventID" id="ev-id" value="">
               <input type="hidden" name="events" value="1">
               <h2 id="ev-title">ADD EVENT</h2>
 
@@ -119,8 +121,8 @@ $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
                   <input type="time" name="end" id="ev-end" value="18:00" required></label>
                 <label class="ev-field"><span>PROGRAM / COLLEGE</span>
                   <select name="program" id="ev-program">
-                    <option value=""><?= e($ATT_ALL_LABEL) ?></option>
-                    <?php foreach ($ATT_PROGRAMS as $pg): ?><option value="<?= e($pg) ?>"><?= e($pg) ?></option><?php endforeach; ?>
+                    <option value=""><?= e($ATT_ALL_LABEL ?? 'ALL PROGRAMS') ?></option>
+                    <?php foreach ($eventPrograms as $pg): ?><option value="<?= e($pg) ?>"><?= e($pg) ?></option><?php endforeach; ?>
                   </select></label>
               </div>
 
@@ -131,9 +133,18 @@ $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
                          role="combobox" aria-expanded="false" aria-controls="ev-coord-list" aria-autocomplete="list" aria-label="Event coordinator">
                   <button type="button" class="ev-caret" id="ev-caret" tabindex="-1" aria-label="Show coordinators"></button>
                   <ul class="ev-list" id="ev-coord-list" role="listbox" hidden>
-                    <?php foreach ($ATT_FACULTY_NAMES as $fn): ?><li role="option" data-v="<?= e($fn) ?>"><?= e($fn) ?></li><?php endforeach; ?>
+                    <?php foreach (($ATT_FACULTY_NAMES ?? []) as $fn): ?><li role="option" data-v="<?= e($fn) ?>"><?= e($fn) ?></li><?php endforeach; ?>
                   </ul>
                 </div></div>
+
+              <!-- Remark: required when a coordinator/faculty changes an event; shown read-only to the dean when reviewing -->
+              <style>
+                #ev-remark { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; font: inherit; resize: vertical;
+                             color: inherit; background: transparent; border: 1px solid rgba(128,128,128,.45); }
+                #ev-remark[readonly] { opacity: .85; resize: none; }
+              </style>
+              <label class="ev-field" id="ev-remark-wrap" hidden><span>REMARK (WHY IS THIS EVENT BEING CHANGED?)</span>
+                <textarea name="remark" id="ev-remark" rows="3" maxlength="500" placeholder="eg. Venue is not available, moved to the next day"></textarea></label>
 
               <!-- Dean approval notice for non-dean submissions -->
               <p class="ev-note" id="ev-note" hidden>This event will be sent to the dean for approval.</p>
@@ -179,7 +190,7 @@ $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
                     <th class="sel"></th><th>Event</th><th>Date</th><th>Time in / Time out</th><th>Status</th><th>Instructor</th><th>Hours</th>
                   </tr></thead>
                   <tbody>
-                  <?php foreach ($recs as $r): $cls = ['ON-TIME' => 'st-ontime', 'LATE' => 'st-late', 'ABSENT' => 'st-absent'][$r['status']]; ?>
+                  <?php foreach ($recs as $r): $cls = ['ON-TIME' => 'st-ontime', 'LATE' => 'st-late', 'ABSENT' => 'st-absent'][$r['status']] ?? ''; ?>
                     <tr>
                       <td class="sel"></td>
                       <td><?= e($r['event']) ?></td>
@@ -294,7 +305,7 @@ $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
                     <th class="sel"></th><th>Event</th><th>Date</th><th>Time in / Time out</th><th>Status</th><th>Instructor</th><th>Hours</th>
                   </tr></thead>
                   <tbody>
-                  <?php foreach ($recs as $r): $cls = ['ON-TIME' => 'st-ontime', 'LATE' => 'st-late', 'ABSENT' => 'st-absent'][$r['status']]; ?>
+                  <?php foreach ($recs as $r): $cls = ['ON-TIME' => 'st-ontime', 'LATE' => 'st-late', 'ABSENT' => 'st-absent'][$r['status']] ?? ''; ?>
                     <tr>
                       <td class="sel"><input type="checkbox" class="rd" name="ids[]" value="<?= e($r['id']) ?>" aria-label="Select <?= e($r['event']) ?>"></td>
                       <td><?= e($r['event']) ?></td>

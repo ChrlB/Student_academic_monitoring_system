@@ -344,6 +344,15 @@ document.addEventListener('DOMContentLoaded', () => {
       f('ev-program').value = mode === 'add' ? (evDlg.dataset.myProgram || '') : (d.program || '');
       const locked = mode === 'view' || mode === 'review';
       fields.forEach(x => { x.disabled = locked; });
+      /* Remark: coordinators/faculty must explain an edit; everyone else just reads it */
+      const rm = f('ev-remark'), rmWrap = f('ev-remark-wrap');
+      if (rm && rmWrap) {
+        const asking = mode === 'edit' && !isDean;
+        rm.readOnly = !asking;
+        rm.required = asking;
+        rm.value    = asking ? '' : (d.remark || '');
+        rmWrap.hidden = !(asking || d.remark);
+      }
       if (!isDean) { f('ev-status').disabled = true; f('ev-coord').disabled = true; if (mode === 'edit') { f('ev-name').disabled = true; f('ev-program').disabled = true; } }
       f('ev-note').hidden    = isDean || locked;
       f('ev-ok').hidden      = locked;
@@ -361,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const openRow = row => openDlg(row.dataset.review === '1' ? 'review' : (row.dataset.edit === '1' ? 'edit' : 'view'), {
       id: row.dataset.id, name: row.dataset.name, date: row.dataset.date, status: row.dataset.status,
-      start: row.dataset.start, end: row.dataset.end, coord: row.dataset.coord, program: row.dataset.program, att: row.dataset.att
+      start: row.dataset.start, end: row.dataset.end, coord: row.dataset.coord, program: row.dataset.program, att: row.dataset.att, remark: row.dataset.remark
     });
     document.querySelectorAll('.ev-row').forEach(row => {
       row.addEventListener('click', () => openRow(row));
