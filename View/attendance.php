@@ -5,6 +5,7 @@ require_once __DIR__ . "/../PageLogic/attendance_logic.php";
 # Temporary flag: reserve Department filter for Super Admin while DB setup is pending
 $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
 $eventPrograms   = $ATT_PROGRAMS ?? [];
+
 ?>
 
 <!DOCTYPE html>
