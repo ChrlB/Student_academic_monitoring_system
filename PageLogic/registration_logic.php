@@ -1,4 +1,8 @@
 <?php
+/**
+ * Registration page (registrar only). Data for View/registration.php; the save endpoints are in
+ * registration_actions.php.
+ */
 require_once __DIR__ . '/../Services/auth.php';
 require_once __DIR__ . '/../Services/csrf.php';
 require_once __DIR__ . '/registration_actions.php';
@@ -31,4 +35,11 @@ try {
     error_log('registration departments failed: ' . $err->getMessage());
 }
 
-$regAsgReady = regAssignmentsReady();   
+$regProgramDepts = [];   
+try {
+    foreach ($db_connection->query('SELECT program, department FROM programs')->fetchAll(PDO::FETCH_ASSOC) as $pr) {
+        $regProgramDepts[strtoupper($pr['program'])] = $pr['department'];
+    }
+} catch (Throwable $err) {
+    error_log('registration programs failed: ' . $err->getMessage());
+}

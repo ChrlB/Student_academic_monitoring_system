@@ -120,7 +120,7 @@ $attCanScan = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($
 $attIsDean  = ($attPos === 'dean');
 $attScoped  = ($attPos === 'coordinator');
 # Dean only manages their own department (admin stays unrestricted)
-$attDeptScoped = $attIsDean && (string)$attMyDept !== '';
+$attDeptScoped = (in_array($attPos, ['dean', 'registrar'], true) && (string)$attMyDept !== '') || $attPos === 'faculty';
 $evpage     = ($attGroup !== 'student' && (!empty($_GET['events']) || !empty($_POST['events'])));
 if ($evpage) $_SESSION["page"] = "EVENTS | " . $attLabel;
 

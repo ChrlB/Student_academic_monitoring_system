@@ -7,6 +7,7 @@ require_once __DIR__."/../Services/imageHandler.php";
 require_once __DIR__ . '/../Services/ClearanceDocumentHandler.php';
 require_once __DIR__.'/../PageLogic/faculty_account_actions.php';
 require_once __DIR__.'/../PageLogic/registration_actions.php';
+require_once __DIR__.'/../PageLogic/google_link_actions.php';
 class Router {
     private array $routes = [];
 
@@ -112,9 +113,9 @@ $router->post('/registration',  fn($request) => require __DIR__ . '/../View/regi
 $router->post('/registration-add',      fn() => registrationAdd($_POST));
 $router->post('/registration-restrict', fn() => registrationRestrict($_POST));
 $router->post('/registration-update',   fn() => registrationUpdate($_POST));
+$router->post('/registration-archive',  fn() => registrationArchive($_POST));
 $router->post('/registration-delete',   fn() => registrationDelete($_POST));
-$router->post('/registration-assign',   fn() => registrationAssign($_POST));
-$router->post('/registration-unassign', fn() => registrationUnassign($_POST));
+$router->post('/registration-logs', fn() => registrationLogs($_POST));
 
 $router->post('/login', fn($request) => login($request));
 $router->post('/logout', fn() => logout());    
@@ -127,6 +128,7 @@ $router->post('/faculty-info',    fn() => saveFacultyInfo($_POST));
 $router->post('/faculty-contact', fn() => saveFacultyContact($_POST));
  
 $router->post('/upload-profile', fn() => uploadProfile());
+$router->post('/link-google', fn() => linkGoogleAccount($_POST));
 $router->get('/get-profile', fn() => getProfilePic());
 
 $router->post('/upload-document', function ($request) { 

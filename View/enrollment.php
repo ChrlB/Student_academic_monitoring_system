@@ -61,7 +61,7 @@ $csrf = $logic->csrf();
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AMS - Enrollment</title>
-
+<link rel="icon" type="image/x-icon" href="<?= BASE_PATH ?>/View/resources/favicon1.jpg">
     <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/general.css">
     <link rel="stylesheet" href="<?= BASE_PATH ?>/View/style/enrollment.css">
 </head>
