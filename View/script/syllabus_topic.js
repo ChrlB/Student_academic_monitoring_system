@@ -89,7 +89,7 @@
     }
 
     var MODE_NAMES = {
-      standard: 'Quiz', instant: 'Instant feedback', timed: 'Timed exam', confidence: 'Confidence marking',
+      standard: 'Quiz', instant: 'Instant feedback', timed: 'Timed quiz', confidence: 'Confidence marking',
       adaptive: 'Adaptive', survival: 'Survival', study: 'Study mode', flash: 'Flashcards',
       review: 'Review'
     };
@@ -154,9 +154,7 @@
       }
 
       if (r.passed) {
-        res.appendChild(el('p', null, r.completed
-          ? 'This topic is now completed.'
-          : (r.kind === 'quiz' ? 'Well done! The mock exam is now unlocked.' : 'Well done!')));
+        res.appendChild(el('p', null, r.completed ? 'This topic is now completed.' : 'Well done!'));
         if (r.review && r.review.length) {
           var ul = el('ul', 'quiz-review');
           r.review.forEach(function (it) {
@@ -562,10 +560,13 @@
     }
 
     /* ----- add material: type switch + upload with progress ----- */
-    var ACCEPT = { pdf: '.pdf,application/pdf', video: '.mp4,.webm,video/mp4,video/webm' };
+    var ACCEPT = { pdf: '.pdf,application/pdf' };
 
     function syncContentForm(form) {
-      form.elements.file.setAttribute('accept', ACCEPT[form.elements.kind.value] || '');
+      var isVideo = form.elements.kind.value === 'video';       // a recorded lesson is a link, a PDF is an upload
+      form.querySelector('.cf-file').classList.toggle('is-hidden', isVideo);
+      form.querySelector('.cf-url').classList.toggle('is-hidden', !isVideo);
+      form.elements.file.setAttribute('accept', ACCEPT.pdf);
     }
 
     var contentForm = wrap.querySelector('.content-form');
@@ -588,9 +589,15 @@
         fd.append('title', title);
         fd.append('description', form.elements.description.value.trim());
 
-        var file = form.elements.file.files[0];
-        if (!file) { toast('Choose a file to upload.', true); return; }
-        fd.append('file', file);
+        if (kind === 'video') {
+          var link = form.elements.url.value.trim();
+          if (!link) { toast('Paste the link to the recording first.', true); return; }
+          fd.append('url', link);
+        } else {
+          var file = form.elements.file.files[0];
+          if (!file) { toast('Choose a file to upload.', true); return; }
+          fd.append('file', file);
+        }
 
         var btn   = form.querySelector('button[type="submit"]');
         var bar   = form.querySelector('.upload-progress');
@@ -641,7 +648,7 @@
     var MODE_HELP = {
       standard: 'Students answer every question on one page, then submit. Results appear at the end.',
       instant: 'One question at a time. Students see the right answer and your explanation straight after each question. Best for learning.',
-      timed: 'Like a real exam: a countdown runs, answers are locked until they submit, and nothing is shown until the end.',
+      timed: 'A countdown runs, answers are locked until they submit, and nothing is shown until the end.',
       confidence: 'Older mode: students rate how sure they are. Sure and right earns more; sure and wrong loses points.',
       adaptive: 'Older mode: questions get harder after a correct answer and easier after a miss.',
       survival: 'Older mode: students have limited lives and each wrong answer costs one.'
@@ -902,11 +909,13 @@
         var cTitle = item.querySelector('[name="title"]').value.trim();
         if (!cTitle) { toast('Title cannot be empty.', true); return; }
         var bodyEl = item.querySelector('[name="body"]');
+        var urlEl = item.querySelector('[name="url"]');
         run('edit_content', {
           contentID: btn.dataset.content,
           title: cTitle,
           description: item.querySelector('[name="description"]').value.trim(),
-          body: bodyEl ? bodyEl.value : ''
+          body: bodyEl ? bodyEl.value : '',
+          url: urlEl ? urlEl.value.trim() : ''
         });
 
       } else if (action === 'toggle-publish') {
@@ -973,11 +982,6 @@
 
       } else if (action === 'csv-template') {
         downloadCsvTemplate();
-
-      } else if (action === 'show-exam') {
-        var examCard = document.getElementById('card-exam');
-        if (examCard) { examCard.classList.remove('is-hidden'); examCard.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-        btn.remove();
       }
     });
   }

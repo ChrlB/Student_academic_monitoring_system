@@ -159,8 +159,8 @@ $classUrl = $current ? BASE_PATH . '/syllabus?class=' . (int) $current['schedID'
                     <?php endforeach; ?>
                 </select>
                 <label class="mini check"><input type="checkbox" id="copyPages" checked> Lesson pages</label>
-                <label class="mini check"><input type="checkbox" id="copyFiles" checked> Materials (PDFs and videos)</label>
-                <label class="mini check"><input type="checkbox" id="copyQuizzes" checked> Quizzes and exams (copied as drafts)</label>
+                <label class="mini check"><input type="checkbox" id="copyFiles" checked> Materials (PDFs and video links)</label>
+                <label class="mini check"><input type="checkbox" id="copyQuizzes" checked> Quizzes (copied as drafts)</label>
                 <div class="hint">Opening dates and deadlines are not copied. Set them for this class after copying.</div>
                 <div class="cf-row">
                     <button type="button" class="syl-btn inline" data-action="run-copy">Copy into this class</button>

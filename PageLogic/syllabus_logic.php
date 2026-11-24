@@ -20,21 +20,20 @@ $_SESSION["page"] = "SYLLABUS";
     Upcoming     the professor set an "opens on" date that is still in the future (locked)
     Not Started  the student has not opened the topic
     In Progress  the student opened it
-    Completed    the student passed the checkpoint (mock exam if there is one, else mini quiz),
+    Completed    the student passed the quiz,
                  or - when the topic has no quiz - marked it as finished
-    A failed quiz/exam forces the student to study again: retake is locked until the cooldown
+    A failed quiz asks the student to study again: the retake unlocks after a short wait.
     passed AND (when the topic has PDF/video materials) at least one material was opened again.
 ========================================================
 */
 class SyllabusLogic
 {
     private const KINDS      = ['pdf', 'video', 'note'];
-    private const QUIZ_KINDS = ['quiz', 'exam'];
+    private const QUIZ_KINDS = ['quiz'];
 
     // Allowed uploads. Real limits are also capped by php.ini (upload_max_filesize / post_max_size).
     private const FILE_RULES = [
         'pdf'   => ['ext' => ['pdf'],         'mime' => ['application/pdf'],                         'max' => 52428800],   // 50 MB
-        'video' => ['ext' => ['mp4', 'webm'], 'mime' => ['video/mp4', 'video/x-m4v', 'video/webm'],  'max' => 524288000],  // 500 MB
         'image' => ['ext' => ['png', 'jpg', 'jpeg', 'gif', 'webp'], 'mime' => ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], 'max' => 5242880],  // 5 MB (pictures inside lesson pages)
     ];
     private const MIME_BY_EXT = [
@@ -342,7 +341,7 @@ class SyllabusLogic
                FROM syllabus_quizzes z
                JOIN syllabus_tasks t ON t.taskID = z.taskID
                JOIN syllabus_modules m ON m.moduleID = t.moduleID
-              WHERE m.schedID = :s",
+              WHERE m.schedID = :s AND z.kind = 'quiz'",
             [':s' => $schedID]
         ) as $z) {
             if (!$staff && ((int)$z['is_published'] !== 1 || (int)$z['qn'] < 1)) continue;
@@ -563,7 +562,8 @@ class SyllabusLogic
     public function contentsForTask(int $taskID, bool $includeHidden): array
     {
         return $this->all(
-            "SELECT contentID, taskID, kind, title, description, body, file_name, file_size, is_published
+            "SELECT contentID, taskID, kind, title, description, body, file_name, file_size, is_published,
+                    (CASE WHEN stored_name IS NULL OR stored_name = '' THEN 0 ELSE 1 END) AS has_file
                FROM syllabus_contents
               WHERE taskID = :t" . ($includeHidden ? '' : ' AND is_published = 1') . "
               ORDER BY sort_order, contentID",
@@ -595,7 +595,7 @@ class SyllabusLogic
     }
 
     /* ---------------------------------------------------------
-       CHECKPOINTS (mini quiz + mock exam)
+       QUIZZES
     --------------------------------------------------------- */
     private function questionsOf(int $quizID, bool $withAnswers): array
     {
@@ -615,17 +615,17 @@ class SyllabusLogic
     }
 
     /**
-     * ['quiz' => row|null, 'exam' => row|null]
+     * ['quiz' => row|null]
      * staff:   every checkpoint, with its questions and the correct answers
      * student: published ones that have questions, plus this student's attempt summary
      * other:   published ones that have questions
      */
     public function assessmentsFor(int $taskID, string $mode): array
     {
-        $out  = ['quiz' => null, 'exam' => null];
+        $out  = ['quiz' => null];
         $rows = $this->all(
             "SELECT quizID, kind, mode, title, pass_percent, cooldown_minutes, draw_count, time_limit_minutes, lives, allow_practice, is_published
-               FROM syllabus_quizzes WHERE taskID = :t",
+               FROM syllabus_quizzes WHERE taskID = :t AND kind = 'quiz'",
             [':t' => $taskID]
         );
         foreach ($rows as $q) {
@@ -678,7 +678,6 @@ class SyllabusLogic
     public function studentFlow(array $assess, ?array $progress): array
     {
         $quiz = $assess['quiz'];
-        $exam = $assess['exam'];
         $completed = ($progress && $progress['status'] === 'completed');
         $flagged   = ($progress && (int)$progress['needs_restudy'] === 1 && !$completed);
 
@@ -686,39 +685,26 @@ class SyllabusLogic
         $failedTitle = '';
         $failedQuiz  = 0;
         $missed      = [];
-        if ($flagged) {
-            $failedQuiz = (int)($progress['last_fail_quizID'] ?? 0);
-            $cool = 0;
-            foreach ([$quiz, $exam] as $q) {
-                if ($q && (int)$q['quizID'] === $failedQuiz) {
-                    $cool = (int)$q['cooldown_minutes'];
-                    $failedTitle = $q['title'];
-                }
-            }
-            $failAt   = $progress['last_fail_at'] ? strtotime($progress['last_fail_at']) : time();
-            $secsLeft = max(0, $failAt + $cool * 60 - time());
-            if ($failedQuiz > 0) $missed = $this->lastMissed($failedQuiz);
+        if ($flagged && $quiz) {
+            $failedQuiz  = (int)$quiz['quizID'];
+            $failedTitle = $quiz['title'];
+            $cool        = (int)$quiz['cooldown_minutes'];
+            $failAt      = $progress['last_fail_at'] ? strtotime($progress['last_fail_at']) : time();
+            $secsLeft    = max(0, $failAt + $cool * 60 - time());
+            $missed      = $this->lastMissed($failedQuiz);
         }
         $waiting = ($flagged && $secsLeft > 0);
 
-        $state = ['quiz' => null, 'exam' => null];
-        foreach (self::QUIZ_KINDS as $k) {
-            $q = $assess[$k];
-            if (!$q) continue;
-            if ($q['passed'])                                   $s = 'passed';
-            elseif ($completed)                                 $s = 'closed';
-            elseif ($waiting)                                   $s = 'restudy';
-            elseif ($k === 'exam' && $quiz && !$quiz['passed']) $s = 'needs_quiz';
-            else                                                $s = 'ready';
-            $state[$k] = $s;
+        $state = ['quiz' => null];
+        if ($quiz) {
+            if ($quiz['passed'])  $state['quiz'] = 'passed';
+            elseif ($completed)   $state['quiz'] = 'closed';
+            elseif ($waiting)     $state['quiz'] = 'restudy';
+            else                  $state['quiz'] = 'ready';
         }
 
-        $next = null;                       // the one thing the student should do now
-        if (!$completed && !$waiting) {
-            foreach (self::QUIZ_KINDS as $k) {
-                if ($state[$k] === 'ready') { $next = $k; break; }
-            }
-        }
+        // the one thing the student should do now
+        $next = (!$completed && !$waiting && $state['quiz'] === 'ready') ? 'quiz' : null;
 
         return [
             'completed'    => $completed,
@@ -751,7 +737,7 @@ class SyllabusLogic
             "SELECT a.studentID, z.kind, MAX(a.score_pct) AS best, COUNT(*) AS n, MAX(a.passed) AS passed
                FROM syllabus_attempts a
                JOIN syllabus_quizzes z ON z.quizID = a.quizID
-              WHERE z.taskID = :t
+              WHERE z.taskID = :t AND z.kind = 'quiz'
               GROUP BY a.studentID, z.kind",
             [':t' => $taskID]
         ) as $a) {
@@ -770,7 +756,6 @@ class SyllabusLogic
                 'state' => $state,
                 'last'  => $p['last_opened_at'] ?? null,
                 'quiz'  => $att[$sid]['quiz'] ?? null,
-                'exam'  => $att[$sid]['exam'] ?? null,
             ];
         }
         return $rows;
@@ -956,6 +941,64 @@ class SyllabusLogic
     }
 
     /* ---------------------------------------------------------
+       RECORDED LESSONS ARE EMBEDDED FROM A LINK (nothing is stored on the school server)
+       Recognised: YouTube, Vimeo, Google Drive. Any other https link (Zoom, Teams, ...)
+       is shown as an "Open recording" button. Only these hosts are ever put in an iframe.
+    --------------------------------------------------------- */
+    public static function parseVideoLink(string $url): array
+    {
+        $url = trim($url);
+        $out = ['ok' => false, 'provider' => 'link', 'embed' => null, 'url' => $url];
+        if ($url === '' || strlen($url) > 500) return $out;
+
+        $p = parse_url($url);
+        if (!$p || strtolower((string)($p['scheme'] ?? '')) !== 'https' || empty($p['host'])) return $out;
+        if (!filter_var($url, FILTER_VALIDATE_URL)) return $out;
+
+        $out['ok'] = true;
+        $host = strtolower((string)preg_replace('/^www\./i', '', $p['host']));
+        $path = (string)($p['path'] ?? '');
+        $q = [];
+        parse_str((string)($p['query'] ?? ''), $q);
+
+        $start = 0;                                           // "&t=90" / "&t=90s" / "?start=90"
+        $t = (string)($q['t'] ?? ($q['start'] ?? ''));
+        if (preg_match('/^(\d{1,6})s?$/', $t, $tm)) $start = (int)$tm[1];
+
+        // YouTube
+        $yt = '';
+        if (in_array($host, ['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com'], true)) {
+            if ($path === '/watch' && isset($q['v'])) $yt = (string)$q['v'];
+            elseif (preg_match('#^/(?:embed|shorts|live|v)/([A-Za-z0-9_-]{6,20})#', $path, $m)) $yt = $m[1];
+        } elseif ($host === 'youtu.be' && preg_match('#^/([A-Za-z0-9_-]{6,20})#', $path, $m)) {
+            $yt = $m[1];
+        }
+        if ($yt !== '' && preg_match('/^[A-Za-z0-9_-]{6,20}$/', $yt)) {
+            $out['provider'] = 'youtube';
+            $out['embed']    = 'https://www.youtube-nocookie.com/embed/' . $yt . ($start > 0 ? '?start=' . $start : '');
+            return $out;
+        }
+
+        // Vimeo (public, or unlisted with a hash)
+        if (in_array($host, ['vimeo.com', 'player.vimeo.com'], true)
+            && preg_match('#^/(?:video/)?(\d{5,12})(?:/([a-f0-9]{6,20}))?$#i', $path, $m)) {
+            $h = $m[2] ?? ($q['h'] ?? '');
+            $out['provider'] = 'vimeo';
+            $out['embed']    = 'https://player.vimeo.com/video/' . $m[1] . (preg_match('/^[a-f0-9]{6,20}$/i', (string)$h) ? '?h=' . $h : '');
+            return $out;
+        }
+
+        // Google Drive file (must be shared as "Anyone with the link")
+        if ($host === 'drive.google.com' && preg_match('#^/file/d/([A-Za-z0-9_-]{10,80})#', $path, $m)) {
+            $out['provider'] = 'drive';
+            $out['embed']    = 'https://drive.google.com/file/d/' . $m[1] . '/preview';
+            return $out;
+        }
+
+        return $out;      // valid https link, but not embeddable: shown as a button
+    }
+
+    /* ---------------------------------------------------------
        POST plumbing
     --------------------------------------------------------- */
     private function reply(array $data, int $code = 200): void
@@ -1118,10 +1161,10 @@ class SyllabusLogic
 
     private function publishedAssessments(int $taskID): array
     {
-        $out = ['quiz' => null, 'exam' => null];
+        $out = ['quiz' => null];
         foreach ($this->all(
             "SELECT z.*, (SELECT COUNT(*) FROM syllabus_questions q WHERE q.quizID = z.quizID) AS qn
-               FROM syllabus_quizzes z WHERE z.taskID = :t AND z.is_published = 1",
+               FROM syllabus_quizzes z WHERE z.taskID = :t AND z.kind = 'quiz' AND z.is_published = 1",
             [':t' => $taskID]
         ) as $z) {
             if ((int)$z['qn'] >= 1) $out[$z['kind']] = $z;
@@ -1137,7 +1180,12 @@ class SyllabusLogic
                 $taskID = $this->intParam('taskID');
                 $this->studentTask($taskID);
                 $a = $this->publishedAssessments($taskID);
-                if ($a['quiz'] || $a['exam']) $this->fail('Pass the checkpoint to complete this topic.', 409);
+                if ($a['quiz'] && !$this->value(
+                    "SELECT 1 FROM syllabus_attempts WHERE quizID = :q AND studentID = :s AND passed = 1 LIMIT 1",
+                    [':q' => $a['quiz']['quizID'], ':s' => $this->userID]
+                )) {
+                    $this->fail('Pass the quiz to complete this topic.', 409);
+                }
                 $this->recordOpen($taskID);   // makes sure a progress row exists
                 $this->run(
                     "UPDATE syllabus_progress SET status = 'completed', completed_at = :n, needs_restudy = 0
@@ -1164,10 +1212,10 @@ class SyllabusLogic
     /* ---------------------------------------------------------
        QUIZ RUNNER  (graded checkpoints + ungraded practice)
 
-       Graded modes  (quiz/exam row -> `mode`)
+       Graded modes  (the quiz's `mode`)
          standard    all questions on one page, submit at the end
          instant     one question at a time, right answer + explanation shown straight away
-         timed       simulated exam: countdown, answers locked until submit, no feedback
+         timed       countdown, answers locked until submit, no feedback
          confidence  student rates how sure they are; sure+right earns more, sure+wrong costs points
          adaptive    next question gets harder after a correct answer, easier after a miss
          survival    limited lives; a wrong answer costs one
@@ -1260,7 +1308,7 @@ class SyllabusLogic
             "SELECT q.questionID
                FROM syllabus_questions q
                JOIN syllabus_quizzes z ON z.quizID = q.quizID
-              WHERE z.taskID = :t AND z.is_published = 1 AND z.allow_practice = 1
+              WHERE z.taskID = :t AND z.kind = 'quiz' AND z.is_published = 1 AND z.allow_practice = 1
               ORDER BY q.questionID",
             [':t' => $taskID]
         );
@@ -1333,7 +1381,7 @@ class SyllabusLogic
     {
         $quiz = $this->one(
             "SELECT z.*, (SELECT COUNT(*) FROM syllabus_questions q WHERE q.quizID = z.quizID) AS qn
-               FROM syllabus_quizzes z WHERE z.quizID = :q",
+               FROM syllabus_quizzes z WHERE z.quizID = :q AND z.kind = 'quiz'",
             [':q' => $this->intParam('quizID')]
         );
         if (!$quiz || (int)$quiz['is_published'] !== 1 || (int)$quiz['qn'] < 1) $this->fail('This checkpoint is not available.', 404);
@@ -1349,16 +1397,6 @@ class SyllabusLogic
             if ($left > 0) $this->fail('Review the lesson first. You can retake in ' . (int)ceil($left / 60) . ' minute(s).', 409);
             // the wait is over: the retake is open again
             $this->run("UPDATE syllabus_progress SET needs_restudy = 0 WHERE studentID = :s AND taskID = :t", [':s' => $this->userID, ':t' => $taskID]);
-        }
-
-        if ($quiz['kind'] === 'exam') {
-            $pa = $this->publishedAssessments($taskID);
-            if ($pa['quiz'] && !$this->value(
-                "SELECT 1 FROM syllabus_attempts WHERE quizID = :q AND studentID = :s AND passed = 1 LIMIT 1",
-                [':q' => $pa['quiz']['quizID'], ':s' => $this->userID]
-            )) {
-                $this->fail('Pass the mini quiz before the mock exam.', 409);
-            }
         }
 
         $mode = in_array($quiz['mode'], self::MODES, true) ? $quiz['mode'] : 'standard';
@@ -1619,7 +1657,7 @@ class SyllabusLogic
         $completed = false;
         if ($passed) {
             $pa = $this->publishedAssessments($taskID);
-            $required = $pa['exam'] ? 'exam' : ($pa['quiz'] ? 'quiz' : null);
+            $required = $pa['quiz'] ? 'quiz' : null;
             if ($required === $quiz['kind']) {
                 $this->run(
                     "UPDATE syllabus_progress SET status = 'completed', completed_at = :n, needs_restudy = 0
@@ -1785,7 +1823,7 @@ class SyllabusLogic
     {
         foreach ($this->all(
             "SELECT quizID, kind, mode, title, pass_percent, cooldown_minutes, draw_count, time_limit_minutes, lives, allow_practice
-               FROM syllabus_quizzes WHERE taskID = :t",
+               FROM syllabus_quizzes WHERE taskID = :t AND kind = 'quiz'",
             [':t' => $oldTask]
         ) as $z) {
             $this->run(
@@ -1833,7 +1871,7 @@ class SyllabusLogic
                JOIN syllabus_quizzes z ON z.quizID = a.quizID
                JOIN syllabus_tasks t ON t.taskID = z.taskID
                JOIN syllabus_modules m ON m.moduleID = t.moduleID
-              WHERE m.schedID = :s
+              WHERE m.schedID = :s AND z.kind = 'quiz'
               GROUP BY a.studentID, a.quizID, z.title",
             [':s' => $schedID]
         ) as $r) {
@@ -1867,7 +1905,7 @@ class SyllabusLogic
                JOIN syllabus_quizzes z ON z.quizID = q.quizID
                JOIN syllabus_tasks t ON t.taskID = z.taskID
                JOIN syllabus_modules m ON m.moduleID = t.moduleID
-              WHERE m.schedID = :s
+              WHERE m.schedID = :s AND z.kind = 'quiz'
               GROUP BY q.questionID, q.prompt
              HAVING SUM(s.wrong_count + s.correct_count) >= 3 AND SUM(s.wrong_count) > 0
               ORDER BY SUM(s.wrong_count) / SUM(s.wrong_count + s.correct_count) DESC, SUM(s.wrong_count) DESC
@@ -1987,11 +2025,12 @@ class SyllabusLogic
                 $desc  = $this->optionalText('description', 500);
                 $body  = null;
                 $file  = null;
-                if ($kind === 'note') {
-                    $body = $this->optionalText('body', 20000, true);
-                    if ($body === null) $this->fail('Write the note text first.');
+                if ($kind === 'video') {                 // a recorded lesson is embedded from a link and never stored here
+                    $link = self::parseVideoLink((string)($_POST['url'] ?? ''));
+                    if (!$link['ok']) $this->fail('Paste a valid https:// link to the recording (YouTube, Vimeo, Google Drive, Zoom...).');
+                    $body = $link['url'];
                 } else {
-                    $file = $this->storeUpload($kind);
+                    $file = $this->storeUpload($kind);   // PDF
                 }
                 try {
                     $next = (int)$this->value("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM syllabus_contents WHERE taskID = :t", [':t' => $taskID]);
@@ -2021,6 +2060,11 @@ class SyllabusLogic
                     if ($body === null) $this->fail('The note text cannot be empty.');
                     $this->run("UPDATE syllabus_contents SET title = :t, description = :d, body = :b WHERE contentID = :c",
                         [':t' => $title, ':d' => $desc, ':b' => $body, ':c' => $row['contentID']]);
+                } elseif ($row['kind'] === 'video' && empty($row['stored_name'])) {   // an embedded recording: its link can change
+                    $link = self::parseVideoLink((string)($_POST['url'] ?? ''));
+                    if (!$link['ok']) $this->fail('Paste a valid https:// link to the recording.');
+                    $this->run("UPDATE syllabus_contents SET title = :t, description = :d, body = :b WHERE contentID = :c",
+                        [':t' => $title, ':d' => $desc, ':b' => $link['url'], ':c' => $row['contentID']]);
                 } else {
                     $this->run("UPDATE syllabus_contents SET title = :t, description = :d WHERE contentID = :c",
                         [':t' => $title, ':d' => $desc, ':c' => $row['contentID']]);
@@ -2094,17 +2138,17 @@ class SyllabusLogic
                 $this->reply(['ok' => true, 'url' => 'syllabus-file?image=' . (int)$this->pdo->lastInsertId()]);
                 break;
 
-            /* ----- checkpoints: mini quiz + mock exam ----- */
+            /* ----- quiz ----- */
             case 'save_quiz':
                 $taskID = $this->intParam('taskID');
                 $this->requireCanManageTask($taskID);
                 $kind = (string)($_POST['kind'] ?? '');
-                if (!in_array($kind, self::QUIZ_KINDS, true)) $this->fail('Choose quiz or exam.');
+                if (!in_array($kind, self::QUIZ_KINDS, true)) $this->fail('Choose a valid checkpoint type.');
                 $mode    = (string)($_POST['mode'] ?? 'standard');
                 $oldMode = (string)$this->value("SELECT mode FROM syllabus_quizzes WHERE taskID = :t AND kind = :k", [':t' => $taskID, ':k' => $kind]);
                 if (!in_array($mode, self::SAVE_MODES, true) && $mode !== $oldMode) $this->fail('Choose how this checkpoint is run.');
                 if (!in_array($mode, self::MODES, true)) $this->fail('Choose how this checkpoint is run.');
-                $title = $this->optionalText('title', 200) ?? ($kind === 'exam' ? 'Mock exam' : 'Quiz');
+                $title = $this->optionalText('title', 200) ?? 'Quiz';
                 $pass  = $this->intRangeParam('pass_percent', 1, 100, 70);
                 $cool  = $this->intRangeParam('cooldown_minutes', 0, 1440, 2);
                 $draw  = null;
