@@ -1,7 +1,9 @@
 <?php
 /*
   GET /syllabus-file?id=CONTENT_ID[&download=1]
-  Streams an uploaded PDF / video after checking the login + class access.
+  GET /syllabus-file?image=IMAGE_ID
+  GET /syllabus-file?project_sub=SUBMISSION_ID[&download=1]
+  Streams an uploaded PDF / video / lesson image / project submission after checking login + class access.
   Supports HTTP Range requests so videos can be seeked in the browser.
 */
 require_once __DIR__ . '/../Services/auth.php';
@@ -15,18 +17,21 @@ function syllabusFileNotFound(string $msg = 'File not found.'): void
     exit;
 }
 
-$sl    = new SyllabusLogic();
-$id    = (int)($_GET['id'] ?? 0);
-$imgId = (int)($_GET['image'] ?? 0);
+$sl     = new SyllabusLogic();
+$id     = (int)($_GET['id'] ?? 0);
+$imgId  = (int)($_GET['image'] ?? 0);
+$projId = (int)($_GET['project_sub'] ?? 0);
 
-if ($imgId > 0) {                       // picture inside a lesson page
+if ($imgId > 0) {                          // picture inside a lesson page
     $row = $sl->imageForServing($imgId);
-} else {                                // PDF / video material
+} elseif ($projId > 0) {                   // student project submission file
+    $row = $sl->projectSubmissionForServing($projId);
+} else {                                   // PDF / video material
     $row = $id > 0 ? $sl->contentForServing($id) : null;
 }
 
 if (!$row || empty($row['stored_name'])) syllabusFileNotFound();
-if (!preg_match('/^[a-f0-9]{32}\.(pdf|mp4|webm|png|jpe?g|gif|webp)$/', $row['stored_name'])) syllabusFileNotFound();
+if (!preg_match('/^[a-f0-9]{32}\.(pdf|mp4|webm|png|jpe?g|gif|webp|zip|docx?|pptx|xlsx|txt)$/', $row['stored_name'])) syllabusFileNotFound();
 
 $path = SyllabusLogic::storageDir() . '/' . $row['stored_name'];
 if (!is_file($path)) syllabusFileNotFound('The file is missing on the server.');

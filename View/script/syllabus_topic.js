@@ -398,6 +398,69 @@
         if (window.confirm('Mark this topic as finished?')) reloadAfter('mark_finished', { taskID: btn.dataset.task });
       }
     });
+
+    // student: project submission (file and/or link)
+    var projForm = wrap.querySelector('.project-submit-form');
+    if (projForm) {
+      projForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var subType = projForm.dataset.subType || 'both';
+        var linkEl  = projForm.elements.link_url;
+        var fileEl  = projForm.elements.file;
+        var notesEl = projForm.elements.notes;
+        var linkVal = linkEl ? linkEl.value.trim() : '';
+        var fileObj = (fileEl && fileEl.files) ? fileEl.files[0] : null;
+
+        if (subType === 'link' && !linkVal) { toast('Paste a link to your project first.', true); return; }
+        if (subType === 'file' && !fileObj && !wrap.querySelector('.proj-sub-status')) { toast('Choose a file to upload.', true); return; }
+        if (subType === 'both' && !linkVal && !fileObj && !wrap.querySelector('.proj-sub-status')) { toast('Attach a file or paste a link to your project.', true); return; }
+
+        var fd = new FormData();
+        fd.append('csrf_token', csrf);
+        fd.append('action', 'submit_project');
+        fd.append('projectID', projForm.dataset.project);
+        fd.append('link_url', linkVal);
+        fd.append('notes', notesEl ? notesEl.value.trim() : '');
+        if (fileObj) fd.append('file', fileObj);
+
+        var btn   = projForm.querySelector('button[type="submit"]');
+        var bar   = projForm.querySelector('.upload-progress');
+        var fill  = bar ? bar.firstElementChild : null;
+        var label = projForm.querySelector('.upload-label');
+
+        function reset() {
+          if (btn) btn.disabled = false;
+          if (bar) bar.hidden = true;
+          if (label) label.textContent = '';
+        }
+
+        if (btn) btn.disabled = true;
+        if (bar) { bar.hidden = false; if (fill) fill.style.width = '0%'; }
+        if (label) label.textContent = fileObj ? 'Uploading... 0%' : 'Submitting...';
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', endpoint);
+        xhr.withCredentials = true;
+        xhr.upload.onprogress = function (ev) {
+          if (!ev.lengthComputable || !fill) return;
+          var pct = Math.round(ev.loaded / ev.total * 100);
+          fill.style.width = pct + '%';
+          if (label) label.textContent = pct < 100 ? 'Uploading... ' + pct + '%' : 'Saving...';
+        };
+        xhr.onload = function () {
+          var json = null;
+          try { json = JSON.parse(xhr.responseText); } catch (err) {}
+          if (xhr.status >= 200 && xhr.status < 300 && json && json.ok) {
+            window.location.reload();
+          } else {
+            toast((json && json.error) || 'Submission failed (HTTP ' + xhr.status + ').', true);
+            reset();
+          }
+        };
+        xhr.onerror = function () { toast('Network error while submitting. Please try again.', true); reset(); };
+        xhr.send(fd);
+      });
+    }
   }
 
   /* =====================================================================
@@ -683,6 +746,127 @@
         run('save_quiz', data);
       });
     });
+
+    /* ----- project builder settings ----- */
+    var projSettings = wrap.querySelector('.project-settings');
+    if (projSettings) {
+      projSettings.addEventListener('submit', function (e) {
+        e.preventDefault();
+        run('save_project', {
+          taskID: projSettings.dataset.task,
+          title: projSettings.elements.title.value.trim(),
+          instructions: projSettings.elements.instructions.value.trim(),
+          submission_type: projSettings.elements.submission_type.value,
+          max_score: projSettings.elements.max_score.value,
+          pass_score: projSettings.elements.pass_score.value,
+          require_approval: projSettings.elements.require_approval.checked ? '1' : '0',
+          published: projSettings.elements.published.checked ? '1' : '0'
+        });
+      });
+    }
+
+    function openGradeModal(sub) {
+      var overlay = el('div', 'quiz-overlay');
+      var box = el('div', 'quiz-box');
+      overlay.appendChild(box);
+      document.body.appendChild(overlay);
+
+      box.appendChild(el('h2', null, 'Project Submission — ' + sub.student));
+      box.appendChild(el('div', 'sub', 'Submitted ' + sub.date));
+
+      if (sub.link) {
+        var linkP = el('p');
+        var a = el('a', null, 'Open submitted link: ' + sub.link);
+        a.href = sub.link;
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.style.color = '#6d28d9';
+        linkP.appendChild(a);
+        box.appendChild(linkP);
+      }
+      if (sub.file && sub.fileUrl) {
+        var fileP = el('p');
+        var fa = el('a', null, 'Download submitted file: ' + sub.file);
+        fa.href = sub.fileUrl;
+        fa.style.color = '#6d28d9';
+        fileP.appendChild(fa);
+        box.appendChild(fileP);
+      }
+      if (sub.notes) {
+        var nBox = el('div', 'quiz-feedback');
+        nBox.style.background = '#f3f0fa';
+        nBox.style.color = '#1f1f1f';
+        nBox.appendChild(el('strong', null, 'Student notes:'));
+        var nTxt = el('div', null, sub.notes);
+        nTxt.style.whiteSpace = 'pre-wrap';
+        nBox.appendChild(nTxt);
+        box.appendChild(nBox);
+      }
+
+      var form = el('form');
+      var stLabel = el('label', null, 'Decision ');
+      stLabel.style.display = 'block';
+      stLabel.style.marginBottom = '10px';
+      var stSel = document.createElement('select');
+      stSel.name = 'status';
+      stSel.style.cssText = 'display:block;width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:6px;';
+      [['approved', 'Approved (Pass)'], ['revision', 'Request revision'], ['submitted', 'Submitted (Pending)']].forEach(function (opt) {
+        var o = document.createElement('option');
+        o.value = opt[0];
+        o.textContent = opt[1];
+        if (sub.status === opt[0]) o.selected = true;
+        stSel.appendChild(o);
+      });
+      stLabel.appendChild(stSel);
+      form.appendChild(stLabel);
+
+      var scLabel = el('label', null, 'Score (0 to ' + sub.max + ', optional)');
+      scLabel.style.display = 'block';
+      scLabel.style.marginBottom = '10px';
+      var scIn = document.createElement('input');
+      scIn.type = 'number';
+      scIn.name = 'score';
+      scIn.min = '0';
+      scIn.max = String(sub.max);
+      scIn.value = sub.score != null ? String(sub.score) : '';
+      scIn.style.cssText = 'display:block;width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;';
+      scLabel.appendChild(scIn);
+      form.appendChild(scLabel);
+
+      var fbLabel = el('label', null, 'Feedback for student (optional)');
+      fbLabel.style.display = 'block';
+      fbLabel.style.marginBottom = '12px';
+      var fbIn = document.createElement('textarea');
+      fbIn.name = 'feedback';
+      fbIn.rows = 3;
+      fbIn.value = sub.feedback || '';
+      fbIn.style.cssText = 'display:block;width:100%;padding:8px;margin-top:4px;border:1px solid #ccc;border-radius:6px;box-sizing:border-box;font-family:inherit;';
+      fbLabel.appendChild(fbIn);
+      form.appendChild(fbLabel);
+
+      var actions = el('div', 'quiz-actions');
+      var cancelBtn = el('button', 'quiz-btn secondary', 'Cancel');
+      cancelBtn.type = 'button';
+      cancelBtn.addEventListener('click', function () { overlay.remove(); });
+      var saveBtn = el('button', 'quiz-btn', 'Save grade');
+      saveBtn.type = 'submit';
+      actions.appendChild(cancelBtn);
+      actions.appendChild(saveBtn);
+      form.appendChild(actions);
+
+      form.addEventListener('submit', function (ev) {
+        ev.preventDefault();
+        saveBtn.disabled = true;
+        run('grade_project', {
+          submissionID: sub.id,
+          status: stSel.value,
+          score: scIn.value,
+          feedback: fbIn.value.trim()
+        }).then(function () { overlay.remove(); });
+      });
+
+      box.appendChild(form);
+    }
 
     /* ----- checkpoint builder: questions ----- */
     var LETTERS = 'ABCDEF';
@@ -982,6 +1166,24 @@
 
       } else if (action === 'csv-template') {
         downloadCsvTemplate();
+
+      } else if (action === 'reveal-assess') {
+        var target = document.getElementById(btn.dataset.target);
+        if (target) {
+          target.classList.remove('is-hidden');
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          btn.classList.add('is-hidden');
+        }
+
+      } else if (action === 'delete-project') {
+        if (window.confirm('Delete this project and all student submissions? This cannot be undone.')) {
+          run('delete_project', { projectID: btn.dataset.project });
+        }
+
+      } else if (action === 'grade-project') {
+        var subObj = null;
+        try { subObj = JSON.parse(btn.dataset.sub); } catch (err) { return; }
+        if (subObj) openGradeModal(subObj);
       }
     });
   }
