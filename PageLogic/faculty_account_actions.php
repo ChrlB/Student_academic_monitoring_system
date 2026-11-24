@@ -1,5 +1,5 @@
 <?php
-
+require_once __DIR__ . '/../Services/account_log.php';
 require_once __DIR__ . '/faculty_account_logic.php';
 require_once __DIR__ . '/../Services/csrf.php';
 
@@ -30,7 +30,7 @@ function validateFacultyValue(array $s, string $raw): array {
 }
 
 function saveFacultyInfo($post) {
-    global $userDAO;
+    global $userDAO, $db_connection;
     [$num, $year, $role] = facultyGuard($post);
     facultyLoadAccountHelpers();   // only after the login check in facultyGuard()
 
@@ -49,6 +49,9 @@ function saveFacultyInfo($post) {
         facultyJson(['ok' => false, 'errors' => $errors, 'message' => reset($errors)], 422);
     }
 
+    $limitMsg = accountEditLimitMessage($db_connection ?? null, (string)$_SESSION['userID']);
+    if ($limitMsg !== '') facultyJson(['ok' => false, 'message' => $limitMsg], 429);
+    $logBefore = accountLogSnapshot($db_connection ?? null, 'faculty', $num, $year);
     try {
         $userDAO->executeQuery('updateFacultyBasic', [
             $clean['middle_name']   ?? (string)$row['middle_name'],
@@ -56,12 +59,33 @@ function saveFacultyInfo($post) {
             strtolower($clean['gender'] ?? (string)$row['gender']),
             $clean['address']       ?? (string)$row['address'],
             $clean['number']        ?? (string)$row['number'],
+            ($clean['institutional_email'] ?? '') !== '' ? $clean['institutional_email'] : ((string)($row['email'] ?? '') ?: null),
             $num, $year,
         ]);
     } catch (Throwable $e) {
         error_log('faculty info save failed: ' . $e->getMessage());
-        facultyJson(['ok' => false, 'message' => 'Something went wrong. Please try again.'], 500);
+        // most likely the faculty.email column does not exist yet (faculty_email_migration.sql not run):
+        // save everything else so the page still works
+        $saved = false;
+        try {
+            $st = $db_connection->prepare('UPDATE faculty SET middle_name = ?, date_of_birth = ?, gender = ?, address = ?, number = ? WHERE facultyID = ? AND YEAR(date_created) = ?');
+            $st->execute([
+                $clean['middle_name']   ?? (string)$row['middle_name'],
+                $clean['date_of_birth'] ?? (string)$row['date_of_birth'],
+                strtolower($clean['gender'] ?? (string)$row['gender']),
+                $clean['address']       ?? (string)$row['address'],
+                $clean['number']        ?? (string)$row['number'],
+                $num, $year,
+            ]);
+            $saved = true;
+        } catch (Throwable $e2) {
+            error_log('faculty info fallback save failed: ' . $e2->getMessage());
+        }
+        if (!$saved) facultyJson(['ok' => false, 'message' => 'Something went wrong. Please try again.'], 500);
     }
+
+    $changes = accountLogDiff($logBefore, accountLogSnapshot($db_connection ?? null, 'faculty', $num, $year));
+    accountLog($db_connection ?? null, (string)$_SESSION['userID'], '', 'updated', $changes !== '' ? 'Edited own information. ' . $changes : 'Saved own information (no changes)');
 
     // send the stored (normalised) values back so the boxes show exactly what was saved
     $fresh = loadFacultyRow($num, $year);
@@ -73,18 +97,23 @@ function saveFacultyInfo($post) {
 }
 
 function saveFacultyContact($post) {
-    global $userDAO;
+    global $userDAO, $db_connection;
     [$num, $year] = facultyGuard($post);
 
     $raw = $post['number'] ?? '';
     [$number, $err] = validateProfileValue('number', ['Contact Number', 'phone', 20, true], is_string($raw) ? $raw : '');
     if ($err) facultyJson(['ok' => false, 'message' => $err, 'errors' => ['number' => $err]], 422);
 
+    $limitMsg = accountEditLimitMessage($db_connection ?? null, (string)$_SESSION['userID']);
+    if ($limitMsg !== '') facultyJson(['ok' => false, 'message' => $limitMsg], 429);
+    $logBefore = accountLogSnapshot($db_connection ?? null, 'faculty', $num, $year);
     try {
         $userDAO->executeQuery('updateFacultyNumber', [$number, $num, $year]);
     } catch (Throwable $e) {
         error_log('faculty contact save failed: ' . $e->getMessage());
         facultyJson(['ok' => false, 'message' => 'Something went wrong. Please try again.'], 500);
     }
+    $changes = accountLogDiff($logBefore, accountLogSnapshot($db_connection ?? null, 'faculty', $num, $year));
+    if ($changes !== '') accountLog($db_connection ?? null, (string)$_SESSION['userID'], '', 'updated', 'Edited own information. ' . $changes);
     facultyJson(['ok' => true, 'message' => 'Profile saved.', 'values' => ['number' => $number]]);
 }

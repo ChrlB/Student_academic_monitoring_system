@@ -28,7 +28,6 @@
     height: 100%;
     position: relative;
     z-index: 0;
-
   }
 }
 
@@ -69,7 +68,6 @@
   background: rgba(40, 40, 40, 0.3);
   color: #fff;
   box-sizing: content-box;
-
 }
 
 .updates_frame2 {
@@ -83,7 +81,6 @@
   color: #fff;
   box-sizing: content-box;
   height: 100%;
-  
 
   thead {
     background: transparent;
@@ -92,15 +89,12 @@
     padding: 10px 15px;
   }
 
-
   thead th,
   thead tr {
     background: #282828;
   }
 
   .updates_records {
-    
-
     tr {
       position: relative;
       border-radius: 20px;
@@ -115,7 +109,6 @@
         border-bottom-right-radius: 20px;
       }
     }
-
 
     tr:hover {
       background-color: #e9b8e565;
@@ -132,7 +125,7 @@
       z-index: 10;
       width: 500px;
       min-height: 100px;
-      background-color: #1F193D;
+      background-color: #1f193d;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.3s;
@@ -180,7 +173,6 @@
 }
 
 * {
-
   /**/
   .searchbar_frame {
     border-radius: 20px;
@@ -197,10 +189,10 @@
       border: 0px;
       font-size: 20px;
     }
-    button{
+    button {
       padding: 10px;
     }
-    .search_icon{
+    .search_icon {
       padding: 0px;
       height: 20px;
     }
@@ -216,7 +208,7 @@
   }
 
   .clearance_box {
-    background-image: linear-gradient(#CABECE, #B19EB8, #A189A9, #A189A9);
+    background-image: linear-gradient(#cabece, #b19eb8, #a189a9, #a189a9);
     height: 150px;
     padding: 20px 30px;
     width: 95%;
@@ -226,7 +218,7 @@
 
     .open_button {
       width: 70px;
-      border-radius: 50%
+      border-radius: 50%;
     }
 
     .open_button:hover {
@@ -244,7 +236,7 @@
     justify-content: space-between;
     width: 400px;
     align-items: center;
-    background-color: #7D6186;
+    background-color: #7d6186;
     padding: 10px 15px;
     border-radius: 50px;
     /* gap: 10px; */
@@ -262,8 +254,6 @@
       text-overflow: hidden;
     }
   }
-
-
 
   .subject_container {
     background-color: rgba(0, 0, 0, 0.2);
@@ -296,7 +286,7 @@
     }
 
     button:hover {
-      background-color: #A45DBB;
+      background-color: #a45dbb;
     }
 
     .uploaded_file_container {
@@ -304,7 +294,7 @@
       justify-content: space-between;
       /* width:100%;  */
       align-items: center;
-      background-color: #7D6186;
+      background-color: #7d6186;
       padding: 10px 15px;
       border-radius: 50px;
       gap: 10px;
@@ -323,11 +313,7 @@
         font-size: 30px;
       }
     }
-
-
   }
-
-
 
   .drop_shadow {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
@@ -336,39 +322,35 @@
   .drop_shadow:hover {
     box-shadow: 0 10px 15px rgba(0, 0, 0, 0.4);
   }
-
 }
 
-*{
-  
-
+* {
   button {
-      padding: 10px 25px;
-      font-size: 20px;
-      border-radius: 50px;
-      background-color: #A45DBB;
-    }
+    padding: 10px 25px;
+    font-size: 20px;
+    border-radius: 50px;
+    background-color: #a45dbb;
+  }
 
-    button:hover {
-      background-color: #cc87e3;
-    }
-  .student_clearance_panel{
+  button:hover {
+    background-color: #cc87e3;
+  }
+  .student_clearance_panel {
     padding: 20px;
     border-radius: 30px;
-     background: rgba(40, 40, 40, 0.3);
+    background: rgba(40, 40, 40, 0.3);
   }
-  .search_icon{
+  .search_icon {
     height: 20px;
   }
 
-
-  .subject_uploaded_file_container{
+  .subject_uploaded_file_container {
     .uploaded_file_container {
       font-size: 16px;
       justify-content: space-between;
-      width:400px; 
+      width: 400px;
       align-items: center;
-      background-color: #7D6186;
+      background-color: #7d6186;
       padding: 10px 15px;
       border-radius: 50px;
       gap: 10px;
@@ -385,7 +367,6 @@
   }
 }
 
-
 .uploads_container {
   padding: 40px;
   border-radius: 30px;
@@ -396,11 +377,9 @@
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  background-color: #1F193D;
-
+  background-color: #1f193d;
 
   overflow: auto;
-
 
   display: flex;
   flex-direction: column;
@@ -529,11 +508,8 @@ button {
 }
 
 main {
-
   padding: 30px;
   background-color: rgba(0, 0, 0, 0.2);
-
-
 }
 
 .status_rejected {

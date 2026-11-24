@@ -83,10 +83,66 @@
       lock(e.target);
     });
   }
+  // Same rules as validateEmailAddress() in PageLogic/account_actions.php (the server checks again).
+  var EMAIL_TYPOS = {
+    'gmial.com': 'gmail.com', 'gmai.com': 'gmail.com', 'gamil.com': 'gmail.com', 'gmaill.com': 'gmail.com',
+    'gmal.com': 'gmail.com', 'gmil.com': 'gmail.com', 'gnail.com': 'gmail.com', 'ggmail.com': 'gmail.com',
+    'gmail.co': 'gmail.com', 'gmail.con': 'gmail.com', 'gmail.cm': 'gmail.com', 'gmail.om': 'gmail.com',
+    'gmail.comm': 'gmail.com', 'gmail.vom': 'gmail.com',
+    'yahoo.con': 'yahoo.com', 'yaho.com': 'yahoo.com', 'yahooo.com': 'yahoo.com', 'yahoo.cm': 'yahoo.com',
+    'hotmial.com': 'hotmail.com', 'hotmail.con': 'hotmail.com', 'hotmai.com': 'hotmail.com',
+    'outlok.com': 'outlook.com', 'outlook.con': 'outlook.com', 'outllok.com': 'outlook.com',
+    'icloud.con': 'icloud.com', 'iclod.com': 'icloud.com'
+  };
+  function emailProblem(raw) {
+    var v = raw.trim().toLowerCase();
+    if (v === '') return '';
+    if (/\s/.test(v)) return 'Email Address cannot contain spaces.';
+    if (v.length > 100) return 'Email Address is too long (100 characters at most).';
+    var at = v.split('@');
+    if (
+      at.length !== 2 ||
+      !/^[a-z0-9!#$%&'*+\/=?^_`{|}~.-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(v) ||
+      /^\.|\.\.|\.@/.test(v) ||
+      /(^|\.)-|-(\.|$)/.test(at[1])
+    )
+      return 'Enter a valid email address, e.g. name@gmail.com.';
+    var local = at[0],
+      domain = at[1];
+    if (local.length > 64) return 'Email Address is not valid: the part before @ is too long.';
+    var tld = domain.slice(domain.lastIndexOf('.') + 1);
+    if (!/^[a-z]{2,24}$/.test(tld) && !/^xn--[a-z0-9-]{2,59}$/.test(tld))
+      return 'Email Address does not end in a valid domain such as .com or .ph.';
+    var rep = domain.match(/\.([a-z]{2,24})\.\1$/);
+    if (rep)
+      return (
+        'Email Address ends with “.' + rep[1] + '.' + rep[1] + '”. Did you mean ' +
+        local + '@' + domain.slice(0, -(rep[1].length + 1)) + '?'
+      );
+    if (domain.indexOf('gmail.com.') === 0)
+      return 'Email Address looks mistyped. Did you mean ' + local + '@gmail.com?';
+    if (Object.prototype.hasOwnProperty.call(EMAIL_TYPOS, domain))
+      return 'Email Address looks mistyped. Did you mean ' + local + '@' + EMAIL_TYPOS[domain] + '?';
+    return '';
+  }
+
   if (pr) {
     pr.querySelector('form').addEventListener('submit', function (e) {
       var num = pr.querySelector('input[name="number"]');
       var pm = document.getElementById('pr-msg');
+      var mail = pr.querySelector('input[name="email"]');
+      if (mail && !mail.disabled) {
+        var mErr = emailProblem(mail.value);
+        if (mErr) {
+          e.preventDefault();
+          if (pm) {
+            pm.textContent = mErr;
+            pm.hidden = false;
+          }
+          mail.focus();
+          return;
+        }
+      }
       if (num && !num.disabled && num.value.trim() !== '') {
         var v = num.value.trim(),
           d = v.replace(/\D/g, ''),

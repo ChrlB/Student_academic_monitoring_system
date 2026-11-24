@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__ . '/../PageLogic/registration_logic.php';   // registrar check, $regAccounts, $regDepartments, e()
+require_once __DIR__ . '/../PageLogic/registration_logic.php';  
 
 $filters = [
     'all'                 => 'All Accounts',
@@ -15,7 +15,6 @@ $total = count($regAccounts);
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -345,6 +344,7 @@ $total = count($regAccounts);
             <option value="restored">Restored</option>
             <option value="deleted">Deleted</option>
             <option value="login">Logged in</option>
+            <option value="logout">Logged out</option>
             <option value="login_blocked">Login blocked</option>
             <option value="login_failed">Failed login</option>
           </select>
@@ -384,9 +384,11 @@ $total = count($regAccounts);
       </div>
     </div>
   </dialog>
+
   <div class="reg-toast" id="reg-toast" role="status" aria-live="polite" hidden></div>
 
   <script src="<?= BASE_PATH ?>/View/script/registration.js"></script>
   <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
+
 </html>

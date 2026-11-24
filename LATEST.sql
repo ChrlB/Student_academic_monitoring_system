@@ -1646,6 +1646,7 @@ ALTER TABLE students
 ALTER TABLE faculty
   ADD COLUMN `archived_at` DATETIME NULL DEFAULT NULL,
   ADD COLUMN `archived_prev_status` VARCHAR(20) NULL DEFAULT NULL;
+  
 -- Account activity log for the Registration page (Logs button). Run once in phpMyAdmin (ams_db -> SQL).
 -- Safe to run again: it only creates the table if it is missing.
   CREATE TABLE IF NOT EXISTS `account_logs` (
@@ -1660,3 +1661,5 @@ ALTER TABLE faculty
   KEY `idx_logs_account` (`account_id`),
   KEY `idx_logs_created` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+ALTER TABLE faculty ADD COLUMN email VARCHAR(100) NULL DEFAULT NULL;

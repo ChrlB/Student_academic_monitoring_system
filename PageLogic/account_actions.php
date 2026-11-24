@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../Services/session.php';
 require_once __DIR__ . '/../Services/csrf.php';
+require_once __DIR__ . '/../Services/account_log.php';
 
 const PW_MIN_LENGTH = 8;
 const PW_MAX_LENGTH = 72;      
@@ -137,6 +138,8 @@ function changePassword($post) {
     }
 
     unset($_SESSION['pw_fails']);
+    global $db_connection;
+    accountLog($db_connection ?? null, (string)$_SESSION['userID'], '', 'updated', 'Changed their password');
     session_regenerate_id(true);
     accountDone('Password changed successfully.');
 }
@@ -181,7 +184,7 @@ function validateProfileValue(string $field, array $rule, string $raw): array {
     if ($type === 'email') {
         if (mb_strlen($v) > $limit) return ['', "$label is too long ($limit characters at most)."];
         if (!filter_var($v, FILTER_VALIDATE_EMAIL)) return ['', 'Enter a valid email address.'];
-        return [strtolower($v), null];
+        return [strtolower($v), null];   // any valid address (e.g. a linked Gmail); the school-domain rule was dropped
     }
     if ($type === 'phone') {
         // Philippine mobile number: 09XX XXX XXXX (11 digits) or +63 9XX XXX XXXX. Spaces, dashes and brackets are ignored.
@@ -205,7 +208,7 @@ function validateProfileValue(string $field, array $rule, string $raw): array {
 }
 
 function updateProfile($post) {
-    global $userDAO;
+    global $userDAO, $db_connection;
     [$table, $num, $year] = accountUserOrLogin();
 
     if ($table !== 'students') {
@@ -227,6 +230,9 @@ function updateProfile($post) {
         $clean[$field] = $value;
     }
 
+    $limitMsg = accountEditLimitMessage($db_connection ?? null, (string)$_SESSION['userID']);
+    if ($limitMsg !== '') accountFail('profile', $limitMsg, $old);
+    $logBefore = accountLogSnapshot($db_connection ?? null, 'students', $num, $year);
     try {
         $exists = $userDAO->executeQuery('studentRowExists', [$num, $year]);
         if (!is_array($exists) || empty($exists)) {
@@ -250,5 +256,7 @@ function updateProfile($post) {
         accountFail('profile', 'Something went wrong. Please try again.', $old);
     }
 
+    $changes = accountLogDiff($logBefore, accountLogSnapshot($db_connection ?? null, 'students', $num, $year));
+    accountLog($db_connection ?? null, (string)$_SESSION['userID'], '', 'updated', $changes !== '' ? 'Edited own information. ' . $changes : 'Saved own information (no changes)');
     accountDone('Profile updated successfully.');
 }

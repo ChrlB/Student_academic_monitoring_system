@@ -1,10 +1,13 @@
 <?php
+
 require_once __DIR__ . '/../Services/session.php';
 require_once __DIR__ . '/../Services/csrf.php';
+require_once __DIR__ . '/../Services/account_log.php';   
 
 const LOGIN_MAX_FAILS    = 5;    
 const LOGIN_LOCK_MINUTES = 5;   
 
+// The ID exactly as typed (trimmed, max 20 characters) so the form can show it again. Never used for a lookup.
 function loginTypedId($raw): string {
     return mb_substr(trim((string)$raw), 0, 20);
 }
@@ -37,13 +40,17 @@ function normalizeLoginId(string $raw): string {
         : '';
 }
 function logout() {
+    global $db_connection;
+    if (!empty($_SESSION['userID'])) {   // log it before the session is destroyed
+        accountLog($db_connection ?? null, (string)$_SESSION['userID'], '', 'logout', 'Signed out', (string)$_SESSION['userID']);
+    }
     terminateSession();
     header('Location: ' . BASE_PATH . '/login?status=loggedout');
     exit;
 }
 
 function login($login_info) {
-    global $userDAO;
+    global $userDAO, $db_connection;
 
     $typedId = loginTypedId($login_info['username'] ?? '');
 
@@ -91,11 +98,16 @@ function login($login_info) {
 
     if (!password_verify($password, (string)$user['password'])) {
         $_SESSION['login_fails'][] = time();
+        accountLog($db_connection ?? null, (string)($user['userID'] ?? $userID), '', 'login_failed', 'Wrong password', (string)($user['userID'] ?? $userID));
         loginFieldFail(['password' => 'Incorrect password.'], $typedId);
     }
+    // a registrar can restrict an account (registration page); only say so once the password was right,
+    // so nobody can find out which IDs exist or are restricted by guessing. Shown inline under the School ID box.
     if (strtolower(trim((string)($user['status'] ?? ''))) === 'restricted') {
+        accountLog($db_connection ?? null, (string)($user['userID'] ?? $userID), '', 'login_blocked', 'Restricted or archived account', (string)($user['userID'] ?? $userID));
         loginFieldFail(['username' => 'This account is restricted. Please contact the registrar.'], $typedId);
     }
+    accountLog($db_connection ?? null, (string)($user['userID'] ?? $userID), '', 'login', 'Signed in', (string)($user['userID'] ?? $userID));
     session_regenerate_id(true);
 
     $_SESSION['userID'] = $user['userID'] ?? $userID;
@@ -104,11 +116,6 @@ function login($login_info) {
 
     $_SESSION['folderID'] = $user['folderID'] ?? null;
     $_SESSION['real_userID'] = $user['real_userID'] ?? null;
-
-    $_SESSION['program'] = $user['program'] ?? null;
-    $_SESSION['department'] = $user['department'] ?? null;
-
-    $_SESSION['officeID'] = $user['officeID'] ?? null;
 
     $_SESSION['message'] = 'Account verification successful';
 
