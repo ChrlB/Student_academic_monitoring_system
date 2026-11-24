@@ -1,6 +1,14 @@
 <?php
 date_default_timezone_set('Asia/Manila'); 
 
+/**
+ * Account activity log (table account_logs, created by logs_migration.sql).
+ * One row per event: who did what to which account and when. Every call is best effort: if the table does not
+ * exist yet, or the insert fails, the real action (login, registration change...) carries on unaffected.
+ *
+ * action codes: created, updated, restricted, lifted, archived, restored, deleted, assigned, unassigned,
+ *               login, login_blocked, login_failed
+ */
 
 /** "Last, M., First" for a school ID (students: YYYY+5 digits, faculty: F+YYYY+5 digits), or '' if not found. */
 function accountLogName(PDO $pdo, string $id): string {

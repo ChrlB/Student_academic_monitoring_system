@@ -1,0 +1,35 @@
+AMS Syllabus Tracker v5 — Setup Instructions
+============================================
+
+What's included in this update (all previous video-link changes preserved):
+1. Midterm & Final organization
+   - Modules are tagged as Midterm or Final, grouped under Midterm and Final sections
+     with term progress bars, term filter tabs (All / Midterm / Final), and a 1-click
+     move button between terms.
+2. Academic Calendar integration (basis for creating topics & auto-filling dates)
+   - Shared per (acad_year, sem) across all classes in that semester.
+   - Configure semester start date, Midterm/Final week split, exam weeks, and holidays/breaks.
+   - Generate starter Midterm & Final modules/weekly topics directly from the calendar.
+   - Picking a calendar week when adding or editing a topic automatically fills Opens on
+     and Deadline; a Sync button recalculates dates if the calendar changes.
+3. Three assessment types: Quiz, Exam, and Project
+   - Quiz: existing interactive quiz builder (standard / instant / timed).
+   - Exam: optional on-demand Exam builder (+ Add Exam), defaults to Timed mode.
+   - Project: optional on-demand Project builder (+ Add Project) supporting file uploads
+     (PDF, ZIP, DOCX, PPTX, XLSX, TXT, images up to 50 MB), links/URLs, or both, plus
+     a faculty Review & Grade modal in the topic's Student Progress table.
+
+Setup Steps
+-----------
+1. Run latest_syllabus_tracker/part4/syllabus_tracker_v5.sql in phpMyAdmin
+   (select ams_db > SQL or Import tab). It is idempotent and safe to run more than once.
+2. Replace these 7 files in your Student_academic_monitoring_system folder
+   (paths match the folder structure inside this ZIP):
+   - PageLogic/syllabus_logic.php
+   - PageLogic/syllabus_file.php
+   - View/syllabus.php
+   - View/syllabus_topic.php
+   - View/script/syllabus.js
+   - View/script/syllabus_topic.js
+   - View/style/syllabus.css
+3. Hard-refresh the browser (Ctrl+Shift+R).

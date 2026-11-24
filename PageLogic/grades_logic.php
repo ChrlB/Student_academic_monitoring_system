@@ -149,7 +149,8 @@ class GradesLogic
             "SELECT TRIM(es.subjectID) AS subject_code,
                     s.name AS subject_name,
                     es.midterm_grade,
-                    es.final_grade
+                    es.final_grade,
+                    es.status AS enrollment_status
              FROM enrolled_subjects es
              JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
              JOIN subjects s ON TRIM(s.subjectID) = TRIM(es.subjectID)
@@ -164,6 +165,63 @@ class GradesLogic
                 ':sem' => $sem,
             ]
         );
+    }
+
+    public function studentHasFailedGrades(): bool
+    {
+        $studentID = $this->currentStudentID();
+        if ($studentID <= 0) {
+            return false;
+        }
+
+        $rows = $this->all(
+            "SELECT es.enrolled_subjectID
+             FROM enrolled_subjects es
+             WHERE es.studentID = :studentID
+               AND es.status IN ('approved','enrolled','passed','failed')
+               AND (
+                   es.status = 'failed'
+                   OR (
+                       es.midterm_grade IS NOT NULL
+                       AND es.final_grade IS NOT NULL
+                       AND (es.midterm_grade + es.final_grade) / 2 < 75
+                   )
+               )
+             LIMIT 1",
+            [':studentID' => $studentID]
+        );
+
+        return !empty($rows);
+    }
+
+    public function studentProgramCoordinatorContact(): ?array
+    {
+        $studentID = $this->currentStudentID();
+        if ($studentID <= 0) {
+            return null;
+        }
+
+        $emailColumn = $this->all("SHOW COLUMNS FROM faculty LIKE 'email'");
+        $emailExpression = $emailColumn
+            ? "COALESCE(NULLIF(TRIM(f.email), ''), CONCAT('F', YEAR(f.date_created), LPAD(f.facultyID, 5, '0'), '@gordoncollege.edu.ph'))"
+            : "CONCAT('F', YEAR(f.date_created), LPAD(f.facultyID, 5, '0'), '@gordoncollege.edu.ph')";
+        $rows = $this->all(
+            "SELECT CONCAT_WS(' ', f.first_name, f.last_name) AS coordinator_name,
+                    $emailExpression AS coordinator_email
+             FROM students st
+             JOIN programs p ON TRIM(p.program) = TRIM(st.program)
+             JOIN faculty f
+               ON TRIM(f.program) = TRIM(st.program)
+              AND TRIM(f.department) = TRIM(p.department)
+             WHERE st.studentID = :studentID
+               AND f.status = 'active'
+               AND LOWER(TRIM(f.role)) = 'program coordinator'
+             ORDER BY f.last_name, f.first_name, f.facultyID
+             LIMIT 1",
+            [':studentID' => $studentID]
+        );
+
+        return $rows[0] ?? null;
     }
 
     public static function percentageToGwa(float $percentage): ?float
@@ -872,6 +930,67 @@ class GradesLogic
         }
         unset($row);
         return $rows;
+    }
+
+    public function coordinatorFailedStudents(): array
+    {
+        if (strtolower(trim((string)($_SESSION['role'] ?? ''))) !== 'program coordinator') {
+            return [];
+        }
+
+        $facultyID = (int)$this->currentUserID();
+        if ($facultyID <= 0) {
+            return [];
+        }
+
+        return $this->all(
+            "SELECT st.studentID,
+                    CONCAT(YEAR(st.date_created), LPAD(st.studentID, 5, '0')) AS display_student_id,
+                    CONCAT_WS(' ', st.first_name, st.last_name) AS student_name,
+                    COALESCE(
+                        NULLIF(TRIM(st.email), ''),
+                        CONCAT(YEAR(st.date_created), LPAD(st.studentID, 5, '0'), '@gordoncollege.edu.ph')
+                    ) AS student_email,
+                    NULLIF(TRIM(st.number), '') AS student_phone,
+                    GROUP_CONCAT(
+                        DISTINCT CONCAT(
+                            TRIM(es.subjectID),
+                            IF(s.name IS NULL OR TRIM(s.name) = '', '', CONCAT(' - ', TRIM(s.name))),
+                            IF(
+                                es.midterm_grade IS NOT NULL AND es.final_grade IS NOT NULL,
+                                CONCAT(' (', FORMAT((es.midterm_grade + es.final_grade) / 2, 2), ')'),
+                                ''
+                            )
+                        )
+                        ORDER BY TRIM(es.subjectID)
+                        SEPARATOR '; '
+                    ) AS failed_subjects
+             FROM faculty f
+             JOIN programs p
+               ON TRIM(p.program) = TRIM(f.program)
+              AND TRIM(p.department) = TRIM(f.department)
+             JOIN students st ON TRIM(st.program) = TRIM(p.program)
+             JOIN enrolled_subjects es ON es.studentID = st.studentID
+             JOIN enrollment_period ep
+               ON ep.enrollmentID = es.enrollmentID
+              AND TRIM(ep.program) = TRIM(p.program)
+             LEFT JOIN subjects s ON TRIM(s.subjectID) = TRIM(es.subjectID)
+             WHERE f.facultyID = :facultyID
+               AND f.status = 'active'
+               AND LOWER(TRIM(f.role)) = 'program coordinator'
+               AND es.status IN ('approved','enrolled','passed','failed')
+               AND (
+                   es.status = 'failed'
+                   OR (
+                       es.midterm_grade IS NOT NULL
+                       AND es.final_grade IS NOT NULL
+                       AND (es.midterm_grade + es.final_grade) / 2 < 75
+                   )
+               )
+             GROUP BY st.studentID, st.date_created, st.first_name, st.last_name, st.email, st.number
+             ORDER BY st.last_name, st.first_name, st.studentID",
+            [':facultyID' => $facultyID]
+        );
     }
 
     public function coordinatorSubmission(int $submissionID): array

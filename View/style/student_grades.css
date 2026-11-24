@@ -239,6 +239,12 @@
   font-size: 0.87rem;
 }
 
+.student-grades__table tr.grade-failed > td {
+  color: #fff;
+  background: rgba(153, 27, 27, 0.9);
+  font-weight: 700;
+}
+
 .student-grades__empty {
   padding: 28px 16px;
   color: rgba(255, 255, 255, 0.86);

@@ -218,7 +218,9 @@ function getUploadedSubjectRequireMents($acadyear, $subjectID){
 
 function getFacultyRequireMents($acadyear,$facultyID,  $studentID = 'self'){
     global $clearanceDAO;
+    
     if($studentID == 'self') $studentID = $_SESSION['userID'];
+    if($_SESSION['role'] == 'program coordinator') $studentID = 'All';
     $records = $clearanceDAO->executeQuery("getFacultyRequirements",[
         $_SESSION['userID'],
         $facultyID, 
@@ -232,6 +234,7 @@ function getFacultyRequireMents($acadyear,$facultyID,  $studentID = 'self'){
 function getUploadedFacultyRequireMents($acadyear, $facultyID,$studentID = 'self'){
     global $clearanceDAO;
     if($studentID == 'self') $studentID = $_SESSION['userID'];
+    if($_SESSION['role'] == 'program coordinator') $studentID = 'All';
     $records = $clearanceDAO->executeQuery("getUploadedFacultyRequirements",[
         $_SESSION['userID'],
         $facultyID, 

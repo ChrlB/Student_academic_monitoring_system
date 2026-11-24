@@ -20,28 +20,46 @@ $_SESSION["page"] = "SYLLABUS";
     Upcoming     the professor set an "opens on" date that is still in the future (locked)
     Not Started  the student has not opened the topic
     In Progress  the student opened it
-    Completed    the student passed the checkpoint (mock exam if there is one, else mini quiz),
+    Completed    the student passed the quiz,
                  or - when the topic has no quiz - marked it as finished
-    A failed quiz/exam forces the student to study again: retake is locked until the cooldown
+    A failed quiz asks the student to study again: the retake unlocks after a short wait.
     passed AND (when the topic has PDF/video materials) at least one material was opened again.
 ========================================================
 */
 class SyllabusLogic
 {
-    private const KINDS      = ['pdf', 'video', 'note'];
-    private const QUIZ_KINDS = ['quiz', 'exam'];
+    private const KINDS             = ['pdf', 'video', 'note'];
+    private const QUIZ_KINDS        = ['quiz', 'exam'];
+    private const TERMS             = ['midterm', 'final'];
+    private const PROJECT_SUB_TYPES = ['file', 'link', 'both'];
 
     // Allowed uploads. Real limits are also capped by php.ini (upload_max_filesize / post_max_size).
     private const FILE_RULES = [
-        'pdf'   => ['ext' => ['pdf'],         'mime' => ['application/pdf'],                         'max' => 52428800],   // 50 MB
-        'video' => ['ext' => ['mp4', 'webm'], 'mime' => ['video/mp4', 'video/x-m4v', 'video/webm'],  'max' => 524288000],  // 500 MB
-        'image' => ['ext' => ['png', 'jpg', 'jpeg', 'gif', 'webp'], 'mime' => ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], 'max' => 5242880],  // 5 MB (pictures inside lesson pages)
+        'pdf'     => ['ext' => ['pdf'], 'mime' => ['application/pdf'], 'max' => 52428800],   // 50 MB
+        'image'   => ['ext' => ['png', 'jpg', 'jpeg', 'gif', 'webp'], 'mime' => ['image/png', 'image/jpeg', 'image/gif', 'image/webp'], 'max' => 5242880],  // 5 MB (pictures inside lesson pages)
+        'project' => [
+            'ext'  => ['pdf', 'zip', 'docx', 'doc', 'pptx', 'xlsx', 'txt', 'png', 'jpg', 'jpeg', 'webp'],
+            'mime' => [
+                'application/pdf', 'application/zip', 'application/x-zip-compressed', 'application/x-zip',
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword',
+                'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                'application/octet-stream', 'text/plain',
+                'image/png', 'image/jpeg', 'image/webp',
+            ],
+            'max'  => 52428800,   // 50 MB
+        ],
     ];
     private const MIME_BY_EXT = [
         'pdf' => 'application/pdf', 'mp4' => 'video/mp4', 'webm' => 'video/webm',
         'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'webp' => 'image/webp',
+        'zip' => 'application/zip', 'doc' => 'application/msword',
+        'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'pptx' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'txt' => 'text/plain',
     ];
-    private const STORED_RE = '/^[a-f0-9]{32}\.(pdf|mp4|webm|png|jpe?g|gif|webp)$/';
+    private const STORED_RE = '/^[a-f0-9]{32}\.(pdf|mp4|webm|png|jpe?g|gif|webp|zip|docx?|pptx|xlsx|txt)$/';
 
     private PDO $pdo;
     public string $role;
@@ -280,6 +298,163 @@ class SyllabusLogic
         return $row;
     }
 
+    /** Project submission row for the file endpoint, or null when this user must not get it. */
+    public function projectSubmissionForServing(int $submissionID): ?array
+    {
+        $row = $this->one(
+            "SELECT ps.submissionID, ps.studentID, ps.stored_name, ps.file_name, ps.mime_type, m.schedID
+               FROM syllabus_project_submissions ps
+               JOIN syllabus_projects sp ON sp.projectID = ps.projectID
+               JOIN syllabus_tasks t ON t.taskID = sp.taskID
+               JOIN syllabus_modules m ON m.moduleID = t.moduleID
+              WHERE ps.submissionID = :s",
+            [':s' => $submissionID]
+        );
+        if (!$row || empty($row['stored_name'])) return null;
+        $isOwner = ($this->isStudent && (int)$row['studentID'] === $this->userID);
+        if (!$isOwner && !$this->canManageSched((int)$row['schedID'])) return null;
+        return $row;
+    }
+
+    /* ---------------------------------------------------------
+       ACADEMIC CALENDAR (per acad_year + sem)
+       Provides the term/week basis for creating topics and auto-filling dates.
+    --------------------------------------------------------- */
+    public function academicCalendar(string $acadYear, int $sem): ?array
+    {
+        $cal = $this->one(
+            "SELECT calendarID, acad_year, sem, semester_start, midterm_weeks, total_weeks,
+                    midterm_exam_week, final_exam_week, updated_at
+               FROM syllabus_academic_calendar
+              WHERE acad_year = :ay AND sem = :s",
+            [':ay' => $acadYear, ':s' => $sem]
+        );
+        if (!$cal) return null;
+
+        $breaks = $this->all(
+            "SELECT breakID, title, start_date, end_date, skip_week
+               FROM syllabus_calendar_breaks
+              WHERE calendarID = :c
+              ORDER BY start_date, breakID",
+            [':c' => (int)$cal['calendarID']]
+        );
+        $cal['breaks'] = $breaks;
+        $cal['weeks']  = $this->computeCalendarWeeks($cal, $breaks);
+
+        $today = $this->today();
+        $cal['current_week'] = null;
+        foreach ($cal['weeks'] as $w) {
+            if ($today >= $w['start_date'] && $today <= $w['end_date']) {
+                $cal['current_week'] = $w;
+                break;
+            }
+        }
+        $lastWeek = end($cal['weeks']);
+        $cal['semester_end'] = $lastWeek ? $lastWeek['end_date'] : $cal['semester_start'];
+        return $cal;
+    }
+
+    public function calendarForSched(int $schedID): ?array
+    {
+        $ep = $this->one(
+            "SELECT ep.acad_year, ep.sem
+               FROM subject_schedules ss
+               JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
+              WHERE ss.schedID = :s",
+            [':s' => $schedID]
+        );
+        if (!$ep) return null;
+        return $this->academicCalendar((string)$ep['acad_year'], (int)$ep['sem']);
+    }
+
+    /** Computes Week 1..N date ranges, midterm/final tags, exam weeks and overlapping breaks. */
+    private function computeCalendarWeeks(array $cal, array $breaks): array
+    {
+        $total   = max(1, min(26, (int)$cal['total_weeks']));
+        $midW    = max(1, min($total, (int)$cal['midterm_weeks']));
+        $midExam = $cal['midterm_exam_week'] ? (int)$cal['midterm_exam_week'] : null;
+        $finExam = $cal['final_exam_week'] ? (int)$cal['final_exam_week'] : null;
+
+        $cursor = new DateTime($cal['semester_start']);
+        $weeks  = [];
+
+        for ($w = 1; $w <= $total; $w++) {
+            // If a skip-week break overlaps the current week window, push the week past that break.
+            $guard = 0;
+            while ($guard < 20) {
+                $guard++;
+                $ws = $cursor->format('Y-m-d');
+                $we = (clone $cursor)->modify('+6 days')->format('Y-m-d');
+                $pushed = false;
+                foreach ($breaks as $b) {
+                    if ((int)$b['skip_week'] === 1 && $b['start_date'] <= $we && $b['end_date'] >= $ws) {
+                        $after = new DateTime($b['end_date']);
+                        $after->modify('+1 day');
+                        if ($after > $cursor) {
+                            $cursor = $after;
+                            $pushed = true;
+                            break;
+                        }
+                    }
+                }
+                if (!$pushed) break;
+            }
+
+            $startStr = $cursor->format('Y-m-d');
+            $endStr   = (clone $cursor)->modify('+6 days')->format('Y-m-d');
+            $term     = ($w <= $midW) ? 'midterm' : 'final';
+
+            $notes = [];
+            foreach ($breaks as $b) {
+                if ((int)$b['skip_week'] === 0 && $b['start_date'] <= $endStr && $b['end_date'] >= $startStr) {
+                    $notes[] = $b['title'];
+                }
+            }
+
+            $examLabel = '';
+            if ($midExam !== null && $w === $midExam)     $examLabel = 'Midterm Exam Week';
+            elseif ($finExam !== null && $w === $finExam) $examLabel = 'Final Exam Week';
+
+            $weeks[$w] = [
+                'week_no'      => $w,
+                'term'         => $term,
+                'start_date'   => $startStr,
+                'end_date'     => $endStr,
+                'is_exam_week' => ($examLabel !== ''),
+                'exam_label'   => $examLabel,
+                'breaks'       => $notes,
+            ];
+            $cursor->modify('+7 days');
+        }
+
+        return $weeks;
+    }
+
+    /** Syncs available_from and due_date for all topics with a week_no in a class to the calendar. */
+    private function syncClassDatesToCalendar(int $schedID, array $cal): int
+    {
+        $weeks = $cal['weeks'] ?? [];
+        if (!$weeks) return 0;
+        $tasks = $this->all(
+            "SELECT t.taskID, t.week_no
+               FROM syllabus_tasks t
+               JOIN syllabus_modules m ON m.moduleID = t.moduleID
+              WHERE m.schedID = :s AND t.week_no IS NOT NULL",
+            [':s' => $schedID]
+        );
+        $updated = 0;
+        foreach ($tasks as $t) {
+            $w = (int)$t['week_no'];
+            if (!isset($weeks[$w])) continue;
+            $this->run(
+                "UPDATE syllabus_tasks SET available_from = :a, due_date = :d WHERE taskID = :id",
+                [':a' => $weeks[$w]['start_date'], ':d' => $weeks[$w]['end_date'], ':id' => (int)$t['taskID']]
+            );
+            $updated++;
+        }
+        return $updated;
+    }
+
 
     /* ---------------------------------------------------------
        TRACKER DATA + COMPUTATIONS
@@ -293,9 +468,11 @@ class SyllabusLogic
         $staff = ($mode === 'staff');
         $today = $this->today();
 
+        $calendar = $this->calendarForSched($schedID);
+
         $modules = $this->all(
-            "SELECT moduleID, title FROM syllabus_modules
-              WHERE schedID = :s ORDER BY sort_order, moduleID",
+            "SELECT moduleID, title, term FROM syllabus_modules
+              WHERE schedID = :s ORDER BY FIELD(term, 'midterm', 'final'), sort_order, moduleID",
             [':s' => $schedID]
         );
 
@@ -334,7 +511,7 @@ class SyllabusLogic
             $pageTasks[$pr['taskID']] = true;
         }
 
-        // checkpoints per topic (students only see published ones that have questions)
+        // assessments per topic: quiz, exam, project (students only see published ones)
         $quizByTask = [];
         foreach ($this->all(
             "SELECT z.taskID, z.kind, z.is_published,
@@ -342,11 +519,23 @@ class SyllabusLogic
                FROM syllabus_quizzes z
                JOIN syllabus_tasks t ON t.taskID = z.taskID
                JOIN syllabus_modules m ON m.moduleID = t.moduleID
-              WHERE m.schedID = :s",
+              WHERE m.schedID = :s AND z.kind IN ('quiz','exam')",
             [':s' => $schedID]
         ) as $z) {
             if (!$staff && ((int)$z['is_published'] !== 1 || (int)$z['qn'] < 1)) continue;
             $quizByTask[$z['taskID']][$z['kind']] = $z;
+        }
+
+        $projByTask = [];
+        foreach ($this->all(
+            "SELECT sp.taskID, sp.projectID, sp.title, sp.is_published
+               FROM syllabus_projects sp
+               JOIN syllabus_tasks t ON t.taskID = sp.taskID
+               JOIN syllabus_modules m ON m.moduleID = t.moduleID
+              WHERE m.schedID = :s" . ($staff ? '' : ' AND sp.is_published = 1'),
+            [':s' => $schedID]
+        ) as $sp) {
+            $projByTask[(int)$sp['taskID']] = $sp;
         }
 
         // progress: own rows (student) or class-wide stats (staff)
@@ -408,6 +597,9 @@ class SyllabusLogic
             $t['contents']   = $hide ? [] : ($contentsByTask[$tid] ?? []);
             $t['has_page']   = !$hide && isset($pageTasks[$tid]);
             $t['quizzes']    = $hide ? [] : ($quizByTask[$tid] ?? []);
+            $t['project']    = $hide ? null : ($projByTask[$tid] ?? null);
+            $t['cal_week']   = ($calendar && $t['week_no'] !== null && isset($calendar['weeks'][(int)$t['week_no']]))
+                               ? $calendar['weeks'][(int)$t['week_no']] : null;
             $t['done']       = false;
             $t['restudy']    = false;
             $t['opened_n']   = 0;
@@ -436,16 +628,23 @@ class SyllabusLogic
             'pct' => 0, 'overdue' => 0, 'materials' => count($contents), 'students' => $nStudents,
             'current' => null, 'next' => null, 'next_open' => null, 'people' => [],
             'open_topics' => 0, 'help' => [], 'hard' => [],
+            'terms' => [
+                'midterm' => ['modules' => 0, 'total' => 0, 'done' => 0, 'class_done' => 0, 'pct' => 0],
+                'final'   => ['modules' => 0, 'total' => 0, 'done' => 0, 'class_done' => 0, 'pct' => 0],
+            ],
         ];
         $firstProgress = null;
         $firstOpen     = null;
         $classDone     = 0;
 
         foreach ($modules as &$m) {
+            $mTerm          = in_array($m['term'] ?? '', self::TERMS, true) ? $m['term'] : 'midterm';
+            $m['term']      = $mTerm;
             $m['tasks']     = $byModule[$m['moduleID']] ?? [];
             $m['total']     = count($m['tasks']);
             $m['done']      = 0;
             $m['class_done'] = 0;
+            $sum['terms'][$mTerm]['modules']++;
 
             foreach ($m['tasks'] as $t) {
                 $t['module_title'] = $m['title'];
@@ -490,8 +689,21 @@ class SyllabusLogic
             } else {
                 $m['pct'] = 0;
             }
+            $sum['terms'][$mTerm]['total']      += $m['total'];
+            $sum['terms'][$mTerm]['done']       += $m['done'];
+            $sum['terms'][$mTerm]['class_done'] += $m['class_done'];
         }
         unset($m);
+
+        foreach (self::TERMS as $tk) {
+            $tt = &$sum['terms'][$tk];
+            if ($mode === 'student') {
+                $tt['pct'] = $tt['total'] > 0 ? (int)round($tt['done'] / $tt['total'] * 100) : 0;
+            } elseif ($staff) {
+                $tt['pct'] = ($nStudents > 0 && $tt['total'] > 0) ? (int)round($tt['class_done'] / ($nStudents * $tt['total']) * 100) : 0;
+            }
+        }
+        unset($tt);
 
         if ($mode === 'student') {
             $sum['pct']       = $sum['total'] > 0 ? (int)round($sum['done'] / $sum['total'] * 100) : 0;
@@ -522,7 +734,7 @@ class SyllabusLogic
             $sum['next_open']['days_until'] = (int)(new DateTime($today))->diff(new DateTime($sum['next_open']['available_from']))->days;
         }
 
-        return ['modules' => $modules, 'summary' => $sum];
+        return ['modules' => $modules, 'summary' => $sum, 'calendar' => $calendar];
     }
 
     /* ---------------------------------------------------------
@@ -532,7 +744,7 @@ class SyllabusLogic
     {
         $t = $this->one(
             "SELECT t.taskID, t.title, t.week_no, t.available_from, t.due_date,
-                    m.moduleID, m.title AS module_title, m.schedID
+                    m.moduleID, m.title AS module_title, m.term, m.schedID
                FROM syllabus_tasks t
                JOIN syllabus_modules m ON m.moduleID = t.moduleID
               WHERE t.taskID = :t",
@@ -563,7 +775,8 @@ class SyllabusLogic
     public function contentsForTask(int $taskID, bool $includeHidden): array
     {
         return $this->all(
-            "SELECT contentID, taskID, kind, title, description, body, file_name, file_size, is_published
+            "SELECT contentID, taskID, kind, title, description, body, file_name, file_size, is_published,
+                    (CASE WHEN stored_name IS NULL OR stored_name = '' THEN 0 ELSE 1 END) AS has_file
                FROM syllabus_contents
               WHERE taskID = :t" . ($includeHidden ? '' : ' AND is_published = 1') . "
               ORDER BY sort_order, contentID",
@@ -595,7 +808,7 @@ class SyllabusLogic
     }
 
     /* ---------------------------------------------------------
-       CHECKPOINTS (mini quiz + mock exam)
+       QUIZZES
     --------------------------------------------------------- */
     private function questionsOf(int $quizID, bool $withAnswers): array
     {
@@ -615,17 +828,17 @@ class SyllabusLogic
     }
 
     /**
-     * ['quiz' => row|null, 'exam' => row|null]
+     * ['quiz' => row|null]
      * staff:   every checkpoint, with its questions and the correct answers
      * student: published ones that have questions, plus this student's attempt summary
      * other:   published ones that have questions
      */
     public function assessmentsFor(int $taskID, string $mode): array
     {
-        $out  = ['quiz' => null, 'exam' => null];
+        $out  = ['quiz' => null, 'exam' => null, 'project' => null];
         $rows = $this->all(
             "SELECT quizID, kind, mode, title, pass_percent, cooldown_minutes, draw_count, time_limit_minutes, lives, allow_practice, is_published
-               FROM syllabus_quizzes WHERE taskID = :t",
+               FROM syllabus_quizzes WHERE taskID = :t AND kind IN ('quiz','exam')",
             [':t' => $taskID]
         );
         foreach ($rows as $q) {
@@ -652,6 +865,42 @@ class SyllabusLogic
             }
             $out[$q['kind']] = $q;
         }
+
+        // Project assessment (optional third kind)
+        $proj = $this->one(
+            "SELECT projectID, taskID, title, instructions, submission_type, max_score, pass_score, require_approval, is_published
+               FROM syllabus_projects WHERE taskID = :t",
+            [':t' => $taskID]
+        );
+        if ($proj) {
+            if ($mode === 'staff') {
+                $proj['sub_count'] = (int)$this->value(
+                    "SELECT COUNT(*) FROM syllabus_project_submissions WHERE projectID = :p",
+                    [':p' => (int)$proj['projectID']]
+                );
+                $proj['approved_count'] = (int)$this->value(
+                    "SELECT COUNT(*) FROM syllabus_project_submissions WHERE projectID = :p AND status = 'approved'",
+                    [':p' => (int)$proj['projectID']]
+                );
+                $out['project'] = $proj;
+            } elseif ((int)$proj['is_published'] === 1) {
+                $proj['submission'] = null;
+                $proj['passed']     = false;
+                if ($mode === 'student') {
+                    $sub = $this->one(
+                        "SELECT submissionID, link_url, file_name, file_size, notes, status, score, feedback, submitted_at, graded_at
+                           FROM syllabus_project_submissions
+                          WHERE projectID = :p AND studentID = :s",
+                        [':p' => (int)$proj['projectID'], ':s' => $this->userID]
+                    );
+                    $proj['submission'] = $sub;
+                    if ($sub) {
+                        $proj['passed'] = ((int)$proj['require_approval'] === 0) || ($sub['status'] === 'approved');
+                    }
+                }
+                $out['project'] = $proj;
+            }
+        }
         return $out;
     }
 
@@ -677,47 +926,66 @@ class SyllabusLogic
     /** What the student may do next on this topic. */
     public function studentFlow(array $assess, ?array $progress): array
     {
-        $quiz = $assess['quiz'];
-        $exam = $assess['exam'];
+        $quiz    = $assess['quiz'] ?? null;
+        $exam    = $assess['exam'] ?? null;
+        $project = $assess['project'] ?? null;
+
         $completed = ($progress && $progress['status'] === 'completed');
         $flagged   = ($progress && (int)$progress['needs_restudy'] === 1 && !$completed);
 
         $secsLeft    = 0;
         $failedTitle = '';
         $failedQuiz  = 0;
+        $failedKind  = '';
         $missed      = [];
         if ($flagged) {
-            $failedQuiz = (int)($progress['last_fail_quizID'] ?? 0);
-            $cool = 0;
-            foreach ([$quiz, $exam] as $q) {
-                if ($q && (int)$q['quizID'] === $failedQuiz) {
-                    $cool = (int)$q['cooldown_minutes'];
-                    $failedTitle = $q['title'];
-                }
+            $lastFailId = (int)($progress['last_fail_quizID'] ?? 0);
+            $failedObj  = null;
+            if ($exam && (int)$exam['quizID'] === $lastFailId)     $failedObj = $exam;
+            elseif ($quiz && (int)$quiz['quizID'] === $lastFailId) $failedObj = $quiz;
+            elseif ($quiz)                                         $failedObj = $quiz;
+            elseif ($exam)                                         $failedObj = $exam;
+
+            if ($failedObj) {
+                $failedQuiz  = (int)$failedObj['quizID'];
+                $failedTitle = $failedObj['title'];
+                $failedKind  = $failedObj['kind'];
+                $cool        = (int)$failedObj['cooldown_minutes'];
+                $failAt      = $progress['last_fail_at'] ? strtotime($progress['last_fail_at']) : time();
+                $secsLeft    = max(0, $failAt + $cool * 60 - time());
+                $missed      = $this->lastMissed($failedQuiz);
             }
-            $failAt   = $progress['last_fail_at'] ? strtotime($progress['last_fail_at']) : time();
-            $secsLeft = max(0, $failAt + $cool * 60 - time());
-            if ($failedQuiz > 0) $missed = $this->lastMissed($failedQuiz);
         }
         $waiting = ($flagged && $secsLeft > 0);
 
-        $state = ['quiz' => null, 'exam' => null];
-        foreach (self::QUIZ_KINDS as $k) {
-            $q = $assess[$k];
-            if (!$q) continue;
-            if ($q['passed'])                                   $s = 'passed';
-            elseif ($completed)                                 $s = 'closed';
-            elseif ($waiting)                                   $s = 'restudy';
-            elseif ($k === 'exam' && $quiz && !$quiz['passed']) $s = 'needs_quiz';
-            else                                                $s = 'ready';
-            $state[$k] = $s;
+        $state = ['quiz' => null, 'exam' => null, 'project' => null];
+        if ($quiz) {
+            if ($quiz['passed'])                              $state['quiz'] = 'passed';
+            elseif ($completed)                               $state['quiz'] = 'closed';
+            elseif ($waiting && $failedKind === 'quiz')       $state['quiz'] = 'restudy';
+            else                                              $state['quiz'] = 'ready';
+        }
+        if ($exam) {
+            if ($exam['passed'])                              $state['exam'] = 'passed';
+            elseif ($completed)                               $state['exam'] = 'closed';
+            elseif ($waiting && $failedKind === 'exam')       $state['exam'] = 'restudy';
+            else                                              $state['exam'] = 'ready';
+        }
+        if ($project) {
+            $sub = $project['submission'] ?? null;
+            if ($project['passed'])                           $state['project'] = 'passed';
+            elseif ($completed)                               $state['project'] = 'closed';
+            elseif ($sub && $sub['status'] === 'revision')    $state['project'] = 'revision';
+            elseif ($sub && $sub['status'] === 'submitted')   $state['project'] = 'submitted';
+            else                                              $state['project'] = 'ready';
         }
 
-        $next = null;                       // the one thing the student should do now
-        if (!$completed && !$waiting) {
-            foreach (self::QUIZ_KINDS as $k) {
-                if ($state[$k] === 'ready') { $next = $k; break; }
-            }
+        // the one thing the student should do now
+        $next = null;
+        if (!$completed) {
+            if (!$waiting && $state['quiz'] === 'ready')                                   $next = 'quiz';
+            elseif (!$waiting && $state['exam'] === 'ready')                               $next = 'exam';
+            elseif (in_array($state['project'], ['ready', 'revision'], true))              $next = 'project';
         }
 
         return [
@@ -751,11 +1019,23 @@ class SyllabusLogic
             "SELECT a.studentID, z.kind, MAX(a.score_pct) AS best, COUNT(*) AS n, MAX(a.passed) AS passed
                FROM syllabus_attempts a
                JOIN syllabus_quizzes z ON z.quizID = a.quizID
-              WHERE z.taskID = :t
+              WHERE z.taskID = :t AND z.kind IN ('quiz','exam')
               GROUP BY a.studentID, z.kind",
             [':t' => $taskID]
         ) as $a) {
             $att[(int)$a['studentID']][$a['kind']] = $a;
+        }
+
+        $projSubs = [];
+        foreach ($this->all(
+            "SELECT ps.submissionID, ps.studentID, ps.link_url, ps.file_name, ps.stored_name, ps.notes,
+                    ps.status, ps.score, ps.feedback, ps.submitted_at, ps.graded_at
+               FROM syllabus_project_submissions ps
+               JOIN syllabus_projects sp ON sp.projectID = ps.projectID
+              WHERE sp.taskID = :t",
+            [':t' => $taskID]
+        ) as $ps) {
+            $projSubs[(int)$ps['studentID']] = $ps;
         }
 
         $rows = [];
@@ -766,11 +1046,13 @@ class SyllabusLogic
                    : ($p['status'] === 'completed' ? 'completed'
                    : ((int)$p['needs_restudy'] === 1 ? 'restudy' : 'progress'));
             $rows[] = [
-                'name'  => $r['name'],
-                'state' => $state,
-                'last'  => $p['last_opened_at'] ?? null,
-                'quiz'  => $att[$sid]['quiz'] ?? null,
-                'exam'  => $att[$sid]['exam'] ?? null,
+                'studentID' => $sid,
+                'name'      => $r['name'],
+                'state'     => $state,
+                'last'      => $p['last_opened_at'] ?? null,
+                'quiz'      => $att[$sid]['quiz'] ?? null,
+                'exam'      => $att[$sid]['exam'] ?? null,
+                'project'   => $projSubs[$sid] ?? null,
             ];
         }
         return $rows;
@@ -956,6 +1238,64 @@ class SyllabusLogic
     }
 
     /* ---------------------------------------------------------
+       RECORDED LESSONS ARE EMBEDDED FROM A LINK (nothing is stored on the school server)
+       Recognised: YouTube, Vimeo, Google Drive. Any other https link (Zoom, Teams, ...)
+       is shown as an "Open recording" button. Only these hosts are ever put in an iframe.
+    --------------------------------------------------------- */
+    public static function parseVideoLink(string $url): array
+    {
+        $url = trim($url);
+        $out = ['ok' => false, 'provider' => 'link', 'embed' => null, 'url' => $url];
+        if ($url === '' || strlen($url) > 500) return $out;
+
+        $p = parse_url($url);
+        if (!$p || strtolower((string)($p['scheme'] ?? '')) !== 'https' || empty($p['host'])) return $out;
+        if (!filter_var($url, FILTER_VALIDATE_URL)) return $out;
+
+        $out['ok'] = true;
+        $host = strtolower((string)preg_replace('/^www\./i', '', $p['host']));
+        $path = (string)($p['path'] ?? '');
+        $q = [];
+        parse_str((string)($p['query'] ?? ''), $q);
+
+        $start = 0;                                           // "&t=90" / "&t=90s" / "?start=90"
+        $t = (string)($q['t'] ?? ($q['start'] ?? ''));
+        if (preg_match('/^(\d{1,6})s?$/', $t, $tm)) $start = (int)$tm[1];
+
+        // YouTube
+        $yt = '';
+        if (in_array($host, ['youtube.com', 'm.youtube.com', 'music.youtube.com', 'youtube-nocookie.com'], true)) {
+            if ($path === '/watch' && isset($q['v'])) $yt = (string)$q['v'];
+            elseif (preg_match('#^/(?:embed|shorts|live|v)/([A-Za-z0-9_-]{6,20})#', $path, $m)) $yt = $m[1];
+        } elseif ($host === 'youtu.be' && preg_match('#^/([A-Za-z0-9_-]{6,20})#', $path, $m)) {
+            $yt = $m[1];
+        }
+        if ($yt !== '' && preg_match('/^[A-Za-z0-9_-]{6,20}$/', $yt)) {
+            $out['provider'] = 'youtube';
+            $out['embed']    = 'https://www.youtube-nocookie.com/embed/' . $yt . ($start > 0 ? '?start=' . $start : '');
+            return $out;
+        }
+
+        // Vimeo (public, or unlisted with a hash)
+        if (in_array($host, ['vimeo.com', 'player.vimeo.com'], true)
+            && preg_match('#^/(?:video/)?(\d{5,12})(?:/([a-f0-9]{6,20}))?$#i', $path, $m)) {
+            $h = $m[2] ?? ($q['h'] ?? '');
+            $out['provider'] = 'vimeo';
+            $out['embed']    = 'https://player.vimeo.com/video/' . $m[1] . (preg_match('/^[a-f0-9]{6,20}$/i', (string)$h) ? '?h=' . $h : '');
+            return $out;
+        }
+
+        // Google Drive file (must be shared as "Anyone with the link")
+        if ($host === 'drive.google.com' && preg_match('#^/file/d/([A-Za-z0-9_-]{10,80})#', $path, $m)) {
+            $out['provider'] = 'drive';
+            $out['embed']    = 'https://drive.google.com/file/d/' . $m[1] . '/preview';
+            return $out;
+        }
+
+        return $out;      // valid https link, but not embeddable: shown as a button
+    }
+
+    /* ---------------------------------------------------------
        POST plumbing
     --------------------------------------------------------- */
     private function reply(array $data, int $code = 200): void
@@ -1086,7 +1426,7 @@ class SyllabusLogic
         $action = (string)($_POST['action'] ?? '');
 
         try {
-            if (in_array($action, ['mark_finished', 'run_start', 'run_answer', 'run_submit'], true)) {
+            if (in_array($action, ['mark_finished', 'run_start', 'run_answer', 'run_submit', 'submit_project'], true)) {
                 if (!$this->isStudent) $this->fail('Only students can do this.', 403);
                 $this->handleStudentAction($action);
             } else {
@@ -1118,15 +1458,53 @@ class SyllabusLogic
 
     private function publishedAssessments(int $taskID): array
     {
-        $out = ['quiz' => null, 'exam' => null];
+        $out = ['quiz' => null, 'exam' => null, 'project' => null];
         foreach ($this->all(
             "SELECT z.*, (SELECT COUNT(*) FROM syllabus_questions q WHERE q.quizID = z.quizID) AS qn
-               FROM syllabus_quizzes z WHERE z.taskID = :t AND z.is_published = 1",
+               FROM syllabus_quizzes z WHERE z.taskID = :t AND z.kind IN ('quiz','exam') AND z.is_published = 1",
             [':t' => $taskID]
         ) as $z) {
             if ((int)$z['qn'] >= 1) $out[$z['kind']] = $z;
         }
+        $proj = $this->one(
+            "SELECT * FROM syllabus_projects WHERE taskID = :t AND is_published = 1",
+            [':t' => $taskID]
+        );
+        if ($proj) $out['project'] = $proj;
         return $out;
+    }
+
+    /** Marks the topic completed for a student when all published assessments (quiz, exam, project) are satisfied. */
+    private function checkTopicCompletion(int $taskID, int $studentID): bool
+    {
+        $pa = $this->publishedAssessments($taskID);
+        if (!$pa['quiz'] && !$pa['exam'] && !$pa['project']) return false;
+
+        foreach (['quiz', 'exam'] as $k) {
+            if ($pa[$k] && !$this->value(
+                "SELECT 1 FROM syllabus_attempts WHERE quizID = :q AND studentID = :s AND passed = 1 LIMIT 1",
+                [':q' => $pa[$k]['quizID'], ':s' => $studentID]
+            )) {
+                return false;
+            }
+        }
+        if ($pa['project']) {
+            $sub = $this->one(
+                "SELECT status FROM syllabus_project_submissions WHERE projectID = :p AND studentID = :s",
+                [':p' => $pa['project']['projectID'], ':s' => $studentID]
+            );
+            if (!$sub) return false;
+            if ((int)$pa['project']['require_approval'] === 1 && $sub['status'] !== 'approved') return false;
+        }
+
+        $now = $this->nowStr();
+        $this->run(
+            "INSERT INTO syllabus_progress (studentID, taskID, status, first_opened_at, last_opened_at, completed_at, needs_restudy)
+             VALUES (:s, :t, 'completed', :n1, :n2, :n3, 0)
+             ON DUPLICATE KEY UPDATE status = 'completed', completed_at = COALESCE(completed_at, :n4), needs_restudy = 0",
+            [':s' => $studentID, ':t' => $taskID, ':n1' => $now, ':n2' => $now, ':n3' => $now, ':n4' => $now]
+        );
+        return true;
     }
 
     private function handleStudentAction(string $action): void
@@ -1137,13 +1515,120 @@ class SyllabusLogic
                 $taskID = $this->intParam('taskID');
                 $this->studentTask($taskID);
                 $a = $this->publishedAssessments($taskID);
-                if ($a['quiz'] || $a['exam']) $this->fail('Pass the checkpoint to complete this topic.', 409);
+                if ($a['quiz'] && !$this->value(
+                    "SELECT 1 FROM syllabus_attempts WHERE quizID = :q AND studentID = :s AND passed = 1 LIMIT 1",
+                    [':q' => $a['quiz']['quizID'], ':s' => $this->userID]
+                )) {
+                    $this->fail('Pass the quiz to complete this topic.', 409);
+                }
+                if ($a['exam'] && !$this->value(
+                    "SELECT 1 FROM syllabus_attempts WHERE quizID = :q AND studentID = :s AND passed = 1 LIMIT 1",
+                    [':q' => $a['exam']['quizID'], ':s' => $this->userID]
+                )) {
+                    $this->fail('Pass the exam to complete this topic.', 409);
+                }
+                if ($a['project']) {
+                    $sub = $this->one(
+                        "SELECT status FROM syllabus_project_submissions WHERE projectID = :p AND studentID = :s",
+                        [':p' => $a['project']['projectID'], ':s' => $this->userID]
+                    );
+                    if (!$sub) $this->fail('Submit the project to complete this topic.', 409);
+                    if ((int)$a['project']['require_approval'] === 1 && $sub['status'] !== 'approved') {
+                        $this->fail('Wait for your instructor to approve your project submission.', 409);
+                    }
+                }
                 $this->recordOpen($taskID);   // makes sure a progress row exists
                 $this->run(
                     "UPDATE syllabus_progress SET status = 'completed', completed_at = :n, needs_restudy = 0
                       WHERE studentID = :s AND taskID = :t",
                     [':n' => $this->nowStr(), ':s' => $this->userID, ':t' => $taskID]
                 );
+                break;
+
+            case 'submit_project':
+                $projectID = $this->intParam('projectID');
+                $proj = $this->one(
+                    "SELECT * FROM syllabus_projects WHERE projectID = :p AND is_published = 1",
+                    [':p' => $projectID]
+                );
+                if (!$proj) $this->fail('This project is not available.', 404);
+                $taskID = (int)$proj['taskID'];
+                $this->studentTask($taskID);
+                $this->recordOpen($taskID);
+
+                $existing = $this->one(
+                    "SELECT submissionID, stored_name, file_name, mime_type, file_size, status
+                       FROM syllabus_project_submissions
+                      WHERE projectID = :p AND studentID = :s",
+                    [':p' => $projectID, ':s' => $this->userID]
+                );
+                if ($existing && $existing['status'] === 'approved') {
+                    $this->fail('Your project has already been approved.', 409);
+                }
+
+                $subType = (string)$proj['submission_type'];
+                $link    = trim((string)($_POST['link_url'] ?? ''));
+                if ($link !== '') {
+                    if (strlen($link) > 500 || !preg_match('#^https?://#i', $link) || !filter_var($link, FILTER_VALIDATE_URL)) {
+                        $this->fail('Enter a valid http:// or https:// link.');
+                    }
+                }
+                $notes = $this->optionalText('notes', 4000, true);
+
+                $hasNewFile = isset($_FILES['file']) && ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;
+                $file = null;
+                if ($hasNewFile) {
+                    if ($subType === 'link') $this->fail('This project accepts a link only.');
+                    $file = $this->storeUpload('project');
+                }
+                if ($subType === 'link' && $link === '') {
+                    $this->fail('Paste a link to your project.');
+                }
+                if ($subType === 'file' && !$file && !($existing && !empty($existing['stored_name']))) {
+                    $this->fail('Upload your project file.');
+                }
+                if ($subType === 'both' && $link === '' && !$file && !($existing && !empty($existing['stored_name']))) {
+                    $this->fail('Attach a file or paste a link to your project.');
+                }
+
+                $stored = $file ? $file['stored'] : ($existing['stored_name'] ?? null);
+                $fname  = $file ? $file['name']   : ($existing['file_name'] ?? null);
+                $mime   = $file ? $file['mime']   : ($existing['mime_type'] ?? null);
+                $fsize  = $file ? $file['size']   : ($existing['file_size'] ?? null);
+                $oldStored = ($file && $existing && !empty($existing['stored_name'])) ? $existing['stored_name'] : null;
+
+                $now = $this->nowStr();
+                try {
+                    if ($existing) {
+                        $this->run(
+                            "UPDATE syllabus_project_submissions
+                                SET link_url = :l, file_name = :fn, stored_name = :sn, mime_type = :mt,
+                                    file_size = :fs, notes = :nt, status = 'submitted', submitted_at = :now
+                              WHERE submissionID = :id",
+                            [
+                                ':l' => ($link !== '' ? $link : null), ':fn' => $fname, ':sn' => $stored,
+                                ':mt' => $mime, ':fs' => $fsize, ':nt' => $notes, ':now' => $now,
+                                ':id' => (int)$existing['submissionID'],
+                            ]
+                        );
+                    } else {
+                        $this->run(
+                            "INSERT INTO syllabus_project_submissions
+                                (projectID, studentID, link_url, file_name, stored_name, mime_type, file_size, notes, status, submitted_at)
+                             VALUES (:p, :s, :l, :fn, :sn, :mt, :fs, :nt, 'submitted', :now)",
+                            [
+                                ':p' => $projectID, ':s' => $this->userID, ':l' => ($link !== '' ? $link : null),
+                                ':fn' => $fname, ':sn' => $stored, ':mt' => $mime, ':fs' => $fsize,
+                                ':nt' => $notes, ':now' => $now,
+                            ]
+                        );
+                    }
+                } catch (PDOException $ex) {
+                    if ($file) $this->removeFiles([$file['stored']]);
+                    throw $ex;
+                }
+                if ($oldStored) $this->removeFiles([$oldStored]);
+                $this->checkTopicCompletion($taskID, $this->userID);
                 break;
 
             case 'run_start':
@@ -1164,10 +1649,10 @@ class SyllabusLogic
     /* ---------------------------------------------------------
        QUIZ RUNNER  (graded checkpoints + ungraded practice)
 
-       Graded modes  (quiz/exam row -> `mode`)
+       Graded modes  (the quiz's `mode`)
          standard    all questions on one page, submit at the end
          instant     one question at a time, right answer + explanation shown straight away
-         timed       simulated exam: countdown, answers locked until submit, no feedback
+         timed       countdown, answers locked until submit, no feedback
          confidence  student rates how sure they are; sure+right earns more, sure+wrong costs points
          adaptive    next question gets harder after a correct answer, easier after a miss
          survival    limited lives; a wrong answer costs one
@@ -1260,7 +1745,7 @@ class SyllabusLogic
             "SELECT q.questionID
                FROM syllabus_questions q
                JOIN syllabus_quizzes z ON z.quizID = q.quizID
-              WHERE z.taskID = :t AND z.is_published = 1 AND z.allow_practice = 1
+              WHERE z.taskID = :t AND z.kind IN ('quiz','exam') AND z.is_published = 1 AND z.allow_practice = 1
               ORDER BY q.questionID",
             [':t' => $taskID]
         );
@@ -1333,7 +1818,7 @@ class SyllabusLogic
     {
         $quiz = $this->one(
             "SELECT z.*, (SELECT COUNT(*) FROM syllabus_questions q WHERE q.quizID = z.quizID) AS qn
-               FROM syllabus_quizzes z WHERE z.quizID = :q",
+               FROM syllabus_quizzes z WHERE z.quizID = :q AND z.kind IN ('quiz','exam')",
             [':q' => $this->intParam('quizID')]
         );
         if (!$quiz || (int)$quiz['is_published'] !== 1 || (int)$quiz['qn'] < 1) $this->fail('This checkpoint is not available.', 404);
@@ -1349,16 +1834,6 @@ class SyllabusLogic
             if ($left > 0) $this->fail('Review the lesson first. You can retake in ' . (int)ceil($left / 60) . ' minute(s).', 409);
             // the wait is over: the retake is open again
             $this->run("UPDATE syllabus_progress SET needs_restudy = 0 WHERE studentID = :s AND taskID = :t", [':s' => $this->userID, ':t' => $taskID]);
-        }
-
-        if ($quiz['kind'] === 'exam') {
-            $pa = $this->publishedAssessments($taskID);
-            if ($pa['quiz'] && !$this->value(
-                "SELECT 1 FROM syllabus_attempts WHERE quizID = :q AND studentID = :s AND passed = 1 LIMIT 1",
-                [':q' => $pa['quiz']['quizID'], ':s' => $this->userID]
-            )) {
-                $this->fail('Pass the mini quiz before the mock exam.', 409);
-            }
         }
 
         $mode = in_array($quiz['mode'], self::MODES, true) ? $quiz['mode'] : 'standard';
@@ -1618,16 +2093,7 @@ class SyllabusLogic
 
         $completed = false;
         if ($passed) {
-            $pa = $this->publishedAssessments($taskID);
-            $required = $pa['exam'] ? 'exam' : ($pa['quiz'] ? 'quiz' : null);
-            if ($required === $quiz['kind']) {
-                $this->run(
-                    "UPDATE syllabus_progress SET status = 'completed', completed_at = :n, needs_restudy = 0
-                      WHERE studentID = :s AND taskID = :t",
-                    [':n' => $now, ':s' => $this->userID, ':t' => $taskID]
-                );
-                $completed = true;
-            }
+            $completed = $this->checkTopicCompletion($taskID, $this->userID);
         } else {
             $this->run(
                 "UPDATE syllabus_progress SET needs_restudy = 1, last_fail_at = :n, last_fail_quizID = :q, restudy_hits = 0
@@ -1699,24 +2165,32 @@ class SyllabusLogic
         $this->pdo->beginTransaction();
         try {
             $base = (int)$this->value("SELECT COALESCE(MAX(sort_order), 0) FROM syllabus_modules WHERE schedID = :s", [':s' => $target]);
-            $mods = $this->all("SELECT moduleID, title FROM syllabus_modules WHERE schedID = :s ORDER BY sort_order, moduleID", [':s' => $source]);
+            $mods = $this->all("SELECT moduleID, title, term FROM syllabus_modules WHERE schedID = :s ORDER BY FIELD(term, 'midterm', 'final'), sort_order, moduleID", [':s' => $source]);
+            $targetCal = $this->calendarForSched($target);
 
             foreach ($mods as $i => $m) {
-                $this->run("INSERT INTO syllabus_modules (schedID, title, sort_order) VALUES (:s, :t, :o)", [':s' => $target, ':t' => $m['title'], ':o' => $base + $i + 1]);
+                $mTerm = in_array($m['term'] ?? '', self::TERMS, true) ? $m['term'] : 'midterm';
+                $this->run("INSERT INTO syllabus_modules (schedID, title, term, sort_order) VALUES (:s, :t, :tm, :o)", [':s' => $target, ':t' => $m['title'], ':tm' => $mTerm, ':o' => $base + $i + 1]);
                 $newMod = (int)$this->pdo->lastInsertId();
 
                 $tasks = $this->all("SELECT taskID, title, week_no, sort_order FROM syllabus_tasks WHERE moduleID = :m ORDER BY sort_order, taskID", [':m' => $m['moduleID']]);
                 foreach ($tasks as $t) {
+                    $w = $t['week_no'] !== null ? (int)$t['week_no'] : null;
+                    $open = ($targetCal && $w !== null && isset($targetCal['weeks'][$w])) ? $targetCal['weeks'][$w]['start_date'] : null;
+                    $due  = ($targetCal && $w !== null && isset($targetCal['weeks'][$w])) ? $targetCal['weeks'][$w]['end_date'] : null;
                     $this->run(
-                        "INSERT INTO syllabus_tasks (moduleID, title, week_no, sort_order) VALUES (:m, :t, :w, :o)",
-                        [':m' => $newMod, ':t' => $t['title'], ':w' => $t['week_no'], ':o' => $t['sort_order']]
+                        "INSERT INTO syllabus_tasks (moduleID, title, week_no, available_from, due_date, sort_order) VALUES (:m, :t, :w, :a, :d, :o)",
+                        [':m' => $newMod, ':t' => $t['title'], ':w' => $w, ':a' => $open, ':d' => $due, ':o' => $t['sort_order']]
                     );
                     $newTask = (int)$this->pdo->lastInsertId();
                     $oldTask = (int)$t['taskID'];
 
                     if ($pages)   $this->copyPage($oldTask, $newTask, $created);
                     if ($files)   $this->copyContents($oldTask, $newTask, $created);
-                    if ($quizzes) $this->copyQuizzes($oldTask, $newTask);
+                    if ($quizzes) {
+                        $this->copyQuizzes($oldTask, $newTask);
+                        $this->copyProject($oldTask, $newTask);
+                    }
                 }
             }
             $this->pdo->commit();
@@ -1785,7 +2259,7 @@ class SyllabusLogic
     {
         foreach ($this->all(
             "SELECT quizID, kind, mode, title, pass_percent, cooldown_minutes, draw_count, time_limit_minutes, lives, allow_practice
-               FROM syllabus_quizzes WHERE taskID = :t",
+               FROM syllabus_quizzes WHERE taskID = :t AND kind IN ('quiz','exam')",
             [':t' => $oldTask]
         ) as $z) {
             $this->run(
@@ -1821,6 +2295,25 @@ class SyllabusLogic
         }
     }
 
+    private function copyProject(int $oldTask, int $newTask): void
+    {
+        $p = $this->one(
+            "SELECT title, instructions, submission_type, max_score, pass_score, require_approval
+               FROM syllabus_projects WHERE taskID = :t",
+            [':t' => $oldTask]
+        );
+        if (!$p) return;
+        $this->run(
+            "INSERT INTO syllabus_projects (taskID, title, instructions, submission_type, max_score, pass_score, require_approval, is_published)
+             VALUES (:t, :ti, :in, :st, :ms, :ps, :ra, 0)",
+            [
+                ':t' => $newTask, ':ti' => $p['title'], ':in' => $p['instructions'],
+                ':st' => $p['submission_type'], ':ms' => $p['max_score'],
+                ':ps' => $p['pass_score'], ':ra' => $p['require_approval'],
+            ]
+        );
+    }
+
     /* ---------------------------------------------------------
        FACULTY INSIGHTS: who needs help, which questions are hardest
     --------------------------------------------------------- */
@@ -1833,7 +2326,7 @@ class SyllabusLogic
                JOIN syllabus_quizzes z ON z.quizID = a.quizID
                JOIN syllabus_tasks t ON t.taskID = z.taskID
                JOIN syllabus_modules m ON m.moduleID = t.moduleID
-              WHERE m.schedID = :s
+              WHERE m.schedID = :s AND z.kind IN ('quiz','exam')
               GROUP BY a.studentID, a.quizID, z.title",
             [':s' => $schedID]
         ) as $r) {
@@ -1867,7 +2360,7 @@ class SyllabusLogic
                JOIN syllabus_quizzes z ON z.quizID = q.quizID
                JOIN syllabus_tasks t ON t.taskID = z.taskID
                JOIN syllabus_modules m ON m.moduleID = t.moduleID
-              WHERE m.schedID = :s
+              WHERE m.schedID = :s AND z.kind IN ('quiz','exam')
               GROUP BY q.questionID, q.prompt
              HAVING SUM(s.wrong_count + s.correct_count) >= 3 AND SUM(s.wrong_count) > 0
               ORDER BY SUM(s.wrong_count) / SUM(s.wrong_count + s.correct_count) DESC, SUM(s.wrong_count) DESC
@@ -1891,14 +2384,29 @@ class SyllabusLogic
                 $sched = $this->intParam('schedID');
                 if (!$this->canManageSched($sched)) $this->fail('You cannot edit this class.', 403);
                 $title = $this->titleParam('title', 200);
+                $term  = (string)($_POST['term'] ?? 'midterm');
+                if (!in_array($term, self::TERMS, true)) $term = 'midterm';
                 $next  = (int)$this->value("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM syllabus_modules WHERE schedID = :s", [':s' => $sched]);
-                $this->run("INSERT INTO syllabus_modules (schedID, title, sort_order) VALUES (:s, :t, :o)", [':s' => $sched, ':t' => $title, ':o' => $next]);
+                $this->run("INSERT INTO syllabus_modules (schedID, title, term, sort_order) VALUES (:s, :t, :tm, :o)", [':s' => $sched, ':t' => $title, ':tm' => $term, ':o' => $next]);
                 break;
 
             case 'rename_module':
                 $id = $this->intParam('moduleID');
                 $this->requireCanManageModule($id);
-                $this->run("UPDATE syllabus_modules SET title = :t WHERE moduleID = :m", [':t' => $this->titleParam('title', 200), ':m' => $id]);
+                $term = (string)($_POST['term'] ?? '');
+                if (in_array($term, self::TERMS, true)) {
+                    $this->run("UPDATE syllabus_modules SET title = :t, term = :tm WHERE moduleID = :m", [':t' => $this->titleParam('title', 200), ':tm' => $term, ':m' => $id]);
+                } else {
+                    $this->run("UPDATE syllabus_modules SET title = :t WHERE moduleID = :m", [':t' => $this->titleParam('title', 200), ':m' => $id]);
+                }
+                break;
+
+            case 'set_module_term':
+                $id = $this->intParam('moduleID');
+                $this->requireCanManageModule($id);
+                $term = (string)($_POST['term'] ?? '');
+                if (!in_array($term, self::TERMS, true)) $this->fail('Choose Midterm or Final.');
+                $this->run("UPDATE syllabus_modules SET term = :tm WHERE moduleID = :m", [':tm' => $term, ':m' => $id]);
                 break;
 
             case 'delete_module':
@@ -1916,11 +2424,18 @@ class SyllabusLogic
                       WHERE t.moduleID = :m",
                     [':m' => $id]
                 ), 'stored_name'));
+                $files = array_merge($files, array_column($this->all(
+                    "SELECT ps.stored_name FROM syllabus_project_submissions ps
+                       JOIN syllabus_projects sp ON sp.projectID = ps.projectID
+                       JOIN syllabus_tasks t ON t.taskID = sp.taskID
+                      WHERE t.moduleID = :m AND ps.stored_name IS NOT NULL",
+                    [':m' => $id]
+                ), 'stored_name'));
                 $this->pdo->beginTransaction();
                 $this->run("DELETE i FROM syllabus_images i JOIN syllabus_tasks t ON t.taskID = i.taskID WHERE t.moduleID = :m", [':m' => $id]);
                 $this->run("DELETE p FROM syllabus_pages p JOIN syllabus_tasks t ON t.taskID = p.taskID WHERE t.moduleID = :m", [':m' => $id]);
                 $this->run("DELETE c FROM syllabus_contents c JOIN syllabus_tasks t ON t.taskID = c.taskID WHERE t.moduleID = :m", [':m' => $id]);
-                $this->run("DELETE FROM syllabus_tasks WHERE moduleID = :m", [':m' => $id]);   // progress, quizzes, questions, attempts cascade
+                $this->run("DELETE FROM syllabus_tasks WHERE moduleID = :m", [':m' => $id]);   // progress, quizzes, projects, attempts cascade
                 $this->run("DELETE FROM syllabus_modules WHERE moduleID = :m", [':m' => $id]);
                 $this->pdo->commit();
                 $this->removeFiles($files);
@@ -1934,6 +2449,14 @@ class SyllabusLogic
                 $week  = $this->weekParam();
                 $open  = $this->dateParam('available_from');
                 $due   = $this->dateParam('due_date');
+                if ($week !== null && ($open === null || $due === null)) {
+                    $schedID = (int)$this->value("SELECT schedID FROM syllabus_modules WHERE moduleID = :m", [':m' => $id]);
+                    $cal = $this->calendarForSched($schedID);
+                    if ($cal && isset($cal['weeks'][$week])) {
+                        if ($open === null) $open = $cal['weeks'][$week]['start_date'];
+                        if ($due === null)  $due  = $cal['weeks'][$week]['end_date'];
+                    }
+                }
                 $this->checkDates($open, $due);
                 $next  = (int)$this->value("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM syllabus_tasks WHERE moduleID = :m", [':m' => $id]);
                 $this->run(
@@ -1949,6 +2472,17 @@ class SyllabusLogic
                 $week  = $this->weekParam();
                 $open  = $this->dateParam('available_from');
                 $due   = $this->dateParam('due_date');
+                if ($week !== null && ($open === null || $due === null)) {
+                    $schedID = (int)$this->value(
+                        "SELECT m.schedID FROM syllabus_tasks t JOIN syllabus_modules m ON m.moduleID = t.moduleID WHERE t.taskID = :t",
+                        [':t' => $id]
+                    );
+                    $cal = $this->calendarForSched($schedID);
+                    if ($cal && isset($cal['weeks'][$week])) {
+                        if ($open === null) $open = $cal['weeks'][$week]['start_date'];
+                        if ($due === null)  $due  = $cal['weeks'][$week]['end_date'];
+                    }
+                }
                 $this->checkDates($open, $due);
                 $this->run(
                     "UPDATE syllabus_tasks SET title = :t, week_no = :w, available_from = :a, due_date = :d WHERE taskID = :id",
@@ -1967,13 +2501,139 @@ class SyllabusLogic
                     "SELECT stored_name FROM syllabus_images WHERE taskID = :t",
                     [':t' => $id]
                 ), 'stored_name'));
+                $files = array_merge($files, array_column($this->all(
+                    "SELECT ps.stored_name FROM syllabus_project_submissions ps
+                       JOIN syllabus_projects sp ON sp.projectID = ps.projectID
+                      WHERE sp.taskID = :t AND ps.stored_name IS NOT NULL",
+                    [':t' => $id]
+                ), 'stored_name'));
                 $this->pdo->beginTransaction();
                 $this->run("DELETE FROM syllabus_images WHERE taskID = :t", [':t' => $id]);
                 $this->run("DELETE FROM syllabus_pages WHERE taskID = :t", [':t' => $id]);
                 $this->run("DELETE FROM syllabus_contents WHERE taskID = :t", [':t' => $id]);
-                $this->run("DELETE FROM syllabus_tasks WHERE taskID = :t", [':t' => $id]);   // progress, quizzes, questions, attempts cascade
+                $this->run("DELETE FROM syllabus_tasks WHERE taskID = :t", [':t' => $id]);   // progress, quizzes, projects, attempts cascade
                 $this->pdo->commit();
                 $this->removeFiles($files);
+                break;
+
+            /* ----- academic calendar ----- */
+            case 'save_calendar':
+                $sched = $this->intParam('schedID');
+                if (!$this->canManageSched($sched)) $this->fail('You cannot edit this class.', 403);
+                $ep = $this->one(
+                    "SELECT ep.acad_year, ep.sem FROM subject_schedules ss JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID WHERE ss.schedID = :s",
+                    [':s' => $sched]
+                );
+                if (!$ep) $this->fail('Class semester not found.', 404);
+                $start = $this->dateParam('semester_start');
+                if ($start === null) $this->fail('Choose the semester start date.');
+                $totalW  = $this->intRangeParam('total_weeks', 4, 26, 18);
+                $midW    = $this->intRangeParam('midterm_weeks', 1, $totalW, (int)floor($totalW / 2));
+                $midExam = trim((string)($_POST['midterm_exam_week'] ?? '')) !== ''
+                           ? $this->intRangeParam('midterm_exam_week', 1, $midW, $midW) : null;
+                $finExam = trim((string)($_POST['final_exam_week'] ?? '')) !== ''
+                           ? $this->intRangeParam('final_exam_week', $midW + 1 <= $totalW ? $midW + 1 : 1, $totalW, $totalW) : null;
+
+                $this->run(
+                    "INSERT INTO syllabus_academic_calendar
+                        (acad_year, sem, semester_start, midterm_weeks, total_weeks, midterm_exam_week, final_exam_week, updated_by)
+                     VALUES (:ay, :sm, :st, :mw, :tw, :me, :fe, :u)
+                     ON DUPLICATE KEY UPDATE
+                        semester_start = :st2, midterm_weeks = :mw2, total_weeks = :tw2,
+                        midterm_exam_week = :me2, final_exam_week = :fe2, updated_by = :u2",
+                    [
+                        ':ay' => $ep['acad_year'], ':sm' => (int)$ep['sem'], ':st' => $start, ':mw' => $midW,
+                        ':tw' => $totalW, ':me' => $midExam, ':fe' => $finExam, ':u' => $this->userID,
+                        ':st2' => $start, ':mw2' => $midW, ':tw2' => $totalW,
+                        ':me2' => $midExam, ':fe2' => $finExam, ':u2' => $this->userID,
+                    ]
+                );
+                if (($_POST['sync_dates'] ?? '') === '1') {
+                    $cal = $this->academicCalendar((string)$ep['acad_year'], (int)$ep['sem']);
+                    if ($cal) $this->syncClassDatesToCalendar($sched, $cal);
+                }
+                break;
+
+            case 'add_calendar_break':
+                $sched = $this->intParam('schedID');
+                if (!$this->canManageSched($sched)) $this->fail('You cannot edit this class.', 403);
+                $cal = $this->calendarForSched($sched);
+                if (!$cal) $this->fail('Save the academic calendar first.');
+                $title = $this->titleParam('title', 150);
+                $start = $this->dateParam('start_date');
+                $end   = $this->dateParam('end_date') ?? $start;
+                if ($start === null) $this->fail('Choose a start date for the holiday or break.');
+                if ($end < $start) $this->fail('The end date must be on or after the start date.');
+                $skip = (($_POST['skip_week'] ?? '') === '1') ? 1 : 0;
+                $this->run(
+                    "INSERT INTO syllabus_calendar_breaks (calendarID, title, start_date, end_date, skip_week)
+                     VALUES (:c, :t, :s, :e, :sk)",
+                    [':c' => (int)$cal['calendarID'], ':t' => $title, ':s' => $start, ':e' => $end, ':sk' => $skip]
+                );
+                break;
+
+            case 'delete_calendar_break':
+                $sched   = $this->intParam('schedID');
+                $breakID = $this->intParam('breakID');
+                if (!$this->canManageSched($sched)) $this->fail('You cannot edit this class.', 403);
+                $cal = $this->calendarForSched($sched);
+                if (!$cal) $this->fail('Academic calendar not found.', 404);
+                $this->run(
+                    "DELETE FROM syllabus_calendar_breaks WHERE breakID = :b AND calendarID = :c",
+                    [':b' => $breakID, ':c' => (int)$cal['calendarID']]
+                );
+                break;
+
+            case 'sync_calendar_dates':
+                $sched = $this->intParam('schedID');
+                if (!$this->canManageSched($sched)) $this->fail('You cannot edit this class.', 403);
+                $cal = $this->calendarForSched($sched);
+                if (!$cal) $this->fail('Configure the academic calendar for this semester first.');
+                $n = $this->syncClassDatesToCalendar($sched, $cal);
+                $this->reply(['ok' => true, 'updated' => $n]);
+                break;
+
+            case 'scaffold_calendar':
+                $sched = $this->intParam('schedID');
+                if (!$this->canManageSched($sched)) $this->fail('You cannot edit this class.', 403);
+                $cal = $this->calendarForSched($sched);
+                if (!$cal) $this->fail('Configure the academic calendar for this semester first.');
+                $withWeeks = (($_POST['include_weeks'] ?? '1') === '1');
+
+                $this->pdo->beginTransaction();
+                $base = (int)$this->value("SELECT COALESCE(MAX(sort_order), 0) FROM syllabus_modules WHERE schedID = :s", [':s' => $sched]);
+                $midW = (int)$cal['midterm_weeks'];
+                $totW = (int)$cal['total_weeks'];
+
+                $this->run(
+                    "INSERT INTO syllabus_modules (schedID, title, term, sort_order) VALUES (:s, :t, 'midterm', :o)",
+                    [':s' => $sched, ':t' => 'Midterm Period (Weeks 1–' . $midW . ')', ':o' => $base + 1]
+                );
+                $midMod = (int)$this->pdo->lastInsertId();
+
+                $finMod = 0;
+                if ($totW > $midW) {
+                    $this->run(
+                        "INSERT INTO syllabus_modules (schedID, title, term, sort_order) VALUES (:s, :t, 'final', :o)",
+                        [':s' => $sched, ':t' => 'Final Period (Weeks ' . ($midW + 1) . '–' . $totW . ')', ':o' => $base + 2]
+                    );
+                    $finMod = (int)$this->pdo->lastInsertId();
+                }
+
+                if ($withWeeks) {
+                    foreach ($cal['weeks'] as $w) {
+                        $modID = ($w['term'] === 'midterm' || $finMod === 0) ? $midMod : $finMod;
+                        $topicTitle = $w['exam_label'] !== ''
+                            ? $w['exam_label']
+                            : 'Week ' . $w['week_no'] . ' Topic';
+                        $this->run(
+                            "INSERT INTO syllabus_tasks (moduleID, title, week_no, available_from, due_date, sort_order)
+                             VALUES (:m, :t, :w, :a, :d, :o)",
+                            [':m' => $modID, ':t' => $topicTitle, ':w' => $w['week_no'], ':a' => $w['start_date'], ':d' => $w['end_date'], ':o' => $w['week_no']]
+                        );
+                    }
+                }
+                $this->pdo->commit();
                 break;
 
             /* ----- learning contents ----- */
@@ -1987,11 +2647,12 @@ class SyllabusLogic
                 $desc  = $this->optionalText('description', 500);
                 $body  = null;
                 $file  = null;
-                if ($kind === 'note') {
-                    $body = $this->optionalText('body', 20000, true);
-                    if ($body === null) $this->fail('Write the note text first.');
+                if ($kind === 'video') {                 // a recorded lesson is embedded from a link and never stored here
+                    $link = self::parseVideoLink((string)($_POST['url'] ?? ''));
+                    if (!$link['ok']) $this->fail('Paste a valid https:// link to the recording (YouTube, Vimeo, Google Drive, Zoom...).');
+                    $body = $link['url'];
                 } else {
-                    $file = $this->storeUpload($kind);
+                    $file = $this->storeUpload($kind);   // PDF
                 }
                 try {
                     $next = (int)$this->value("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM syllabus_contents WHERE taskID = :t", [':t' => $taskID]);
@@ -2021,6 +2682,11 @@ class SyllabusLogic
                     if ($body === null) $this->fail('The note text cannot be empty.');
                     $this->run("UPDATE syllabus_contents SET title = :t, description = :d, body = :b WHERE contentID = :c",
                         [':t' => $title, ':d' => $desc, ':b' => $body, ':c' => $row['contentID']]);
+                } elseif ($row['kind'] === 'video' && empty($row['stored_name'])) {   // an embedded recording: its link can change
+                    $link = self::parseVideoLink((string)($_POST['url'] ?? ''));
+                    if (!$link['ok']) $this->fail('Paste a valid https:// link to the recording.');
+                    $this->run("UPDATE syllabus_contents SET title = :t, description = :d, body = :b WHERE contentID = :c",
+                        [':t' => $title, ':d' => $desc, ':b' => $link['url'], ':c' => $row['contentID']]);
                 } else {
                     $this->run("UPDATE syllabus_contents SET title = :t, description = :d WHERE contentID = :c",
                         [':t' => $title, ':d' => $desc, ':c' => $row['contentID']]);
@@ -2094,17 +2760,17 @@ class SyllabusLogic
                 $this->reply(['ok' => true, 'url' => 'syllabus-file?image=' . (int)$this->pdo->lastInsertId()]);
                 break;
 
-            /* ----- checkpoints: mini quiz + mock exam ----- */
+            /* ----- quiz ----- */
             case 'save_quiz':
                 $taskID = $this->intParam('taskID');
                 $this->requireCanManageTask($taskID);
                 $kind = (string)($_POST['kind'] ?? '');
-                if (!in_array($kind, self::QUIZ_KINDS, true)) $this->fail('Choose quiz or exam.');
+                if (!in_array($kind, self::QUIZ_KINDS, true)) $this->fail('Choose a valid checkpoint type.');
                 $mode    = (string)($_POST['mode'] ?? 'standard');
                 $oldMode = (string)$this->value("SELECT mode FROM syllabus_quizzes WHERE taskID = :t AND kind = :k", [':t' => $taskID, ':k' => $kind]);
                 if (!in_array($mode, self::SAVE_MODES, true) && $mode !== $oldMode) $this->fail('Choose how this checkpoint is run.');
                 if (!in_array($mode, self::MODES, true)) $this->fail('Choose how this checkpoint is run.');
-                $title = $this->optionalText('title', 200) ?? ($kind === 'exam' ? 'Mock exam' : 'Quiz');
+                $title = $this->optionalText('title', 200) ?? ($kind === 'exam' ? 'Exam' : 'Quiz');
                 $pass  = $this->intRangeParam('pass_percent', 1, 100, 70);
                 $cool  = $this->intRangeParam('cooldown_minutes', 0, 1440, 2);
                 $draw  = null;
@@ -2135,6 +2801,88 @@ class SyllabusLogic
                 $this->run("UPDATE syllabus_progress SET needs_restudy = 0 WHERE last_fail_quizID = :q", [':q' => $quiz['quizID']]);
                 $this->run("DELETE FROM syllabus_quizzes WHERE quizID = :q", [':q' => $quiz['quizID']]);   // questions, choices, attempts cascade
                 $this->pdo->commit();
+                break;
+
+            /* ----- project assessment ----- */
+            case 'save_project':
+                $taskID = $this->intParam('taskID');
+                $this->requireCanManageTask($taskID);
+                $title = $this->optionalText('title', 200) ?? 'Project';
+                $instr = $this->optionalText('instructions', 10000, true);
+                $subType = (string)($_POST['submission_type'] ?? 'both');
+                if (!in_array($subType, self::PROJECT_SUB_TYPES, true)) $subType = 'both';
+                $maxScore  = $this->intRangeParam('max_score', 1, 1000, 100);
+                $passScore = $this->intRangeParam('pass_score', 1, $maxScore, min(70, $maxScore));
+                $reqApp    = (($_POST['require_approval'] ?? '1') === '1') ? 1 : 0;
+                $pub       = (($_POST['published'] ?? '') === '1') ? 1 : 0;
+
+                $this->run(
+                    "INSERT INTO syllabus_projects
+                        (taskID, title, instructions, submission_type, max_score, pass_score, require_approval, is_published)
+                     VALUES (:t, :ti, :in, :st, :ms, :ps, :ra, :pub)
+                     ON DUPLICATE KEY UPDATE
+                        title = :ti2, instructions = :in2, submission_type = :st2,
+                        max_score = :ms2, pass_score = :ps2, require_approval = :ra2, is_published = :pub2",
+                    [
+                        ':t' => $taskID, ':ti' => $title, ':in' => $instr, ':st' => $subType,
+                        ':ms' => $maxScore, ':ps' => $passScore, ':ra' => $reqApp, ':pub' => $pub,
+                        ':ti2' => $title, ':in2' => $instr, ':st2' => $subType,
+                        ':ms2' => $maxScore, ':ps2' => $passScore, ':ra2' => $reqApp, ':pub2' => $pub,
+                    ]
+                );
+                break;
+
+            case 'delete_project':
+                $projectID = $this->intParam('projectID');
+                $proj = $this->one("SELECT projectID, taskID FROM syllabus_projects WHERE projectID = :p", [':p' => $projectID]);
+                if (!$proj) $this->fail('Project not found.', 404);
+                $this->requireCanManageTask((int)$proj['taskID']);
+                $files = array_column($this->all(
+                    "SELECT stored_name FROM syllabus_project_submissions WHERE projectID = :p AND stored_name IS NOT NULL",
+                    [':p' => $projectID]
+                ), 'stored_name');
+                $this->run("DELETE FROM syllabus_projects WHERE projectID = :p", [':p' => $projectID]);
+                $this->removeFiles($files);
+                break;
+
+            case 'grade_project':
+                $subID = $this->intParam('submissionID');
+                $sub = $this->one(
+                    "SELECT ps.submissionID, ps.studentID, sp.taskID, sp.max_score, m.schedID
+                       FROM syllabus_project_submissions ps
+                       JOIN syllabus_projects sp ON sp.projectID = ps.projectID
+                       JOIN syllabus_tasks t ON t.taskID = sp.taskID
+                       JOIN syllabus_modules m ON m.moduleID = t.moduleID
+                      WHERE ps.submissionID = :s",
+                    [':s' => $subID]
+                );
+                if (!$sub || !$this->canManageSched((int)$sub['schedID'])) $this->fail('You cannot grade this submission.', 403);
+                $status = (string)($_POST['status'] ?? 'approved');
+                if (!in_array($status, ['submitted', 'approved', 'revision'], true)) $this->fail('Invalid status.');
+                $scoreRaw = trim((string)($_POST['score'] ?? ''));
+                $score = null;
+                if ($scoreRaw !== '') {
+                    $score = $this->intRangeParam('score', 0, (int)$sub['max_score'], 0);
+                }
+                $feedback = $this->optionalText('feedback', 4000, true);
+                $this->run(
+                    "UPDATE syllabus_project_submissions
+                        SET status = :st, score = :sc, feedback = :fb, graded_at = :ga, graded_by = :gb
+                      WHERE submissionID = :id",
+                    [
+                        ':st' => $status, ':sc' => $score, ':fb' => $feedback,
+                        ':ga' => $this->nowStr(), ':gb' => $this->userID, ':id' => $subID,
+                    ]
+                );
+                if ($status === 'approved') {
+                    $this->checkTopicCompletion((int)$sub['taskID'], (int)$sub['studentID']);
+                } elseif ($status === 'revision') {
+                    $this->run(
+                        "UPDATE syllabus_progress SET status = 'in_progress', completed_at = NULL
+                          WHERE studentID = :s AND taskID = :t",
+                        [':s' => (int)$sub['studentID'], ':t' => (int)$sub['taskID']]
+                    );
+                }
                 break;
 
             case 'save_question':

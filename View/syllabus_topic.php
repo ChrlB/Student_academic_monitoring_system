@@ -11,13 +11,14 @@ $fmtSize = function ($b) {
     if ($b >= 1024)       return round($b / 1024) . ' KB';
     return (int) $b . ' B';
 };
-$fileUrl = fn($id, $dl = false) => BASE_PATH . '/syllabus-file?id=' . (int) $id . ($dl ? '&download=1' : '');
+$fileUrl    = fn($id, $dl = false) => BASE_PATH . '/syllabus-file?id=' . (int) $id . ($dl ? '&download=1' : '');
+$projSubUrl = fn($id, $dl = true)  => BASE_PATH . '/syllabus-file?project_sub=' . (int) $id . ($dl ? '&download=1' : '');
 
 $taskID       = (int) ($_GET['id'] ?? 0);
 $setupError   = false;
 $topic        = null;
 $contents     = [];
-$assess       = ['quiz' => null, 'exam' => null];
+$assess       = ['quiz' => null, 'exam' => null, 'project' => null];
 $progress     = null;
 $flow         = null;
 $progressRows = [];
@@ -68,7 +69,8 @@ $badgeClass  = ['completed' => 'status-completed', 'progress' => 'status-progres
 $kindIcon    = ['pdf' => '&#128196;', 'video' => '&#127916;', 'note' => '&#128221;'];
 $kindLabel   = ['pdf' => 'PDF document', 'video' => 'Video', 'note' => 'Note'];
 $stateLabel  = ['not-started' => 'Not started', 'progress' => 'In progress', 'completed' => 'Completed', 'restudy' => 'Must study again'];
-$modeName    = ['standard' => 'Standard', 'instant' => 'Instant feedback', 'timed' => 'Timed exam', 'confidence' => 'Confidence marking', 'adaptive' => 'Adaptive', 'survival' => 'Survival'];
+$modeName    = ['standard' => 'Standard', 'instant' => 'Instant feedback', 'timed' => 'Timed', 'confidence' => 'Confidence marking', 'adaptive' => 'Adaptive', 'survival' => 'Survival'];
+$subTypeLabel = ['file' => 'File upload', 'link' => 'Link / URL', 'both' => 'File upload or link'];
 
 // the badge in the header
 $headBadge = 'not-started';
@@ -93,11 +95,14 @@ if ($topic && !$lockedForMe) {
 // professor checklist
 $lessonDone = ($lessonHtml !== '');
 $matsDone   = (count($contents) > 0);
-$quizDone   = false;
-foreach (['quiz', 'exam'] as $kk) {
-    $qq = $assess[$kk];
-    if ($qq && (int) $qq['is_published'] === 1 && (int) $qq['question_count'] >= 1) $quizDone = true;
-}
+$qq         = $assess['quiz'];
+$ee         = $assess['exam'];
+$pp         = $assess['project'];
+$assessDone = ($qq && (int) $qq['is_published'] === 1 && (int) $qq['question_count'] >= 1)
+           || ($ee && (int) $ee['is_published'] === 1 && (int) $ee['question_count'] >= 1)
+           || ($pp && (int) $pp['is_published'] === 1);
+
+$topicTerm = ($topic && ($topic['term'] ?? 'midterm') === 'final') ? 'final' : 'midterm';
 
 // Prefer a local copy of Quill (View/lib/quill/) so the editor works offline; fall back to the CDN.
 $quillLocal = is_file(__DIR__ . '/lib/quill/quill.js') && is_file(__DIR__ . '/lib/quill/quill.snow.css');
@@ -138,7 +143,7 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
 
             <?php if ($setupError): ?>
 
-                <div class="syl-empty">The topic could not be loaded. Import the latest <strong>syllabus_tracker.sql</strong> into <strong>ams_db</strong> (phpMyAdmin), then refresh.
+                <div class="syl-empty">The topic could not be loaded. Import the latest <strong>syllabus_tracker_v5.sql</strong> into <strong>ams_db</strong> (phpMyAdmin), then refresh.
                     <br><br><a class="back-link" href="<?= $e($backUrl) ?>">&larr; Back to syllabus</a></div>
 
             <?php elseif (!$topic): ?>
@@ -164,7 +169,10 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             <?php endif; ?>
                         <?php endif; ?>
                     </div>
-                    <div class="course-info"><?= $e($topic['week_label']) ?> &middot; <?= $e($topic['module_title']) ?><?= $topic['class_label'] ? ' &middot; ' . $e($topic['class_label']) : '' ?></div>
+                    <div class="course-info">
+                        <span class="term-pill sm <?= $topicTerm === 'final' ? 'is-final' : 'is-midterm' ?>"><?= $topicTerm === 'final' ? 'FINAL' : 'MIDTERM' ?></span>
+                        <?= $e($topic['week_label']) ?> &middot; <?= $e($topic['module_title']) ?><?= $topic['class_label'] ? ' &middot; ' . $e($topic['class_label']) : '' ?>
+                    </div>
                 </div>
                 <div class="topic-header-side">
                     <div class="status-badge <?= $e($badgeClass[$headBadge]) ?>"><?= $e($badgeLabels[$headBadge]) ?></div>
@@ -216,15 +224,25 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                 <div class="next-step">
                     <div>
                         <strong>Next step</strong>
-                        <?php if ($flow['next']): $nq = $assess[$flow['next']]; ?>
-                            <div>Read the lesson and materials, then take the <?= $flow['next'] === 'exam' ? 'mock exam' : 'quiz' ?>.</div>
+                        <?php if ($flow['next'] === 'quiz'): $nq = $assess['quiz']; ?>
+                            <div>Read the lesson and materials, then take the quiz.</div>
+                        <?php elseif ($flow['next'] === 'exam'): $ne = $assess['exam']; ?>
+                            <div>Read the lesson and materials, then take the exam.</div>
+                        <?php elseif ($flow['next'] === 'project'): ?>
+                            <div><?= ($flow['state']['project'] === 'revision') ? 'Your instructor requested a revision on your project. Update and resubmit below.' : 'Complete and submit the project below.' ?></div>
+                        <?php elseif ($assess['project'] && $flow['state']['project'] === 'submitted'): ?>
+                            <div>Your project has been submitted and is waiting for instructor review.</div>
                         <?php else: ?>
                             <div>Read the lesson and materials, then mark the topic as finished.</div>
                         <?php endif; ?>
                     </div>
-                    <?php if ($flow['next']): ?>
-                        <button type="button" class="syl-btn primary" data-action="start-quiz" data-quiz="<?= (int) $nq['quizID'] ?>"><?= $nq['attempts'] > 0 ? 'Retake' : 'Take' ?> the <?= $flow['next'] === 'exam' ? 'mock exam' : 'quiz' ?></button>
-                    <?php else: ?>
+                    <?php if ($flow['next'] === 'quiz'): ?>
+                        <button type="button" class="syl-btn primary" data-action="start-quiz" data-quiz="<?= (int) $nq['quizID'] ?>"><?= $nq['attempts'] > 0 ? 'Retake' : 'Take' ?> the quiz</button>
+                    <?php elseif ($flow['next'] === 'exam'): ?>
+                        <button type="button" class="syl-btn primary" data-action="start-quiz" data-quiz="<?= (int) $ne['quizID'] ?>"><?= $ne['attempts'] > 0 ? 'Retake' : 'Take' ?> the exam</button>
+                    <?php elseif ($flow['next'] === 'project'): ?>
+                        <a class="syl-btn primary" href="#projectCard"><?= ($flow['state']['project'] === 'revision') ? 'Resubmit project' : 'Submit project' ?></a>
+                    <?php elseif (!($assess['project'] && $flow['state']['project'] === 'submitted')): ?>
                         <button type="button" class="syl-btn primary" data-action="mark-finished" data-task="<?= (int) $topic['taskID'] ?>">Mark as finished</button>
                     <?php endif; ?>
                 </div>
@@ -235,8 +253,8 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                 <div class="checklist">
                     <a href="#lesson" class="check-step<?= $lessonDone ? ' done' : '' ?>"><span class="tick"><?= $lessonDone ? '&#10003;' : '1' ?></span> Write the lesson</a>
                     <a href="#materials" class="check-step<?= $matsDone ? ' done' : '' ?>"><span class="tick"><?= $matsDone ? '&#10003;' : '2' ?></span> Add materials <em>(optional)</em></a>
-                    <a href="#checkpoints" class="check-step<?= $quizDone ? ' done' : '' ?>"><span class="tick"><?= $quizDone ? '&#10003;' : '3' ?></span> Add a quiz</a>
-                    <span class="check-hint">Opening dates and deadlines are set on the syllabus page.</span>
+                    <a href="#checkpoints" class="check-step<?= $assessDone ? ' done' : '' ?>"><span class="tick"><?= $assessDone ? '&#10003;' : '3' ?></span> Add assessment <em>(quiz / exam / project)</em></a>
+                    <span class="check-hint">Opening dates and deadlines follow the Academic Calendar on the syllabus page.</span>
                 </div>
             <?php endif; ?>
 
@@ -331,7 +349,7 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                     <?php endif; ?>
                 </div>
 
-                <!-- Right column: materials, then quiz + practice -->
+                <!-- Right column: materials, then assessments (quiz / exam / project) + practice -->
                 <div>
 
                     <div class="syl-widget materials-card" id="materials" style="margin-bottom:20px;">
@@ -369,9 +387,22 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             <?php endif; ?>
 
                             <?php if ($c['kind'] === 'video'): ?>
-                                <video class="ci-video" controls preload="none" data-src="<?= $e($fileUrl($c['contentID'])) ?>">
-                                    Your browser cannot play this video.
-                                </video>
+                                <?php if ((int) $c['has_file'] === 1): ?>
+                                    <video class="ci-video" controls preload="none" data-src="<?= $e($fileUrl($c['contentID'])) ?>">
+                                        Your browser cannot play this video.
+                                    </video>
+                                <?php else: $vl = SyllabusLogic::parseVideoLink((string) $c['body']); ?>
+                                    <?php if ($vl['embed']): ?>
+                                    <div class="ci-embed">
+                                        <iframe src="<?= $e($vl['embed']) ?>" title="<?= $e($c['title']) ?>" loading="lazy" allowfullscreen
+                                                allow="accelerometer; encrypted-media; picture-in-picture; fullscreen"
+                                                referrerpolicy="strict-origin-when-cross-origin"></iframe>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php if ($vl['ok']): ?>
+                                    <a class="ci-link" href="<?= $e($vl['url']) ?>" target="_blank" rel="noopener noreferrer"><?= $vl['embed'] ? 'Open in a new tab' : 'Open the recording' ?> &rsaquo;</a>
+                                    <?php endif; ?>
+                                <?php endif; ?>
                             <?php elseif ($c['kind'] === 'note'): ?>
                                 <div class="ci-note"><?= nl2br($e($c['body'])) ?></div>
                             <?php endif; ?>
@@ -380,6 +411,9 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             <div class="ci-edit">
                                 <input class="syl-input grow" type="text" name="title" maxlength="200" value="<?= $e($c['title']) ?>" aria-label="Material title">
                                 <input class="syl-input grow" type="text" name="description" maxlength="500" value="<?= $e($c['description']) ?>" placeholder="Short description (optional)" aria-label="Description">
+                                <?php if ($c['kind'] === 'video' && (int) $c['has_file'] !== 1): ?>
+                                <input class="syl-input grow" type="url" name="url" maxlength="500" value="<?= $e($c['body']) ?>" placeholder="Video link" aria-label="Video link">
+                                <?php endif; ?>
                                 <?php if ($c['kind'] === 'note'): ?>
                                 <textarea class="syl-input" name="body" maxlength="20000" aria-label="Note text"><?= $e($c['body']) ?></textarea>
                                 <?php endif; ?>
@@ -396,14 +430,18 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             <div class="cf-row">
                                 <select class="syl-input" name="kind" aria-label="Material type">
                                     <option value="pdf">PDF document</option>
-                                    <option value="video">Video (MP4 / WebM)</option>
+                                    <option value="video">Recorded lesson (video link)</option>
                                 </select>
                                 <input class="syl-input grow" type="text" name="title" maxlength="200" placeholder="Title (e.g. Lecture slides)" aria-label="Material title">
                             </div>
                             <input class="syl-input" type="text" name="description" maxlength="500" placeholder="Short description for students (optional)" aria-label="Description">
                             <div class="cf-file">
                                 <input class="syl-input file" type="file" name="file" accept=".pdf,application/pdf" aria-label="Choose file">
-                                <div class="hint">PDF up to 50 MB. Video: MP4 (H.264) or WebM up to 500 MB, and never above your server's upload limit.</div>
+                                <div class="hint">PDF up to 50 MB.</div>
+                            </div>
+                            <div class="cf-url is-hidden">
+                                <input class="syl-input" type="url" name="url" maxlength="500" placeholder="Paste a YouTube, Vimeo or Google Drive link" aria-label="Video link">
+                                <div class="hint">Recorded lessons play from a link, so nothing is stored on the school server. YouTube: set the video to Unlisted. Google Drive: share it as &ldquo;Anyone with the link&rdquo;. Any other link (Zoom, Teams) opens in a new tab.</div>
                             </div>
                             <div class="cf-row">
                                 <button type="submit" class="syl-btn inline">Add material</button>
@@ -414,10 +452,10 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                         <?php endif; ?>
                     </div>
 
-                    <?php if ($mode === 'student' && $flow && ($assess['quiz'] || $assess['exam'] || $practice['pool'] > 0)): ?>
-                    <!-- student: quiz + practice, one place -->
-                    <div class="syl-widget checkpoint-card" id="quiz">
-                        <h3>Quiz &amp; practice</h3>
+                    <?php if ($mode === 'student' && $flow && ($assess['quiz'] || $assess['exam'] || $assess['project'] || $practice['pool'] > 0)): ?>
+                    <!-- student: assessments (quiz, exam, project) + practice -->
+                    <div class="syl-widget checkpoint-card" id="quiz" style="margin-bottom:20px;">
+                        <h3>Assessments &amp; practice</h3>
 
                         <?php foreach (['quiz', 'exam'] as $k):
                             $q = $assess[$k];
@@ -428,22 +466,42 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                         ?>
                         <div class="assess-row">
                             <div>
-                                <strong><?= $k === 'quiz' ? '&#129514;' : '&#128221;' ?> <?= $e($q['title']) ?></strong> <span class="chip"><?= $mn ?></span>
+                                <strong><?= $k === 'quiz' ? '&#129514;' : '&#128221;' ?> <?= $e($q['title']) ?></strong>
+                                <span class="chip"><?= $k === 'quiz' ? 'Quiz' : 'Exam' ?> &middot; <?= $mn ?></span>
                                 <small><?= (int) $q['question_count'] ?> question<?= $q['question_count'] === 1 ? '' : 's' ?> &middot; pass mark <?= (int) $q['pass_percent'] ?>%<?= $q['attempts'] > 0 ? ' &middot; best ' . (int) $q['best'] . '%' : '' ?></small>
                             </div>
                             <div>
                                 <?php if ($st === 'passed'): ?>
                                     <span class="chip ok">Passed</span>
                                 <?php elseif ($st === 'ready'): ?>
-                                    <span class="chip">Ready</span>
+                                    <button type="button" class="syl-btn inline" data-action="start-quiz" data-quiz="<?= (int) $q['quizID'] ?>"><?= $q['attempts'] > 0 ? 'Retake' : 'Start' ?></button>
                                 <?php elseif ($st === 'restudy'): ?>
                                     <span class="lock-note">&#128274; Wait, then retake</span>
-                                <?php elseif ($st === 'needs_quiz'): ?>
-                                    <span class="lock-note">&#128274; Pass the quiz first</span>
                                 <?php endif; ?>
                             </div>
                         </div>
                         <?php endforeach; ?>
+
+                        <?php if ($assess['project']): $pr = $assess['project']; $pst = $flow['state']['project']; ?>
+                        <div class="assess-row">
+                            <div>
+                                <strong>&#128193; <?= $e($pr['title']) ?></strong>
+                                <span class="chip assess-chip proj">Project</span>
+                                <small><?= $e($subTypeLabel[$pr['submission_type']] ?? 'File or link') ?> &middot; <?= (int) $pr['max_score'] ?> pts</small>
+                            </div>
+                            <div>
+                                <?php if ($pst === 'passed'): ?>
+                                    <span class="chip ok">Approved</span>
+                                <?php elseif ($pst === 'submitted'): ?>
+                                    <span class="chip">Submitted</span>
+                                <?php elseif ($pst === 'revision'): ?>
+                                    <span class="chip warn">Revision</span>
+                                <?php else: ?>
+                                    <a class="syl-btn inline" href="#projectCard">Submit</a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <?php endif; ?>
 
                         <?php if ($practice['pool'] > 0): ?>
                         <div class="practice-box">
@@ -458,14 +516,90 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                         <?php endif; ?>
                     </div>
 
+                    <?php if ($assess['project']):
+                        $pr  = $assess['project'];
+                        $sub = $pr['submission'] ?? null;
+                        $canSubmitProj = (!$sub || $sub['status'] !== 'approved');
+                    ?>
+                    <div class="syl-widget project-card" id="projectCard">
+                        <h3>&#128193; <?= $e($pr['title']) ?></h3>
+                        <?php if ($pr['instructions']): ?>
+                        <div class="proj-instructions"><?= nl2br($e($pr['instructions'])) ?></div>
+                        <?php endif; ?>
+                        <div class="hint" style="margin-bottom:10px;">
+                            Submission: <?= $e($subTypeLabel[$pr['submission_type']] ?? 'File or link') ?> &middot;
+                            Max score: <?= (int) $pr['max_score'] ?> pts &middot;
+                            <?= (int) $pr['require_approval'] === 1 ? 'Instructor approval required' : 'Completes upon submission' ?>
+                        </div>
+
+                        <?php if ($sub): ?>
+                        <div class="proj-sub-status">
+                            <div class="cf-row" style="justify-content:space-between;">
+                                <strong>Your submission</strong>
+                                <?php if ($sub['status'] === 'approved'): ?>
+                                    <span class="chip ok">Approved<?= $sub['score'] !== null ? ' · ' . (int) $sub['score'] . '/' . (int) $pr['max_score'] : '' ?></span>
+                                <?php elseif ($sub['status'] === 'revision'): ?>
+                                    <span class="chip warn">Revision requested</span>
+                                <?php else: ?>
+                                    <span class="chip">Submitted &middot; Pending review</span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="hint">Submitted <?= $e(date('M j, Y g:i A', strtotime($sub['submitted_at']))) ?></div>
+                            <?php if ($sub['link_url']): ?>
+                                <div><a class="ci-link" href="<?= $e($sub['link_url']) ?>" target="_blank" rel="noopener noreferrer">Open submitted link &rsaquo;</a></div>
+                            <?php endif; ?>
+                            <?php if ($sub['file_name']): ?>
+                                <div><a class="ci-link" href="<?= $e($projSubUrl($sub['submissionID'])) ?>">Download <?= $e($sub['file_name']) ?><?= $sub['file_size'] ? ' (' . $e($fmtSize($sub['file_size'])) . ')' : '' ?> &rsaquo;</a></div>
+                            <?php endif; ?>
+                            <?php if ($sub['notes']): ?>
+                                <div class="ci-note" style="margin-left:0;"><?= nl2br($e($sub['notes'])) ?></div>
+                            <?php endif; ?>
+                            <?php if ($sub['feedback']): ?>
+                                <div class="proj-feedback">
+                                    <strong>Instructor feedback:</strong>
+                                    <div><?= nl2br($e($sub['feedback'])) ?></div>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                        <?php endif; ?>
+
+                        <?php if ($canSubmitProj): ?>
+                        <form class="project-submit-form" data-project="<?= (int) $pr['projectID'] ?>" data-sub-type="<?= $e($pr['submission_type']) ?>">
+                            <h4><?= $sub ? 'Update submission' : 'Submit your project' ?></h4>
+                            <?php if ($pr['submission_type'] === 'link' || $pr['submission_type'] === 'both'): ?>
+                            <label class="mini">Project link (GitHub, Google Drive, Figma, live URL...)
+                                <input class="syl-input" type="url" name="link_url" maxlength="500" value="<?= $sub ? $e($sub['link_url']) : '' ?>" placeholder="https://...">
+                            </label>
+                            <?php endif; ?>
+                            <?php if ($pr['submission_type'] === 'file' || $pr['submission_type'] === 'both'): ?>
+                            <label class="mini">Attach file (PDF, ZIP, DOCX, PPTX, XLSX, TXT, or image — up to 50 MB)
+                                <input class="syl-input file" type="file" name="file" accept=".pdf,.zip,.doc,.docx,.pptx,.xlsx,.txt,.png,.jpg,.jpeg,.webp">
+                            </label>
+                            <?php endif; ?>
+                            <label class="mini">Notes for instructor (optional)
+                                <textarea class="syl-input" name="notes" maxlength="4000" placeholder="Add any notes or instructions for running/viewing your work..."><?= $sub ? $e($sub['notes']) : '' ?></textarea>
+                            </label>
+                            <div class="cf-row">
+                                <button type="submit" class="syl-btn inline cta"><?= $sub ? 'Resubmit project' : 'Submit project' ?></button>
+                                <span class="upload-label"></span>
+                            </div>
+                            <div class="upload-progress" hidden><div></div></div>
+                        </form>
+                        <?php endif; ?>
+                    </div>
+                    <?php endif; ?>
+
                     <?php elseif ($mode === 'preview' || $mode === 'observer'): ?>
-                        <?php if ($assess['quiz'] || $assess['exam']): ?>
+                        <?php if ($assess['quiz'] || $assess['exam'] || $assess['project']): ?>
                         <div class="syl-widget">
-                            <h3>Quiz</h3>
+                            <h3>Assessments</h3>
                             <?php foreach (['quiz', 'exam'] as $k): if (!$assess[$k]) continue; ?>
-                                <div class="stats-text"><?= $k === 'quiz' ? '&#129514;' : '&#128221;' ?> <?= $e($assess[$k]['title']) ?> <span class="chip"><?= $e($modeName[$assess[$k]['mode']] ?? 'Standard') ?></span> &middot; pass mark <?= (int) $assess[$k]['pass_percent'] ?>%</div>
+                                <div class="stats-text"><?= $k === 'quiz' ? '&#129514;' : '&#128221;' ?> <?= $e($assess[$k]['title']) ?> <span class="chip"><?= $k === 'quiz' ? 'Quiz' : 'Exam' ?> &middot; <?= $e($modeName[$assess[$k]['mode']] ?? 'Standard') ?></span> &middot; pass mark <?= (int) $assess[$k]['pass_percent'] ?>%</div>
                             <?php endforeach; ?>
-                            <div class="milestone-subtext">Students take these here. Quizzes are not available in preview.</div>
+                            <?php if ($assess['project']): ?>
+                                <div class="stats-text">&#128193; <?= $e($assess['project']['title']) ?> <span class="chip assess-chip proj">Project</span> &middot; <?= (int) $assess['project']['max_score'] ?> pts</div>
+                            <?php endif; ?>
+                            <div class="milestone-subtext">Students complete assessments here. Submissions are disabled in preview.</div>
                         </div>
                         <?php endif; ?>
                     <?php endif; ?>
@@ -474,33 +608,46 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
             </div>
 
             <?php if ($canEdit): ?>
-            <!-- Faculty: quiz builder -->
-            <h2 id="checkpoints" style="margin:28px 0 4px;font-size:20px;">&#129514; Quiz builder</h2>
-            <div class="hint" style="margin-bottom:6px;">Add a quiz, paste or type a few questions, tick &ldquo;Published to students&rdquo;, and save. That is all students need.</div>
+            <!-- Faculty: Assessments builder (Quiz, Exam, Project) -->
+            <div class="assess-section-head" id="checkpoints">
+                <div>
+                    <h2 style="margin:28px 0 4px;font-size:20px;">&#129514; Assessments (Quiz, Exam, Project)</h2>
+                    <div class="hint">Add a quiz, an exam, and/or a project for this topic. Tick &ldquo;Published to students&rdquo; when ready.</div>
+                </div>
+                <div class="assess-add-btns">
+                    <?php if (!$assess['exam']): ?>
+                    <button type="button" class="syl-btn inline" data-action="reveal-assess" data-target="card-exam">+ Add Exam</button>
+                    <?php endif; ?>
+                    <?php if (!$assess['project']): ?>
+                    <button type="button" class="syl-btn inline" data-action="reveal-assess" data-target="card-project">+ Add Project</button>
+                    <?php endif; ?>
+                </div>
+            </div>
 
             <div class="assess-wrap">
                 <?php foreach (['quiz', 'exam'] as $k):
                     $q = $assess[$k];
+                    $hiddenByDefault = ($k === 'exam' && !$q);
                     $curMode   = $q ? $q['mode'] : ($k === 'exam' ? 'timed' : 'instant');
                     $allowPrac = $q ? ((int) $q['allow_practice'] === 1) : ($k === 'quiz');
-                    $modeOpts  = ['standard' => 'Standard', 'instant' => 'Instant feedback', 'timed' => 'Timed exam'];
+                    $modeOpts  = ['standard' => 'Standard', 'instant' => 'Instant feedback', 'timed' => ($k === 'exam' ? 'Timed exam' : 'Timed quiz')];
                     if ($q && !isset($modeOpts[$q['mode']])) $modeOpts[$q['mode']] = ($modeName[$q['mode']] ?? $q['mode']) . ' (older mode)';
-                    $hide = ($k === 'exam' && !$q);
+                    $labelTitle = ($k === 'exam') ? 'Exam' : 'Quiz';
                 ?>
-                <div class="assess-card<?= $hide ? ' is-hidden' : '' ?>" id="card-<?= $k ?>" data-kind="<?= $k ?>" data-quiz="<?= $q ? (int) $q['quizID'] : 0 ?>">
+                <div class="assess-card<?= $hiddenByDefault ? ' is-hidden' : '' ?>" id="card-<?= $k ?>" data-kind="<?= $k ?>" data-quiz="<?= $q ? (int) $q['quizID'] : 0 ?>">
                     <h3>
-                        <?= $k === 'quiz' ? '&#129514; Quiz' : '&#128221; Mock exam' ?>
+                        <?= $k === 'quiz' ? '&#129514;' : '&#128221;' ?> <?= $labelTitle ?>
                         <?php if ($q): ?><?= (int) $q['is_published'] === 1 ? '<span class="chip ok">Published</span>' : '<span class="chip warn">Draft</span>' ?><?php endif; ?>
                     </h3>
                     <div class="hint" style="margin-bottom:10px;">
-                        <?= $k === 'quiz'
-                            ? 'Students take this after studying. Passing it completes the topic (or unlocks the mock exam, if you add one).'
-                            : 'Optional. Students must pass the quiz first, then pass this exam to complete the topic.' ?>
+                        <?= $k === 'exam'
+                            ? 'Use for Midterm, Final, or major graded exams. Defaults to Timed mode.'
+                            : 'Students take this after studying. Passing all published assessments completes the topic.' ?>
                     </div>
 
                     <form class="quiz-settings" data-task="<?= (int) $topic['taskID'] ?>" data-kind="<?= $k ?>">
                         <label class="mini" style="flex-basis:100%;">Title
-                            <input class="syl-input" type="text" name="title" maxlength="200" value="<?= $q ? $e($q['title']) : '' ?>" placeholder="<?= $k === 'exam' ? 'Mock exam' : 'Quiz' ?>">
+                            <input class="syl-input" type="text" name="title" maxlength="200" value="<?= $q ? $e($q['title']) : '' ?>" placeholder="<?= $k === 'exam' ? 'e.g. Midterm Exam' : 'Quiz' ?>">
                         </label>
                         <label class="mini" style="flex-basis:100%;">How is it run?
                             <select class="syl-input mode-select" name="mode">
@@ -515,7 +662,7 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             <input class="syl-input" type="number" name="pass_percent" min="1" max="100" value="<?= $q ? (int) $q['pass_percent'] : 70 ?>">
                         </label>
                         <label class="mini mode-only mode-timed">Time limit (minutes)
-                            <input class="syl-input" type="number" name="time_limit_minutes" min="1" max="300" value="<?= ($q && $q['time_limit_minutes']) ? (int) $q['time_limit_minutes'] : 20 ?>">
+                            <input class="syl-input" type="number" name="time_limit_minutes" min="1" max="300" value="<?= ($q && $q['time_limit_minutes']) ? (int) $q['time_limit_minutes'] : ($k === 'exam' ? 60 : 20) ?>">
                         </label>
                         <label class="mini check" style="flex-basis:100%;"><input type="checkbox" name="published" value="1"<?= ($q && (int) $q['is_published'] === 1) ? ' checked' : '' ?>> Published to students</label>
 
@@ -523,7 +670,7 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             <summary>Advanced</summary>
                             <div class="adv-grid">
                                 <label class="mini">Wait before retake (minutes)
-                                    <input class="syl-input" type="number" name="cooldown_minutes" min="0" max="1440" value="<?= $q ? (int) $q['cooldown_minutes'] : 2 ?>">
+                                    <input class="syl-input" type="number" name="cooldown_minutes" min="0" max="1440" value="<?= $q ? (int) $q['cooldown_minutes'] : ($k === 'exam' ? 10 : 2) ?>">
                                 </label>
                                 <label class="mini">Random questions to ask (blank = all)
                                     <input class="syl-input" type="number" name="draw_count" min="1" max="500" value="<?= ($q && $q['draw_count']) ? (int) $q['draw_count'] : '' ?>" placeholder="All">
@@ -532,34 +679,34 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             </div>
                         </details>
 
-                        <button type="submit" class="syl-btn inline"><?= $q ? 'Save settings' : 'Create ' . ($k === 'exam' ? 'mock exam' : 'quiz') ?></button>
+                        <button type="submit" class="syl-btn inline"><?= $q ? 'Save settings' : 'Create ' . strtolower($labelTitle) ?></button>
                         <?php if ($q): ?><button type="button" class="icon-btn" data-action="delete-quiz" data-quiz="<?= (int) $q['quizID'] ?>">Delete</button><?php endif; ?>
                     </form>
 
                     <?php if ($q): ?>
                         <div class="q-list">
-                            <?php foreach ($q['questions'] as $i => $qq):
-                                $labels  = array_column($qq['choices'], 'label');
+                            <?php foreach ($q['questions'] as $i => $qqItem):
+                                $labels  = array_column($qqItem['choices'], 'label');
                                 $correct = 0;
-                                foreach ($qq['choices'] as $ci => $ch) { if ((int) $ch['is_correct'] === 1) { $correct = $ci; break; } }
+                                foreach ($qqItem['choices'] as $ci => $ch) { if ((int) $ch['is_correct'] === 1) { $correct = $ci; break; } }
                                 $payload = json_encode([
-                                    'id' => (int) $qq['questionID'], 'prompt' => $qq['prompt'], 'choices' => $labels, 'correct' => $correct,
-                                    'explanation' => (string) $qq['explanation'], 'difficulty' => (int) $qq['difficulty'],
+                                    'id' => (int) $qqItem['questionID'], 'prompt' => $qqItem['prompt'], 'choices' => $labels, 'correct' => $correct,
+                                    'explanation' => (string) $qqItem['explanation'], 'difficulty' => (int) $qqItem['difficulty'],
                                 ], JSON_UNESCAPED_UNICODE);
                             ?>
                             <div class="q-item" data-q="<?= $e($payload) ?>">
-                                <div><strong>Q<?= $i + 1 ?>.</strong> <?= nl2br($e($qq['prompt'])) ?>
-                                    <?php if (trim((string) $qq['explanation']) !== ''): ?><span class="chip">Has explanation</span><?php endif; ?>
+                                <div><strong>Q<?= $i + 1 ?>.</strong> <?= nl2br($e($qqItem['prompt'])) ?>
+                                    <?php if (trim((string) $qqItem['explanation']) !== ''): ?><span class="chip">Has explanation</span><?php endif; ?>
                                 </div>
                                 <ol class="q-choices" type="A">
-                                    <?php foreach ($qq['choices'] as $ci => $ch): ?>
+                                    <?php foreach ($qqItem['choices'] as $ci => $ch): ?>
                                     <li class="<?= (int) $ch['is_correct'] === 1 ? 'correct' : '' ?>"><?= $e($ch['label']) ?></li>
                                     <?php endforeach; ?>
                                 </ol>
                                 <div class="q-actions">
                                     <button type="button" class="icon-btn" data-action="edit-question">Edit</button>
-                                    <button type="button" class="icon-btn" data-action="duplicate-question" data-question="<?= (int) $qq['questionID'] ?>">Duplicate</button>
-                                    <button type="button" class="icon-btn" data-action="delete-question" data-question="<?= (int) $qq['questionID'] ?>">Delete</button>
+                                    <button type="button" class="icon-btn" data-action="duplicate-question" data-question="<?= (int) $qqItem['questionID'] ?>">Duplicate</button>
+                                    <button type="button" class="icon-btn" data-action="delete-question" data-question="<?= (int) $qqItem['questionID'] ?>">Delete</button>
                                 </div>
                             </div>
                             <?php endforeach; ?>
@@ -611,33 +758,118 @@ Explanation: Basic addition.</pre>
                     <?php endif; ?>
                 </div>
                 <?php endforeach; ?>
-            </div>
 
-            <?php if (!$assess['exam']): ?>
-            <div style="margin-top:14px;">
-                <button type="button" class="syl-btn inline" id="showExamBtn" data-action="show-exam" style="width:auto;">+ Add a mock exam (optional)</button>
+                <!-- Project assessment builder card -->
+                <?php $pr = $assess['project']; ?>
+                <div class="assess-card<?= !$pr ? ' is-hidden' : '' ?>" id="card-project" data-kind="project">
+                    <h3>
+                        &#128193; Project
+                        <?php if ($pr): ?><?= (int) $pr['is_published'] === 1 ? '<span class="chip ok">Published</span>' : '<span class="chip warn">Draft</span>' ?><?php endif; ?>
+                    </h3>
+                    <div class="hint" style="margin-bottom:10px;">
+                        Students submit a file, a link (GitHub, Drive, Figma), or both. Review and grade submissions in the progress table below.
+                    </div>
+
+                    <form class="project-settings" data-task="<?= (int) $topic['taskID'] ?>">
+                        <label class="mini" style="flex-basis:100%;">Title
+                            <input class="syl-input" type="text" name="title" maxlength="200" value="<?= $pr ? $e($pr['title']) : '' ?>" placeholder="e.g. Midterm Project: Database Design">
+                        </label>
+                        <label class="mini" style="flex-basis:100%;">Instructions / rubric
+                            <textarea class="syl-input" name="instructions" maxlength="10000" rows="4" placeholder="Describe deliverables, requirements, and grading criteria..."><?= $pr ? $e($pr['instructions']) : '' ?></textarea>
+                        </label>
+                        <label class="mini">Submission type
+                            <select class="syl-input" name="submission_type">
+                                <?php $curSub = $pr ? $pr['submission_type'] : 'both'; ?>
+                                <option value="both"<?= $curSub === 'both' ? ' selected' : '' ?>>File upload or link</option>
+                                <option value="file"<?= $curSub === 'file' ? ' selected' : '' ?>>File upload only</option>
+                                <option value="link"<?= $curSub === 'link' ? ' selected' : '' ?>>Link / URL only</option>
+                            </select>
+                        </label>
+                        <label class="mini">Max score
+                            <input class="syl-input" type="number" name="max_score" min="1" max="1000" value="<?= $pr ? (int) $pr['max_score'] : 100 ?>">
+                        </label>
+                        <label class="mini">Pass score
+                            <input class="syl-input" type="number" name="pass_score" min="1" max="1000" value="<?= $pr ? (int) $pr['pass_score'] : 70 ?>">
+                        </label>
+                        <label class="mini check" style="flex-basis:100%;">
+                            <input type="checkbox" name="require_approval" value="1"<?= (!$pr || (int) $pr['require_approval'] === 1) ? ' checked' : '' ?>> Require instructor approval to mark topic completed
+                        </label>
+                        <label class="mini check" style="flex-basis:100%;">
+                            <input type="checkbox" name="published" value="1"<?= ($pr && (int) $pr['is_published'] === 1) ? ' checked' : '' ?>> Published to students
+                        </label>
+
+                        <button type="submit" class="syl-btn inline"><?= $pr ? 'Save project' : 'Create project' ?></button>
+                        <?php if ($pr): ?><button type="button" class="icon-btn" data-action="delete-project" data-project="<?= (int) $pr['projectID'] ?>">Delete</button><?php endif; ?>
+                    </form>
+                </div>
             </div>
-            <?php endif; ?>
 
             <!-- Faculty: how the class is doing on this topic -->
             <div class="progress-card">
                 <h3>Student progress on this topic</h3>
                 <?php if (!$progressRows): ?>
                     <div class="milestone-subtext">No students are enrolled in this class yet.</div>
-                <?php else: ?>
+                <?php else:
+                    $showExamCol = (bool) $assess['exam'];
+                    $showProjCol = (bool) $assess['project'];
+                ?>
                 <table class="progress-table">
                     <thead>
-                        <tr><th>Student</th><th>Status</th><th>Quiz</th><th>Mock exam</th><th>Last opened</th></tr>
+                        <tr>
+                            <th>Student</th>
+                            <th>Status</th>
+                            <th>Quiz</th>
+                            <?php if ($showExamCol): ?><th>Exam</th><?php endif; ?>
+                            <?php if ($showProjCol): ?><th>Project</th><?php endif; ?>
+                            <th>Last opened</th>
+                        </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($progressRows as $pr): ?>
+                        <?php foreach ($progressRows as $prRow): ?>
                         <tr>
-                            <td><?= $e($pr['name']) ?></td>
-                            <td><span class="chip <?= $pr['state'] === 'completed' ? 'ok' : ($pr['state'] === 'restudy' ? 'warn' : '') ?>"><?= $e($stateLabel[$pr['state']]) ?></span></td>
-                            <?php foreach (['quiz', 'exam'] as $k): $a = $pr[$k]; ?>
-                            <td><?php if ($a): ?><?= (int) $a['best'] ?>% <span class="milestone-subtext">(<?= (int) $a['n'] ?> tr<?= (int) $a['n'] === 1 ? 'y' : 'ies' ?>)</span> <?= (int) $a['passed'] === 1 ? '<span class="chip ok">Passed</span>' : '<span class="chip bad">Not passed</span>' ?><?php else: ?>&mdash;<?php endif; ?></td>
-                            <?php endforeach; ?>
-                            <td><?= $pr['last'] ? $e(date('M j, g:i A', strtotime($pr['last']))) : '&mdash;' ?></td>
+                            <td><?= $e($prRow['name']) ?></td>
+                            <td><span class="chip <?= $prRow['state'] === 'completed' ? 'ok' : ($prRow['state'] === 'restudy' ? 'warn' : '') ?>"><?= $e($stateLabel[$prRow['state']]) ?></span></td>
+                            <td>
+                                <?php $aq = $prRow['quiz']; if ($aq): ?>
+                                    <?= (int) $aq['best'] ?>% <span class="milestone-subtext">(<?= (int) $aq['n'] ?> tr<?= (int) $aq['n'] === 1 ? 'y' : 'ies' ?>)</span> <?= (int) $aq['passed'] === 1 ? '<span class="chip ok">Passed</span>' : '<span class="chip bad">Not passed</span>' ?>
+                                <?php else: ?>&mdash;<?php endif; ?>
+                            </td>
+                            <?php if ($showExamCol): ?>
+                            <td>
+                                <?php $ae = $prRow['exam']; if ($ae): ?>
+                                    <?= (int) $ae['best'] ?>% <span class="milestone-subtext">(<?= (int) $ae['n'] ?> tr<?= (int) $ae['n'] === 1 ? 'y' : 'ies' ?>)</span> <?= (int) $ae['passed'] === 1 ? '<span class="chip ok">Passed</span>' : '<span class="chip bad">Not passed</span>' ?>
+                                <?php else: ?>&mdash;<?php endif; ?>
+                            </td>
+                            <?php endif; ?>
+                            <?php if ($showProjCol): ?>
+                            <td>
+                                <?php $ps = $prRow['project']; if ($ps):
+                                    $gradePayload = json_encode([
+                                        'id'       => (int) $ps['submissionID'],
+                                        'student'  => $prRow['name'],
+                                        'status'   => $ps['status'],
+                                        'score'    => $ps['score'],
+                                        'max'      => (int) $assess['project']['max_score'],
+                                        'feedback' => (string) ($ps['feedback'] ?? ''),
+                                        'link'     => (string) ($ps['link_url'] ?? ''),
+                                        'file'     => (string) ($ps['file_name'] ?? ''),
+                                        'fileUrl'  => !empty($ps['stored_name']) ? $projSubUrl($ps['submissionID']) : '',
+                                        'notes'    => (string) ($ps['notes'] ?? ''),
+                                        'date'     => date('M j, Y g:i A', strtotime($ps['submitted_at'])),
+                                    ], JSON_UNESCAPED_UNICODE);
+                                ?>
+                                    <?php if ($ps['status'] === 'approved'): ?>
+                                        <span class="chip ok">Approved<?= $ps['score'] !== null ? ' · ' . (int) $ps['score'] . '/' . (int) $assess['project']['max_score'] : '' ?></span>
+                                    <?php elseif ($ps['status'] === 'revision'): ?>
+                                        <span class="chip warn">Revision</span>
+                                    <?php else: ?>
+                                        <span class="chip">Submitted</span>
+                                    <?php endif; ?>
+                                    <button type="button" class="icon-btn" data-action="grade-project" data-sub="<?= $e($gradePayload) ?>">Review</button>
+                                <?php else: ?>&mdash;<?php endif; ?>
+                            </td>
+                            <?php endif; ?>
+                            <td><?= $prRow['last'] ? $e(date('M j, g:i A', strtotime($prRow['last']))) : '&mdash;' ?></td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>

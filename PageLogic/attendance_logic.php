@@ -49,7 +49,7 @@ if (isset($_GET['att_qr']) && $_GET['att_qr'] === '1') {
 # Classify a raw session role string into student, faculty, or manager group
 function att_role_group(string $role): string {
   $r = strtolower(trim($role));
-  if (preg_match('/coordinator|dean|registrar|admin/', $r)) return 'manager';
+  if (preg_match('/coordinator|dean|registrar/', $r)) return 'manager';
   if (preg_match('/prof|faculty|instructor|teacher/', $r))  return 'faculty';
   return 'student';
 }
@@ -93,13 +93,13 @@ $attStudentKey = ($attGroup === 'student' && preg_match('/^\d{9}$/', $attUserRaw
 
 $attPos = 'student';
 if ($attGroup !== 'student') {
-  foreach (['coordinator', 'dean', 'registrar', 'admin'] as $pos) {
+  foreach (['coordinator', 'dean', 'registrar'] as $pos) {
     if (strpos($attRole, $pos) !== false) { $attPos = $pos; break; }
   }
   if ($attPos === 'student') $attPos = 'faculty';
 }
 
-$attLabels = ['coordinator' => 'Coordinator', 'dean' => 'Dean', 'registrar' => 'Registrar', 'admin' => 'Admin'];
+$attLabels = ['coordinator' => 'Coordinator', 'dean' => 'Dean', 'registrar' => 'Registrar'];
 $attLabel  = strtoupper(($attGroup === 'student') ? 'Student' : ($attLabels[$attPos] ?? (ucwords($attRole) ?: 'Faculty')));
 $_SESSION["page"] = "ATTENDANCE | " . $attLabel;
 
@@ -115,11 +115,11 @@ if ($attGroup !== 'student' && $attFacultyID > 0) {
 }
 
 $isAuthorizedDepartment = ($attGroup === 'student') || ($attMyDept !== '' && in_array($attMyDept, $validDepartments, true));
-$attCanEdit = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($attPos, ['coordinator', 'admin', 'dean', 'faculty'], true);
+$attCanEdit = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($attPos, ['coordinator', 'dean'], true);   # only coordinator (own program) and dean (own department) manage events
 $attCanScan = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($attPos, ['coordinator', 'faculty', 'dean'], true);
 $attIsDean  = ($attPos === 'dean');
 $attScoped  = ($attPos === 'coordinator');
-# Dean and registrar only manage their own department, and faculty is department-scoped (admin stays unrestricted)
+# Dean and registrar only manage their own department, and faculty is department-scoped
 $attDeptScoped = (in_array($attPos, ['dean', 'registrar'], true) && (string)$attMyDept !== '') || $attPos === 'faculty';
 $evpage     = ($attGroup !== 'student' && (!empty($_GET['events']) || !empty($_POST['events'])));
 if ($evpage) $_SESSION["page"] = "EVENTS | " . $attLabel;
@@ -139,7 +139,7 @@ $GLOBALS['attFacultyID']           = $attFacultyID;
 $GLOBALS['isAuthorizedDepartment'] = $isAuthorizedDepartment;
 
 # Restrict non-list-permitted staff GET requests to the events view
-$attCanList = ($attGroup === 'student') || in_array($attPos, ['dean', 'coordinator', 'admin'], true);
+$attCanList = ($attGroup === 'student') || in_array($attPos, ['dean', 'coordinator'], true);
 if (!$attCanList && !$evpage && $_SERVER['REQUEST_METHOD'] === 'GET' && !isset($_GET['att_qr'])) {
   header('Location: ' . BASE_PATH . '/attendance?events=1');
   exit;
@@ -231,8 +231,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
       $who = att_title($stuRow['first_name'] . ' ' . $stuRow['last_name']);
       $studentProgram = strtoupper(trim((string)($stuRow['program'] ?? '')));
       $studentDept = strtoupper(trim((string)($stuRow['department'] ?? '')));
-      if ($attDeptScoped && $studentDept !== (string)$attMyDept) {
+      if ($attDeptScoped && $studentDept !== strtoupper(trim((string)$attMyDept))) {
         att_json(['status' => 'error', 'message' => "$who is not in your department."]);
+      }
+      if ($attScoped && $studentProgram !== strtoupper(trim((string)$attMyProgram))) {
+        att_json(['status' => 'error', 'message' => "$who is not in your assigned program."]);
       }
 
       $ev = $db_connection->prepare("
@@ -469,13 +472,13 @@ function att_norm_name(string $s): string {
   return trim(preg_replace('/\s+/', ' ', $s));
 }
 
-# Department that limits which faculty can be picked as coordinator (null = unrestricted, i.e. admin)
+# Department that limits which faculty can be picked as coordinator (null only if the user has no department)
 function att_coord_dept(): ?string {
   $d = strtoupper(trim((string)($GLOBALS['attMyDept'] ?? '')));
-  return (($GLOBALS['attPos'] ?? '') !== 'admin' && $d !== '') ? $d : null;
+  return $d !== '' ? $d : null;
 }
 
-# Fetch non-registrar faculty display names keyed by facultyID (same department unless admin)
+# Fetch non-registrar faculty display names keyed by facultyID (same department as the user)
 function att_faculty_names(): array {
   global $db_connection;
   $out = [];

@@ -622,7 +622,7 @@ $userDAO->prepareStatement("updateStudentProfileFull",
                 ON FCR.faculty_clearanceID = FC.faculty_clearanceID
                 AND FCR.uploaded_by <> ?
         WHERE FC.facultyID = ?
-            AND CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ?
+            AND (CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ? )
             AND ('ALL' = ? OR CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ?)
         ORDER BY EP.acad_year DESC, EP.sem DESC, FCR.uploaded_at DESC;
     ");
@@ -1054,6 +1054,7 @@ $userDAO->prepareStatement("updateStudentProfileFull",
             SS.`time_start`,
             SS.`time_end`,
             SS.`block`,
+            IF(SS.`class_format` = 'onsite', 'F2F-class', 'Online-class') AS class_format,
             F.date_created,
             S.department,
             S.name,
@@ -1587,7 +1588,8 @@ $userDAO->prepareStatement("updateStudentProfileFull",
             SS.time_end AS time_end,
             SS.roomID AS roomID,
             CONCAT(F.last_name, ', ', F.first_name) AS prof_name,
-            CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem
+            CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem,
+            if(SS.`class_format` = 'onsite','F2F-class','Online-class') AS class_format
         FROM enrolled_subjects AS ES
             INNER JOIN students AS ST
                 ON ST.studentID = ES.studentID
