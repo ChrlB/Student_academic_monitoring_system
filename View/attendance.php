@@ -45,7 +45,7 @@ $eventPrograms   = $ATT_PROGRAMS ?? [];
              data-qr-icon="<?= BASE_PATH ?>/View/resources/qr.png"
              data-can-qr="<?= ($attGroup === 'student' || $attCanScan) ? '1' : '0' ?>"
              <?= !$attCanList ? ' data-back="' . e(BASE_PATH) . '/dashboard"' : '' ?>
-             <?= in_array($attPos, ['faculty', 'coordinator'], true) ? ' data-no-back="1"' : '' ?>>
+             <?= in_array($attPos, ['faculty'], true) ? ' data-no-back="1"' : '' ?>>
 
           <?php if ($evpage): /* =============== EVENTS PAGE =============== */ ?>
           <!-- Events management toolbar and event rows -->
@@ -63,7 +63,7 @@ $eventPrograms   = $ATT_PROGRAMS ?? [];
                 <p class="empty">No events yet.</p>
               <?php else: foreach ($events as $ev): ?>
                 <div class="ev-row" role="button" tabindex="0"
-                     title="<?= $ev['canEdit'] ? 'Click to edit' : 'Click to view' ?>"
+                     title="Click to view"
                      data-id="<?= (int)$ev['id'] ?>"
                      data-name="<?= e($ev['name']) ?>"
                      data-date="<?= e($ev['ymd']) ?>"
@@ -97,7 +97,10 @@ $eventPrograms   = $ATT_PROGRAMS ?? [];
               <input type="hidden" name="att_action" id="ev-action" value="add_event">
               <input type="hidden" name="eventID" id="ev-id" value="">
               <input type="hidden" name="events" value="1">
-              <h2 id="ev-title">ADD EVENT</h2>
+              <div class="ev-head">
+                <h2 id="ev-title">ADD EVENT</h2>
+                <button type="button" class="ev-b ok ev-top-edit" id="ev-edit" hidden>Edit</button>
+              </div>
 
               <!-- Event name input -->
               <label class="ev-field"><span>EVENT NAME</span>
@@ -138,11 +141,6 @@ $eventPrograms   = $ATT_PROGRAMS ?? [];
                 </div></div>
 
               <!-- Remark: required when a coordinator/faculty changes an event; shown read-only to the dean when reviewing -->
-              <style>
-                #ev-remark { width: 100%; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; font: inherit; resize: vertical;
-                             color: inherit; background: transparent; border: 1px solid rgba(128,128,128,.45); }
-                #ev-remark[readonly] { opacity: .85; resize: none; }
-              </style>
               <label class="ev-field" id="ev-remark-wrap" hidden><span>REMARK (WHY IS THIS EVENT BEING CHANGED?)</span>
                 <textarea name="remark" id="ev-remark" rows="3" maxlength="500" placeholder="eg. Venue is not available, moved to the next day"></textarea></label>
 

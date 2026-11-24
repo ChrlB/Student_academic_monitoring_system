@@ -640,3 +640,49 @@ header a.att-back svg { display: block; width: 22px; height: 22px; min-width: 0;
   width: max-content; max-width: 90vw; margin-left: auto; margin-right: auto;
   text-align: center; z-index: 10000;
 }
+
+.ev-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  min-height: 32px;
+}
+
+.ev-head h2 {
+  margin: 0;
+  font-size: 2rem;
+  text-align: center;
+}
+
+.att .ev-top-edit:not([hidden]) {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  transition: none !important;
+  animation: none !important;
+}
+
+#ev-remark {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font: inherit;
+  resize: vertical;
+  color: inherit;
+  background: transparent;
+  border: 1px solid rgba(128, 128, 128, .45);
+}
+
+#ev-remark[readonly] {
+  opacity: .85;
+  resize: none;
+}
