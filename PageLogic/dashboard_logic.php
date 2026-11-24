@@ -66,6 +66,7 @@ if ($isStudent) {
 }
 
 $todays = array_filter($schedule, fn($r) => $today && in_array($today, parseDays($r['day']), true));
+//  var_dump($todays);
 usort($todays, fn($a, $b) => strcmp($a['time_start'], $b['time_start']));
 
 function getAllProjectStatus($acad_year = 'now',$userID = 'self' ){
