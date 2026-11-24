@@ -4,6 +4,7 @@ require_once __DIR__ . "/../PageLogic/account_actions.php";
 $acct = getAccountInfo();
 $dlg  = takeDialogState();      
 
+// One labelled, read-only box. $w = how wide it is (CSS class).
 function field(string $label, string $value, string $w = ''): void { ?>
   <label class="f <?= e($w) ?>">
     <span><?= e($label) ?></span>
@@ -132,6 +133,12 @@ function field(string $label, string $value, string $w = ''): void { ?>
                 <?php field('Phone Number',  $acct['contact']['phone'], 'w3'); ?>
                 <?php field('Email Address', $acct['contact']['email'], 'w4'); ?>
               </div>
+              <?php require_once __DIR__ . '/../Services/google_link.php'; if (googleClientId() !== ''): ?>
+              <div id="google-link" data-client-id="<?= e(googleClientId()) ?>" data-csrf="<?= e(csrfToken()) ?>" data-url="<?= e(accountUrl('/link-google')) ?>" style="margin:10px 0 4px">
+                <div id="google-btn"></div>
+                <p id="google-link-msg" role="status" hidden style="margin:8px 0 0;font-size:.9rem"></p>
+              </div>
+              <?php endif; ?>
               <h3 class="sub">Current Address</h3>
               <div class="row-f">
                 <?php field('Region',                   $acct['address']['region'],       'w3'); ?>
@@ -144,7 +151,7 @@ function field(string $label, string $value, string $w = ''): void { ?>
           </details>
         </section>
         <?php endif; ?>
-<?php endif; ?>
+<?php endif; // student vs faculty ?>
 
       </main>
     </div>
@@ -152,6 +159,11 @@ function field(string $label, string $value, string $w = ''): void { ?>
 
   <?php require_once __DIR__ . "/components/account_dialogs.php"; ?>
   <script src="<?= BASE_PATH ?>/View/script/account.js" defer></script>
+  <script src="<?= BASE_PATH ?>/View/script/address.js" defer></script>
+  <?php if (function_exists('googleClientId') && googleClientId() !== ''): ?>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="<?= BASE_PATH ?>/View/script/google_link.js" defer></script>
+  <?php endif; ?>
   <?php if (!$acct['isStudent']): ?>
   <script src="<?= BASE_PATH ?>/View/script/faculty_account.js" defer></script>
   <?php endif; ?>

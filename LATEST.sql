@@ -1634,3 +1634,29 @@ INSERT IGNORE INTO programs (program, name, department) VALUES
 
 -- check the result:
 -- SELECT department, program, name FROM programs ORDER BY department, program;
+
+
+-- Archive support for the Registration page. Run once in phpMyAdmin (ams_db -> SQL).
+-- archived_at is NULL for every active account. Archiving keeps all data; it only sets these columns and
+-- marks the account restricted so it cannot log in. archived_prev_status remembers the status to restore.
+ALTER TABLE students
+  ADD COLUMN `archived_at` DATETIME NULL DEFAULT NULL,
+  ADD COLUMN `archived_prev_status` VARCHAR(20) NULL DEFAULT NULL;
+
+ALTER TABLE faculty
+  ADD COLUMN `archived_at` DATETIME NULL DEFAULT NULL,
+  ADD COLUMN `archived_prev_status` VARCHAR(20) NULL DEFAULT NULL;
+-- Account activity log for the Registration page (Logs button). Run once in phpMyAdmin (ams_db -> SQL).
+-- Safe to run again: it only creates the table if it is missing.
+  CREATE TABLE IF NOT EXISTS `account_logs` (
+  `log_id`       INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `account_id`   VARCHAR(20)  NOT NULL,                 -- school / employee ID the event is about
+  `account_name` VARCHAR(150) NOT NULL DEFAULT '',      -- name at the time, so deleted accounts stay readable
+  `action`       VARCHAR(30)  NOT NULL,                 -- created, updated, restricted, lifted, archived, restored, deleted, assigned, unassigned, login, login_blocked, login_failed
+  `details`      VARCHAR(500) NOT NULL DEFAULT '',
+  `actor_id`     VARCHAR(20)  NOT NULL DEFAULT '',      -- who did it (the registrar, or the account itself for logins)
+  `actor_name`   VARCHAR(100) NOT NULL DEFAULT '',
+  `created_at`   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_logs_account` (`account_id`),
+  KEY `idx_logs_created` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

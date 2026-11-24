@@ -33,6 +33,11 @@ class EnrollmentLogic
     public $studentSubjects = [];
     public $isWindowOpen = true;
 
+    public $bulkStudents = [];
+    public $bulkAdvisers = [];
+    public $bulkProfessors = [];
+    public $bulkSubjectClasses = [];
+    public $bulkSubjectAssignments = [];
     public $allPeriods = [];
     public $periodPrograms = [];
     public $periodDepartments = [];
@@ -105,7 +110,7 @@ class EnrollmentLogic
             return 'dean';
         }
 
-        if (preg_match('/coordinator|adviser|advisor/', $r)) {
+        if (preg_match('/coordinator|program chair|adviser|advisor/', $r)) {
             return 'coordinator';
         }
 
@@ -304,6 +309,7 @@ class EnrollmentLogic
             WHERE sc.studentID = ? AND cr.status = 'credited'
         ");
         $credited->execute([$this->numericID]);
+        $this->pdo->prepare("UPDATE student_curriculum sc SET status='finished' WHERE sc.studentID=? AND EXISTS (SELECT 1 FROM enrolled_subjects es WHERE es.studentID=sc.studentID AND TRIM(es.subjectID)=TRIM(sc.subjectID) AND es.status='passed')")->execute([$this->numericID]);
 
         // Select the enrollment period for this student's program and year level.
         // Older periods with NULL year_level are kept as a fallback.
@@ -459,9 +465,9 @@ class EnrollmentLogic
 
         $stmt = $this->pdo->prepare("
             SELECT DISTINCT subjectID
-            FROM enrolled_subjects
+            FROM student_curriculum
             WHERE studentID = ?
-              AND status IN ('approved', 'enrolled')
+              AND status = 'finished'
         ");
 
         $stmt->execute([$this->numericID]);
@@ -585,7 +591,7 @@ class EnrollmentLogic
             return;
         }
 
-        $this->deanPeriods = $this->pdo->query("SELECT enrollmentID, program, acad_year, sem, status FROM enrollment_period ORDER BY acad_year DESC, sem DESC, enrollmentID DESC")->fetchAll(PDO::FETCH_ASSOC);
+        $this->deanPeriods = $this->pdo->query("SELECT enrollmentID, program, acad_year, sem, year_level, status FROM enrollment_period ORDER BY acad_year DESC, sem DESC, enrollmentID DESC")->fetchAll(PDO::FETCH_ASSOC);
         $selected = filter_input(INPUT_GET, 'dean_period', FILTER_VALIDATE_INT);
         $valid = array_column($this->deanPeriods, 'enrollmentID');
         $periodID = $selected && in_array($selected, array_map('intval', $valid), true)
@@ -599,7 +605,7 @@ class EnrollmentLogic
         }
 
         $stmt = $this->pdo->prepare("
-            SELECT COUNT(DISTINCT CASE WHEN es.status IN ('approved','enrolled') THEN es.studentID END) AS enrolled,
+            SELECT COUNT(DISTINCT CASE WHEN es.status IN ('approved','enrolled','passed','failed') THEN es.studentID END) AS enrolled,
                    COUNT(DISTINCT CASE WHEN es.status = 'pending' THEN es.studentID END) AS pending_students,
                    COUNT(DISTINCT CASE WHEN es.status = 'rejected' THEN es.studentID END) AS rejected_students,
                    SUM(CASE WHEN es.status = 'pending' THEN 1 ELSE 0 END) AS pending_subjects
@@ -610,7 +616,7 @@ class EnrollmentLogic
 
         $stmt = $this->pdo->prepare("
             SELECT s.program, COUNT(DISTINCT es.studentID) AS students,
-                   COUNT(DISTINCT CASE WHEN es.status IN ('approved','enrolled') THEN es.studentID END) AS approved
+                   COUNT(DISTINCT CASE WHEN es.status IN ('approved','enrolled','passed','failed') THEN es.studentID END) AS approved
             FROM enrolled_subjects es JOIN students s ON s.studentID = es.studentID
             WHERE es.enrollmentID = ? AND es.status <> 'dropped'
             GROUP BY s.program ORDER BY s.program
@@ -647,16 +653,18 @@ class EnrollmentLogic
                       WHERE sc.studentID = es.studentID
                         AND TRIM(sc.subjectID) = TRIM(es.subjectID)
                         AND sc.status = 'finished'
+                        AND EXISTS (SELECT 1 FROM subject_credit_requests cr WHERE cr.studentID = sc.studentID AND TRIM(cr.subjectID) = TRIM(sc.subjectID) AND cr.status = 'credited')
                   )
                 UNION ALL
                 SELECT s.studentID, s.first_name, s.last_name, s.program,
                        s.year_level, s.block, s.student_type, sc.subjectID,
-                       'finished' AS status, NULL AS rejection_remarks,
+                       'credited' AS status, NULL AS rejection_remarks,
                        sub.name AS subject_name
                 FROM student_curriculum sc
                 JOIN students s ON s.studentID = sc.studentID
                 LEFT JOIN subjects sub ON TRIM(sub.subjectID) = TRIM(sc.subjectID)
                 WHERE sc.status = 'finished'
+                  AND EXISTS (SELECT 1 FROM subject_credit_requests cr WHERE cr.studentID = sc.studentID AND TRIM(cr.subjectID) = TRIM(sc.subjectID) AND cr.status = 'credited')
                   AND EXISTS (
                       SELECT 1 FROM enrolled_subjects es2
                       WHERE es2.studentID = sc.studentID
@@ -704,7 +712,7 @@ class EnrollmentLogic
 
         $this->deanTrends = $this->pdo->query("
             SELECT ep.acad_year, ep.sem,
-                   COUNT(DISTINCT CASE WHEN es.status IN ('approved','enrolled') THEN es.studentID END) AS enrolled
+                   COUNT(DISTINCT CASE WHEN es.status IN ('approved','enrolled','passed','failed') THEN es.studentID END) AS enrolled
             FROM enrollment_period ep
             LEFT JOIN enrolled_subjects es ON es.enrollmentID = ep.enrollmentID
             GROUP BY ep.acad_year, ep.sem
@@ -723,6 +731,7 @@ class EnrollmentLogic
             FROM professor_student
             WHERE facultyID = ?
               AND studentID = ?
+              AND assignment_type = 'adviser'
             LIMIT 1
         ");
 
@@ -774,7 +783,7 @@ class EnrollmentLogic
             LEFT JOIN enrolled_subjects es
                 ON es.studentID = st.studentID
                 AND es.enrollmentID = ep.enrollmentID
-            WHERE aa.facultyID = ?
+            WHERE aa.facultyID = ? AND aa.assignment_type = 'adviser'
             GROUP BY
                 st.studentID,
                 st.first_name,
@@ -912,6 +921,27 @@ class EnrollmentLogic
             FROM programs
             ORDER BY program
         ")->fetchAll();
+
+        $this->bulkStudents = $this->pdo->query("
+            SELECT st.studentID, CONCAT(YEAR(st.date_created), LPAD(st.studentID,5,'0')) AS display_id,
+                   CONCAT_WS(' ',st.first_name,st.last_name) AS student_name,
+                   st.program, p.department, st.year_level, st.block, st.student_type,
+                   a.facultyID AS adviser_id, CONCAT_WS(' ',f.first_name,f.last_name) AS adviser_name
+            FROM students st JOIN programs p ON p.program = st.program
+            LEFT JOIN professor_student a ON a.studentID = st.studentID AND a.assignment_type = 'adviser'
+            LEFT JOIN faculty f ON f.facultyID = a.facultyID
+            WHERE st.status = 'active' ORDER BY st.program, st.year_level, st.block, st.last_name, st.first_name
+        ")->fetchAll(PDO::FETCH_ASSOC);
+        $this->bulkAdvisers = $this->pdo->query("
+            SELECT facultyID, CONCAT_WS(' ',first_name,last_name) AS name, department, program, role
+            FROM faculty WHERE status = 'active'
+              AND LOWER(TRIM(role)) IN ('program coordinator','program chair','coordinator','adviser','advisor')
+            ORDER BY last_name, first_name
+        ")->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->bulkProfessors = $this->pdo->query("SELECT facultyID, CONCAT_WS(' ',first_name,last_name) AS name, department, program, role FROM faculty WHERE status='active' AND LOWER(TRIM(role)) IN ('prof','professor','faculty','instructor','teacher','program coordinator','program chair','coordinator') ORDER BY last_name,first_name")->fetchAll(PDO::FETCH_ASSOC);
+        $this->bulkSubjectClasses = $this->pdo->query("SELECT DISTINCT es.studentID, es.subjectID, ss.facultyID, ep.program, ep.acad_year, ep.sem, ep.enrollmentID FROM enrolled_subjects es JOIN students st ON st.studentID=es.studentID JOIN enrollment_period ep ON ep.enrollmentID=es.enrollmentID JOIN subject_schedules ss ON ss.enrollmentID=es.enrollmentID AND TRIM(ss.subjectID)=TRIM(es.subjectID) AND (ss.schedID=es.selected_schedID OR (es.selected_schedID IS NULL AND ss.block=st.block)) WHERE es.status IN ('approved','enrolled')")->fetchAll(PDO::FETCH_ASSOC);
+        $this->bulkSubjectAssignments = $this->pdo->query("SELECT ps.studentID, ps.assignment AS subjectID, ps.facultyID, CONCAT_WS(' ',f.first_name,f.last_name) AS name FROM professor_student ps JOIN faculty f ON f.facultyID=ps.facultyID WHERE ps.assignment_type='subject'")->fetchAll(PDO::FETCH_ASSOC);
 
         $this->allPeriods = $this->pdo->query("
             SELECT
@@ -1065,6 +1095,11 @@ class EnrollmentLogic
         }
 
         if ($this->group === 'registrar') {
+            if ($action === 'bulk_assign_adviser') {
+                if (($_POST['assignment_type'] ?? 'adviser') === 'subject') $this->bulkAssignProfessor($_POST);
+                else $this->bulkAssignAdviser($_POST);
+                $this->go(['tab' => 'advisers'], 'advisers-section');
+            }
             if ($action === 'create_period') {
                 $this->createPeriod($_POST);
                 $this->go(['tab' => 'periods'], 'periods-section');
@@ -1150,6 +1185,100 @@ class EnrollmentLogic
         }
 
         $this->go(array_intersect_key($_GET, array_flip(self::MODULE_PARAMS)));
+    }
+
+    private function bulkAssignAdviser(array $data): void
+    {
+        try {
+            $facultyID = (int)($data['faculty_id'] ?? 0);
+            $department = trim((string)($data['department'] ?? ''));
+            $program = trim((string)($data['program'] ?? ''));
+            $year = trim((string)($data['year_level'] ?? ''));
+            $block = trim((string)($data['block'] ?? ''));
+            $replace = ($data['replace_existing'] ?? '') === '1';
+            $raw = json_decode((string)($data['student_ids'] ?? ''), true);
+            if (!$facultyID || $department === '' || $program === '' || !is_array($raw) || !$raw) {
+                throw new InvalidArgumentException('Choose a department, program, adviser and at least one student.');
+            }
+            $ids = [];
+            foreach ($raw as $id) {
+                if (!is_int($id) || $id <= 0) throw new InvalidArgumentException('Invalid student selection.');
+                $ids[$id] = $id;
+            }
+            sort($ids, SORT_NUMERIC);
+            $this->pdo->beginTransaction();
+            $check = $this->pdo->prepare("SELECT facultyID FROM faculty WHERE facultyID = ? AND status = 'active'
+                AND LOWER(TRIM(role)) IN ('program coordinator','program chair','coordinator','adviser','advisor')
+                AND department = ? AND (program = ? OR program IS NULL OR TRIM(program) = '') FOR UPDATE");
+            $check->execute([$facultyID, $department, $program]);
+            if (!$check->fetchColumn()) throw new InvalidArgumentException('The selected adviser is not eligible for this program.');
+            $student = $this->pdo->prepare("SELECT st.studentID, st.year_level, st.block FROM students st
+                JOIN programs p ON p.program = st.program WHERE st.studentID = ? AND st.status = 'active'
+                AND st.program = ? AND p.department = ? FOR UPDATE");
+            $existing = $this->pdo->prepare("SELECT facultyID FROM professor_student WHERE studentID = ? AND assignment_type = 'adviser' FOR UPDATE");
+            $insert = $this->pdo->prepare("INSERT INTO professor_student (facultyID, studentID, assignment_type, assignment) VALUES (?, ?, 'adviser', 'Academic Adviser')");
+            $update = $this->pdo->prepare("UPDATE professor_student SET facultyID = ?, assignment = 'Academic Adviser', assigned_at = CURRENT_TIMESTAMP WHERE studentID = ? AND assignment_type = 'adviser'");
+            $assigned = $reassigned = $skipped = 0;
+            foreach ($ids as $id) {
+                $student->execute([$id, $program, $department]);
+                $row = $student->fetch(PDO::FETCH_ASSOC);
+                if (!$row || ($year !== '' && (string)$row['year_level'] !== $year) || ($block !== '' && preg_replace('/^\d+\s*/', '', (string)$row['block']) !== $block)) {
+                    throw new RuntimeException('A selected student no longer matches the filters. Refresh and try again.');
+                }
+                $existing->execute([$id]);
+                $old = $existing->fetchColumn();
+                if ($old !== false) {
+                    if (!$replace || (int)$old === $facultyID) { $skipped++; continue; }
+                    $update->execute([$facultyID, $id]);
+                    $reassigned++;
+                } else {
+                    if ($replace) { $skipped++; continue; }
+                    $insert->execute([$facultyID, $id]);
+                    $assigned++;
+                }
+            }
+            $this->pdo->commit();
+            $this->flash('ok', "Adviser assignment saved: $assigned assigned, $reassigned reassigned, $skipped skipped.");
+        } catch (Throwable $e) { $this->fail($e); }
+    }
+
+    private function bulkAssignProfessor(array $data): void
+    {
+        try {
+            $faculty = (int)($data['faculty_id'] ?? 0);
+            $period = (int)($data['subject_period'] ?? 0);
+            $subject = trim((string)($data['subject_id'] ?? ''));
+            $program = trim((string)($data['program'] ?? ''));
+            $dept = trim((string)($data['department'] ?? ''));
+            $year = trim((string)($data['year_level'] ?? ''));
+            $block = trim((string)($data['block'] ?? ''));
+            $replace = ($data['replace_existing'] ?? '') === '1';
+            $raw = json_decode((string)($data['student_ids'] ?? ''), true);
+            if (!$faculty || !$period || !$subject || !$program || !$dept || !is_array($raw) || !$raw) throw new InvalidArgumentException('Select a class, professor and students.');
+            foreach ($raw as $id) if (!is_int($id) || $id <= 0) throw new InvalidArgumentException('Invalid student selection.');
+            $ids = array_unique($raw); sort($ids, SORT_NUMERIC);
+            $this->pdo->beginTransaction();
+            $check = $this->pdo->prepare("SELECT facultyID FROM faculty WHERE facultyID=? AND status='active' AND department=? AND (program=? OR program IS NULL OR TRIM(program)='') AND LOWER(TRIM(role)) IN ('prof','professor','faculty','instructor','teacher','program coordinator','program chair','coordinator') FOR UPDATE");
+            $check->execute([$faculty,$dept,$program]);
+            if (!$check->fetchColumn()) throw new RuntimeException('Professor is not eligible for this program.');
+            $student = $this->pdo->prepare("SELECT st.year_level,st.block FROM students st JOIN programs p ON p.program=st.program WHERE st.studentID=? AND st.status='active' AND st.program=? AND p.department=? FOR UPDATE");
+            $class = $this->pdo->prepare("SELECT es.enrolled_subjectID FROM enrolled_subjects es JOIN students st ON st.studentID=es.studentID JOIN enrollment_period ep ON ep.enrollmentID=es.enrollmentID JOIN subject_schedules ss ON ss.enrollmentID=es.enrollmentID AND TRIM(ss.subjectID)=TRIM(es.subjectID) AND (ss.schedID=es.selected_schedID OR (es.selected_schedID IS NULL AND ss.block=st.block)) WHERE es.studentID=? AND es.enrollmentID=? AND TRIM(es.subjectID)=? AND ss.facultyID=? AND ep.program=? AND es.status IN ('approved','enrolled') LIMIT 1 FOR UPDATE");
+            $existing = $this->pdo->prepare("SELECT id,facultyID FROM professor_student WHERE studentID=? AND assignment_type='subject' AND TRIM(assignment)=? FOR UPDATE");
+            $insert = $this->pdo->prepare("INSERT INTO professor_student(facultyID,studentID,assignment_type,assignment) VALUES (?,?,'subject',?)");
+            $delete = $this->pdo->prepare("DELETE FROM professor_student WHERE studentID=? AND assignment_type='subject' AND TRIM(assignment)=?");
+            $changed=0; $skipped=0;
+            foreach ($ids as $id) {
+                $student->execute([$id,$program,$dept]); $row=$student->fetch(PDO::FETCH_ASSOC);
+                if (!$row || ($year!=='' && (string)$row['year_level']!==$year) || ($block!=='' && preg_replace('/^\d+\s*/','',(string)$row['block'])!==$block)) throw new RuntimeException('Student no longer matches filters.');
+                $class->execute([$id,$period,$subject,$faculty,$program]);
+                if (!$class->fetchColumn()) throw new RuntimeException('A selected student is not enrolled in this professor’s class. Update Class Schedule first.');
+                $existing->execute([$id,$subject]); $old=$existing->fetchAll(PDO::FETCH_ASSOC);
+                if (($replace && !$old) || (!$replace && $old) || (count($old)===1 && (int)$old[0]['facultyID']===$faculty)) { $skipped++; continue; }
+                if ($replace) $delete->execute([$id,$subject]);
+                $insert->execute([$faculty,$id,$subject]); $changed++;
+            }
+            $this->pdo->commit(); $this->flash('ok', "Subject professor assignment saved: $changed changed, $skipped skipped.");
+        } catch (Throwable $e) { $this->fail($e); }
     }
 
     private function validatePeriodData($data)
@@ -1712,10 +1841,10 @@ class EnrollmentLogic
 
             $check = $this->pdo->prepare("
                 SELECT 1
-                FROM enrolled_subjects
+                FROM student_curriculum
                 WHERE studentID = ?
-                  AND subjectID = ?
-                  AND status IN ('approved', 'enrolled')
+                  AND TRIM(subjectID) = TRIM(?)
+                  AND status = 'finished'
                 LIMIT 1
             ");
 
@@ -2013,7 +2142,7 @@ class EnrollmentLogic
                     $finish = $this->pdo->prepare("UPDATE student_curriculum SET status = 'finished' WHERE studentID = ? AND TRIM(subjectID) = ?");
                     $finish->execute([$credit['studentID'], $credit['subjectID']]);
                     // Reflect the credit in the student's enrollment record/history too.
-                    $finishEnrollment = $this->pdo->prepare("UPDATE enrolled_subjects SET status = 'finished' WHERE studentID = ? AND TRIM(subjectID) = ?");
+                    $finishEnrollment = $this->pdo->prepare("UPDATE enrolled_subjects SET status = 'finished' WHERE studentID = ? AND TRIM(subjectID) = ? AND status NOT IN ('passed','failed')");
                     $finishEnrollment->execute([$credit['studentID'], $credit['subjectID']]);
                 }
             }
