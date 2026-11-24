@@ -332,7 +332,11 @@ main.att-main { overflow: hidden; }
   white-space: nowrap;
   border-bottom: 1px solid #7a2fd1;
 }
-.att .dd-menu li a { display: block; padding: calc(.5 * var(--u)) calc(.9 * var(--u)); }
+.att .dd-menu li a {
+  display: block;
+  padding: calc(.5 * var(--u)) calc(.9 * var(--u));
+  color: #fff;
+}
 .att .detail-toolbar .dd-menu li a { padding: calc(.8 * var(--u)) calc(1.4 * var(--u)); }
 .att .search button { display: grid; place-items: center; color: #fff; }
 .att .search button svg { width: calc(1.1 * var(--u)); height: calc(1.1 * var(--u)); }

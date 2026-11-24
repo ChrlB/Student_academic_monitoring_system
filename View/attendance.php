@@ -88,11 +88,12 @@ $attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
           <!-- Add / Edit / View / Review event modal dialog -->
           <dialog class="ev-dlg" id="ev-dlg"
                   data-dean="<?= !empty($attIsDean) ? '1' : '0' ?>"
+                  data-my-dept="<?= e($attMyDept ?? '') ?>"
                   data-me="<?= e($ATT_ME_NAME ?? '') ?>"
                   data-my-program="<?= e(in_array($attMyProgram, $ATT_PROGRAMS, true) ? $attMyProgram : '') ?>">
             <form method="post" action="<?= e(att_url()) ?>" id="ev-form" autocomplete="off">
               <input type="hidden" name="att_action" id="ev-action" value="add_event">
-              <input type="hidden" name="eventID" id="ev-id" value="">
+              <input type="hidden" name="eventID" id="ev-id" value="">  
               <input type="hidden" name="events" value="1">
               <h2 id="ev-title">ADD EVENT</h2>
 
