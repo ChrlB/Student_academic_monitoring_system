@@ -43,7 +43,11 @@ if ($isStudentAccount) {
         : 'No grades available';
 }
 
-$view = ($_GET['view'] ?? 'preview') === 'gradebook' ? 'gradebook' : 'preview';
+$requestedView = (string)($_GET['view'] ?? 'preview');
+$view = in_array($requestedView, ['gradebook', 'verification'], true) ? $requestedView : 'preview';
+if ($view === 'verification' && !$isCoordinatorAccount) {
+    $view = 'preview';
+}
 $scheduleID = (int)($_GET['class'] ?? $_POST['class'] ?? 0);
 $assignedClasses = $isFacultyAccount && $view === 'gradebook'
     ? $gradesLogic->assignedClasses()
@@ -178,7 +182,25 @@ if ($isProfessorAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act
 $classPreview = $isFacultyAccount ? $gradesLogic->classPreview($semesterKey) : [];
 $class = null;
 $roster = null;
-$coordinatorSubmissions = $isCoordinatorAccount ? $gradesLogic->coordinatorSubmissions() : [];
+$coordinatorSubmissions = $isCoordinatorAccount && $view === 'preview'
+    ? $gradesLogic->coordinatorSubmissions()
+    : [];
+$coordinatorVerification = null;
+if ($isCoordinatorAccount && $view === 'verification') {
+    try {
+        $coordinatorVerification = $gradesLogic->coordinatorSubmission((int)($_GET['submission'] ?? 0));
+    } catch (Throwable $e) {
+        error_log('Coordinator grade verification load failed: ' . $e->getMessage());
+        $_SESSION['grades_flash'] = [
+            'type' => 'error',
+            'message' => $e instanceof RuntimeException
+                ? $e->getMessage()
+                : 'Unable to load this grade submission. Please try again.',
+        ];
+        header('Location: ' . BASE_PATH . '/grades');
+        exit;
+    }
+}
 $registrarSubmissions = $isRegistrarAccount ? $gradesLogic->registrarSubmissions() : [];
 $requestedRegistrarListAction = $_GET['list_action'] ?? $_GET['filter_action'] ?? '';
 $registrarListAction = in_array($requestedRegistrarListAction, ['filter', 'generate', 'preview'], true)
@@ -778,6 +800,78 @@ $csrf = $gradesLogic->csrfToken();
       min-height: 220px;
     }
 
+    .coordinator-verification-preview {
+      border: 1px solid rgba(255,255,255,0.65);
+      border-radius: 12px;
+      background: rgba(74, 43, 79, 0.62);
+      color: #fff;
+    }
+
+    .coordinator-verification-preview > summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      font-weight: 800;
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .coordinator-verification-preview > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .coordinator-verification-preview > summary span {
+      min-width: 26px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.18);
+      text-align: center;
+    }
+
+    .coordinator-verification-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 8px;
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 0 10px 10px;
+    }
+
+    .coordinator-verification-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 9px;
+      background: rgba(255,255,255,0.07);
+    }
+
+    .coordinator-verification-item strong,
+    .coordinator-verification-item small {
+      display: block;
+    }
+
+    .coordinator-verification-item small {
+      margin-top: 4px;
+      color: rgba(255,255,255,0.82);
+    }
+
+    .coordinator-verification-item .class-scope-btn {
+      min-height: 36px;
+      padding: 7px 12px;
+      flex: 0 0 auto;
+    }
+
+    .coordinator-verification-empty {
+      padding: 0 14px 12px;
+      color: rgba(255,255,255,0.84);
+      font-size: 0.9rem;
+    }
+
     .verification-card {
       margin-top: 14px;
       padding: 16px;
@@ -1255,7 +1349,9 @@ $csrf = $gradesLogic->csrfToken();
               <aside class="grades-sidebar">
                 <a class="back-btn grades-action-link" href="<?= $view === 'gradebook'
                     ? BASE_PATH . '/grades?' . http_build_query(['sem' => $semesterKey])
-                    : BASE_PATH . '/dashboard' ?>">Back</a>
+                    : ($view === 'verification'
+                        ? BASE_PATH . '/grades?' . http_build_query(['sem' => $semesterKey])
+                        : BASE_PATH . '/dashboard') ?>">Back</a>
 
                 <?php if ($view === 'gradebook' && $class): ?>
                   <div class="semester-pill"><?= grades_e($semesterLabel ?: 'No assigned semester') ?></div>
@@ -1278,7 +1374,7 @@ $csrf = $gradesLogic->csrfToken();
                     <noscript><button class="term-btn" type="submit">Show Term</button></noscript>
                   </form>
                 <?php endif; ?>
-                <?php if ($isFacultyAccount && $view === 'preview'): ?>
+                <?php if ($isFacultyAccount && $accountRole !== 'dean' && $view === 'preview'): ?>
                   <?php
                     $gradebookParams = ['view' => 'gradebook', 'sem' => $semesterKey];
                     if (!empty($classPreview)) {
@@ -1298,51 +1394,50 @@ $csrf = $gradesLogic->csrfToken();
               </aside>
 
               <section class="grade-content">
-                <?php if ($isCoordinatorAccount): ?>
+                <?php if ($isCoordinatorAccount && $view === 'verification' && $coordinatorVerification): ?>
                   <section class="gradebook-panel verification-panel" aria-labelledby="coordinator-verification-title">
-                    <h2 class="gradebook-heading" id="coordinator-verification-title">Program Coordinator Grade Verification</h2>
-                    <?php if (!$coordinatorSubmissions): ?>
-                      <div class="gradebook-empty">No grade submissions are awaiting coordinator verification.</div>
-                    <?php else: ?>
-                      <?php foreach ($coordinatorSubmissions as $submission): ?>
-                        <article class="verification-card">
-                          <div class="verification-card-header">
-                            <div>
-                              <strong><?= grades_e($submission['subject_code'] ?? $submission['subjectID']) ?><?= $submission['subject_name'] ? ' - ' . grades_e($submission['subject_name']) : '' ?></strong>
-                              <div><?= grades_e($submission['program'] . $submission['block']) ?> | <?= grades_e(GradesLogic::semesterLabel($submission['acad_year'], $submission['sem'])) ?></div>
-                              <small>Submitted by <?= grades_e($submission['submitted_by_name'] ?: 'Professor') ?> on <?= grades_e($submission['submitted_at']) ?></small>
-                            </div>
-                          </div>
-                          <form method="post" action="<?= BASE_PATH ?>/grades">
-                            <input type="hidden" name="action" value="coordinator_review">
-                            <input type="hidden" name="csrf" value="<?= grades_e($csrf) ?>">
-                            <input type="hidden" name="submissionID" value="<?= (int)$submission['submissionID'] ?>">
-                            <div class="verification-table-wrap">
-                              <table class="grade-table verification-table">
-                                <thead><tr><th>Student ID</th><th>Student</th><th>Midterm</th><th>Final</th></tr></thead>
-                                <tbody>
-                                  <?php foreach ($submission['grades'] as $grade): ?>
-                                    <tr>
-                                      <td><?= grades_e($grade['display_student_id'] ?? ($grade['studentID'] ?? '')) ?></td>
-                                      <td><?= grades_e($grade['student_name'] ?? ('Student ' . $grade['studentID'])) ?></td>
-                                      <td><?= $grade['midterm'] === null ? '—' : grades_e(number_format((float)$grade['midterm'], 2)) ?></td>
-                                      <td><?= $grade['final'] === null ? '—' : grades_e(number_format((float)$grade['final'], 2)) ?></td>
-                                    </tr>
-                                  <?php endforeach; ?>
-                                </tbody>
-                              </table>
-                            </div>
-                            <label class="verification-remark">Remarks
-                              <textarea name="remark" rows="2" placeholder="Optional remarks"></textarea>
-                            </label>
-                            <div class="verification-actions">
-                              <button class="gradebook-submit verification-reject" type="submit" name="decision" value="reject">Reject</button>
-                              <button class="gradebook-submit" type="submit" name="decision" value="approve">Verify & Forward</button>
-                            </div>
-                          </form>
-                        </article>
-                      <?php endforeach; ?>
-                    <?php endif; ?>
+                    <div class="verification-card-header">
+                      <h2 class="gradebook-heading" id="coordinator-verification-title">Review Grade Submission</h2>
+                      <strong>
+                        <?= grades_e($coordinatorVerification['subjectID']) ?>
+                        <?= $coordinatorVerification['subject_name'] ? ' - ' . grades_e($coordinatorVerification['subject_name']) : '' ?>
+                      </strong>
+                      <div>
+                        <?= grades_e($coordinatorVerification['program'] . $coordinatorVerification['block']) ?>
+                        | <?= grades_e(GradesLogic::semesterLabel($coordinatorVerification['acad_year'], $coordinatorVerification['sem'])) ?>
+                      </div>
+                      <small>
+                        Submitted by <?= grades_e($coordinatorVerification['submitted_by_name'] ?: 'Professor') ?>
+                        on <?= grades_e($coordinatorVerification['submitted_at']) ?>
+                      </small>
+                    </div>
+                    <form method="post" action="<?= BASE_PATH ?>/grades">
+                      <input type="hidden" name="action" value="coordinator_review">
+                      <input type="hidden" name="csrf" value="<?= grades_e($csrf) ?>">
+                      <input type="hidden" name="submissionID" value="<?= (int)$coordinatorVerification['submissionID'] ?>">
+                      <div class="verification-table-wrap">
+                        <table class="grade-table verification-table">
+                          <thead><tr><th>Student ID</th><th>Student</th><th>Midterm</th><th>Final</th></tr></thead>
+                          <tbody>
+                            <?php foreach ($coordinatorVerification['grades'] as $grade): ?>
+                              <tr>
+                                <td><?= grades_e($grade['display_student_id'] ?? ($grade['studentID'] ?? '')) ?></td>
+                                <td><?= grades_e($grade['student_name'] ?? ('Student ' . $grade['studentID'])) ?></td>
+                                <td><?= $grade['midterm'] === null ? '—' : grades_e(number_format((float)$grade['midterm'], 2)) ?></td>
+                                <td><?= $grade['final'] === null ? '—' : grades_e(number_format((float)$grade['final'], 2)) ?></td>
+                              </tr>
+                            <?php endforeach; ?>
+                          </tbody>
+                        </table>
+                      </div>
+                      <label class="verification-remark">Remarks
+                        <textarea name="remark" rows="3" placeholder="Optional remarks"></textarea>
+                      </label>
+                      <div class="verification-actions">
+                        <button class="gradebook-submit verification-reject" type="submit" name="decision" value="reject">Reject</button>
+                        <button class="gradebook-submit" type="submit" name="decision" value="approve">Verify & Forward</button>
+                      </div>
+                    </form>
                   </section>
                 <?php elseif ($isRegistrarAccount): ?>
                   <section class="gradebook-panel verification-panel" aria-labelledby="registrar-student-list-title">
@@ -1629,29 +1724,66 @@ $csrf = $gradesLogic->csrfToken();
                           : 'No assigned class schedule or student grades are available to display.' ?>
                     </div>
                   </section>
-                <?php elseif (empty($classPreview)): ?>
-                  <div class="empty-state">No assigned class schedule found for this account.</div>
                 <?php else: ?>
-                  <div class="class-preview-panel">
-                    <div class="class-grid">
-                      <?php foreach ($classPreview as $class): ?>
-                        <a class="class-card-link" href="<?= BASE_PATH ?>/grades?<?= http_build_query([
-                            'view' => 'gradebook',
-                            'class' => (int)$class['schedID'],
-                            'sem' => $semesterKey,
-                        ]) ?>">
-                          <article class="class-card">
-                            <h3><?= grades_e($class['subject_code']) ?> - <?= grades_e($class['program'] . $class['block']) ?></h3>
-                            <ul class="class-meta">
-                              <li><span class="stat-label">Total Students:</span> <?= (int)$class['total_students'] ?></li>
-                              <li><span class="stat-label">Grades Submitted:</span> <?= (int)$class['grades_submitted'] ?></li>
-                              <li><span class="stat-label">Missing Grades:</span> <?= (int)$class['missing_grades'] ?></li>
-                            </ul>
-                          </article>
-                        </a>
-                      <?php endforeach; ?>
+                  <?php if ($isCoordinatorAccount): ?>
+                    <details class="coordinator-verification-preview">
+                      <summary>
+                        Pending grade verification
+                        <span><?= count($coordinatorSubmissions) ?></span>
+                      </summary>
+                      <?php if (!$coordinatorSubmissions): ?>
+                        <div class="coordinator-verification-empty">No grade submissions are awaiting coordinator verification.</div>
+                      <?php else: ?>
+                        <div class="coordinator-verification-list">
+                          <?php foreach ($coordinatorSubmissions as $submission): ?>
+                            <article class="coordinator-verification-item">
+                              <div>
+                                <strong>
+                                  <?= grades_e($submission['subjectID']) ?>
+                                  <?= $submission['subject_name'] ? ' - ' . grades_e($submission['subject_name']) : '' ?>
+                                </strong>
+                                <small>
+                                  <?= grades_e($submission['program'] . $submission['block']) ?>
+                                  | <?= grades_e(GradesLogic::semesterLabel($submission['acad_year'], $submission['sem'])) ?>
+                                  | <?= count($submission['grades']) ?> students
+                                </small>
+                              </div>
+                              <a class="class-scope-btn grades-action-link" href="<?= BASE_PATH ?>/grades?<?= http_build_query([
+                                  'view' => 'verification',
+                                  'submission' => (int)$submission['submissionID'],
+                                  'sem' => $semesterKey,
+                              ]) ?>">Review</a>
+                            </article>
+                          <?php endforeach; ?>
+                        </div>
+                      <?php endif; ?>
+                    </details>
+                  <?php endif; ?>
+
+                  <?php if (empty($classPreview)): ?>
+                    <div class="empty-state">No assigned class schedule found for this account.</div>
+                  <?php else: ?>
+                    <div class="class-preview-panel">
+                      <div class="class-grid">
+                        <?php foreach ($classPreview as $class): ?>
+                          <a class="class-card-link" href="<?= BASE_PATH ?>/grades?<?= http_build_query([
+                              'view' => 'gradebook',
+                              'class' => (int)$class['schedID'],
+                              'sem' => $semesterKey,
+                          ]) ?>">
+                            <article class="class-card">
+                              <h3><?= grades_e($class['subject_code']) ?> - <?= grades_e($class['program'] . $class['block']) ?></h3>
+                              <ul class="class-meta">
+                                <li><span class="stat-label">Total Students:</span> <?= (int)$class['total_students'] ?></li>
+                                <li><span class="stat-label">Grades Submitted:</span> <?= (int)$class['grades_submitted'] ?></li>
+                                <li><span class="stat-label">Missing Grades:</span> <?= (int)$class['missing_grades'] ?></li>
+                              </ul>
+                            </article>
+                          </a>
+                        <?php endforeach; ?>
+                      </div>
                     </div>
-                  </div>
+                  <?php endif; ?>
                 <?php endif; ?>
               </section>
             </div>

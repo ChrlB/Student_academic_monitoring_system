@@ -2,6 +2,9 @@
 # Include attendance page logic and QR modal component
 require_once __DIR__ . "/../PageLogic/attendance_logic.php";
 require_once __DIR__ . "/components/qr_modal.php";
+
+# Temporary flag: reserve Department filter for Super Admin while DB setup is pending
+$attIsSuperAdmin = (($attPos ?? $GLOBALS['attPos'] ?? '') === 'admin');
 ?>
 
 <!DOCTYPE html>
@@ -194,12 +197,14 @@ require_once __DIR__ . "/components/qr_modal.php";
           </section>
 
           <?php elseif (!$stu): /* =============== LIST VIEW =============== */ ?>
-          <!-- Faculty student directory with department/course filters, search, and view toggle -->
+          <!-- Faculty student directory with program/course filters, search, and view toggle -->
           <section class="view">
             <!-- Directory filter, search, layout toggle, and events navigation toolbar -->
             <div class="toolbar">
-              <?php if (!$attScoped): /* coordinator is limited to one program, so no department / course filter */ ?>
+              <?php if ($attIsSuperAdmin): /* Temporary: Department filter reserved for Super Admin while DB setup is pending */ ?>
                 <?php att_dropdown('Department', 'All departments', array_keys($ATT_DEPT_COURSES), $dept, 'dept'); ?>
+              <?php endif; ?>
+              <?php if (!$attScoped): /* Coordinator is scoped to one program; Dean/Admin can filter by program/course */ ?>
                 <?php att_dropdown('Course', 'All courses', $dept ? $ATT_DEPT_COURSES[$dept] : $allCourses, $course, 'course'); ?>
               <?php endif; ?>
 
