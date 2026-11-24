@@ -601,11 +601,6 @@ function registrationDelete($post) {
     regJson(['ok' => true, 'id' => $id, 'message' => "$id was deleted."]);
 }
 
-
-/* ------------------------------------------------------ archive / restore */
-
-/** POST mode=archive|restore. Archiving hides the account from the active list and blocks its login (it is kept
- *  restricted while archived); nothing is deleted. Restoring puts the old status back. */
 function registrationArchive($post) {
     regGuard($post);
     regNeedArchiveMigration();
@@ -636,16 +631,11 @@ function registrationArchive($post) {
     regJson(['ok' => true, 'account' => $acct, 'message' => $restore ? "$id was restored." : "$id was archived."]);
 }
 
-
-/* -------------------------------------------------------------------- logs */
-
 const REG_LOG_ACTIONS = [
     'created' => 'Registered', 'updated' => 'Edited', 'restricted' => 'Restricted', 'lifted' => 'Restriction lifted',
     'archived' => 'Archived', 'restored' => 'Restored', 'deleted' => 'Deleted', 'assigned' => 'Professor assigned',
     'unassigned' => 'Professor removed', 'login' => 'Logged in', 'login_blocked' => 'Login blocked', 'login_failed' => 'Failed login',
 ];
-
-/** POST q (search), action, before (log_id cursor). Newest first, 40 per page. */
 function registrationLogs($post) {
     regGuard($post);
     $pdo = regPdo();
