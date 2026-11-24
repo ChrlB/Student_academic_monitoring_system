@@ -1265,6 +1265,8 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                   <input type="hidden" name="subjectID" value="<?= e($_GET['subjectID']) ?>">
                   <input type="hidden" name="block" value="<?= e($block) ?>">
                   <input type="hidden" name="acad_year_sem" value="<?= e($acadyear) ?>">
+                  <input type="hidden" name="page_uploader" value="<?= htmlspecialchars($_SERVER['REQUEST_URI']) ?>">
+
                   <button type="submit" class="row" style="align-items:center">Download class list 
                     <img src="<?= BASE_PATH ?>/View/resources/Download.png" alt="Download" class="file_icons" style="width:40px">
                   </button>
