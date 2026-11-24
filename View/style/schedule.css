@@ -1,11 +1,14 @@
+/* ---------- Tokens ---------- */
+
 .sched-page,
 .sched-modal,
 .sched-alert {
     --sp-ink: #fff;
     --sp-muted: rgba(255, 255, 255, .75);
     --sp-line: rgba(255, 255, 255, .6);
-    --sp-line-soft: rgba(255, 255, 255, .3);
+    --sp-line-soft: rgba(255, 255, 255, .28);
     --sp-glass: rgba(255, 255, 255, .07);
+    --sp-glass-hi: rgba(255, 255, 255, .12);
     --sp-head: rgba(132, 84, 142, .65);
     --sp-accent: #6d0bab;
     --sp-accent-hi: #8a1fcf;
@@ -14,6 +17,7 @@
     --sp-ok: #c3f3d0;
     color: var(--sp-ink);
     font-family: inherit;
+    line-height: 1.4;
 }
 
 .sched-page *,
@@ -27,6 +31,8 @@
 .sched-alert *::after {
     box-sizing: border-box;
 }
+
+/* ---------- Page ---------- */
 
 .column:has(> .sched-page) {
     min-width: 0;
@@ -59,7 +65,6 @@
     background: transparent;
 }
 
-/* ---------- Panel ---------- */
 .sched-panel {
     flex: 1 0 auto;
     min-width: 0;
@@ -67,10 +72,13 @@
 
 .sched-title {
     margin: 0;
-    font-size: 1.45rem;
+    font-size: 1.5rem;
     font-weight: 700;
     line-height: 1.2;
+    letter-spacing: .01em;
 }
+
+/* ---------- Toolbar, search, bars ---------- */
 
 .sched-toolbar {
     display: flex;
@@ -90,6 +98,7 @@
 .sched-search {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     gap: 10px;
     margin: 14px 0 0;
     padding-bottom: 16px;
@@ -100,13 +109,18 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    flex: 0 1 360px;
+    flex: 0 1 380px;
     min-width: 200px;
-    padding: 0 12px;
     height: 38px;
+    padding: 0 12px;
     border: 1px solid var(--sp-line);
-    border-radius: 8px;
+    border-radius: 10px;
     background: var(--sp-field);
+    transition: border-color .15s, background .15s;
+}
+
+.sched-search__box:hover {
+    background: var(--sp-glass-hi);
 }
 
 .sched-page .sched-search__box input[type="search"] {
@@ -146,26 +160,31 @@
     justify-content: space-between;
     gap: 12px;
     padding-bottom: 14px;
-    border-bottom: 1px solid var(--sp-line-soft);
     margin-bottom: 18px;
+    border-bottom: 1px solid var(--sp-line-soft);
 }
 
 .sched-bar__nav {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
 }
 
 .sched-empty {
-    margin: 36px 0;
+    margin: 28px 0;
+    padding: 28px 16px;
     text-align: center;
     color: var(--sp-muted);
+    border: 1px dashed var(--sp-line-soft);
+    border-radius: 14px;
 }
 
 .sched-flash {
     margin: 0 0 16px;
     padding: 10px 14px;
-    border-radius: 10px;
     border: 1px solid;
+    border-radius: 10px;
     font-size: .92rem;
 }
 
@@ -185,7 +204,8 @@
     background: rgba(160, 30, 60, .25);
 }
 
-/* ---------- Buttons / inputs ---------- */
+/* ---------- Buttons and inputs ---------- */
+
 .sp-icon {
     flex: none;
 }
@@ -198,18 +218,25 @@
     min-height: 36px;
     padding: 0 14px;
     border: 1px solid var(--sp-line);
-    border-radius: 8px;
+    border-radius: 10px;
     background: transparent;
     color: #fff;
     font: inherit;
     font-size: .88rem;
     font-weight: 600;
     text-decoration: none;
+    white-space: nowrap;
     cursor: pointer;
+    transition: background .15s, border-color .15s, transform .05s;
 }
 
 .sp-btn:hover {
-    background: rgba(255, 255, 255, .14);
+    background: rgba(255, 255, 255, .16);
+    border-color: #fff;
+}
+
+.sp-btn:active {
+    transform: translateY(1px);
 }
 
 .sp-btn:focus-visible {
@@ -232,11 +259,8 @@
 }
 
 .sp-btn--danger:hover {
-    background: rgba(200, 40, 75, .75);
-}
-
-.sp-form__actions .sp-btn--danger {
-    margin-right: auto;
+    background: rgba(200, 40, 75, .8);
+    border-color: #ffc2cc;
 }
 
 .sp-btn--block {
@@ -252,6 +276,11 @@
     padding: 0;
 }
 
+.sched-inline {
+    display: inline-flex;
+    margin: 0;
+}
+
 .sched-page select,
 .sched-modal select,
 .sched-page input[type="search"] {
@@ -259,11 +288,17 @@
     max-width: 100%;
     padding: 0 12px;
     border: 1px solid var(--sp-line);
-    border-radius: 8px;
+    border-radius: 10px;
     background-color: var(--sp-field);
     color: #fff;
     font: inherit;
     font-size: .9rem;
+    transition: background-color .15s;
+}
+
+.sched-page select:hover,
+.sched-modal select:hover {
+    background-color: var(--sp-glass-hi);
 }
 
 .sched-page select option,
@@ -279,30 +314,117 @@
     outline-offset: 2px;
 }
 
+.sched-page select:disabled,
+.sched-modal select:disabled {
+    opacity: .65;
+    cursor: not-allowed;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: none;
+}
+
+/* ---------- Dean filters ---------- */
+
+.sched-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+    margin: 14px 0 0;
+}
+
+.sched-filter {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.sched-filter > label {
+    color: var(--sp-muted);
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+
+.sched-filter select {
+    min-width: 170px;
+    max-width: 260px;
+}
+
+.sched-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin: 14px 0 0;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--sp-line-soft);
+    color: var(--sp-muted);
+    font-size: .9rem;
+}
+
+.sched-summary strong {
+    color: var(--sp-ink);
+}
+
+.sched-summary__tags {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-left: auto;
+}
+
+/* ---------- Tags ---------- */
+
 .sp-tag,
 .sp-pill {
     display: inline-block;
+    width: fit-content;
     padding: 1px 10px;
     border: 1px solid var(--sp-line);
     border-radius: 999px;
-    font-size: .68rem;
     color: var(--sp-muted);
-    width: fit-content;
+    font-size: .68rem;
+    font-weight: 600;
+    letter-spacing: .02em;
 }
 
 .sp-pill {
-    background: rgba(255, 255, 255, .85);
-    border-color: transparent;
-    color: #3a1450;
-    font-weight: 700;
-    font-size: .72rem;
     padding: 3px 12px;
+    border-color: transparent;
+    background: rgba(255, 255, 255, .85);
+    color: #3a1450;
+    font-size: .72rem;
+    font-weight: 700;
 }
 
-/* ---------- Week grid / day cards ---------- */
+.sp-tag--draft {
+    border-color: rgba(255, 210, 122, .8);
+    background: rgba(255, 210, 122, .14);
+    color: #ffd27a;
+}
+
+.sp-tag--assigned {
+    border-color: rgba(185, 212, 255, .8);
+    background: rgba(185, 212, 255, .14);
+    color: #b9d4ff;
+}
+
+.sp-tag--deployed {
+    border-color: rgba(195, 243, 208, .8);
+    background: rgba(195, 243, 208, .14);
+    color: #c3f3d0;
+}
+
+/* ---------- Week grid and day cards ---------- */
+
 .sched-week {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: start;
     gap: 16px;
     margin-top: 18px;
 }
@@ -312,31 +434,38 @@
 }
 
 .day-card {
-    border: 1px solid var(--sp-line);
-    border-radius: 16px;
-    overflow: hidden;
-    background: var(--sp-glass);
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--sp-line);
+    border-radius: 16px;
+    background: var(--sp-glass);
+    transition: background .15s, border-color .15s;
+}
+
+.day-card:hover {
+    background: var(--sp-glass-hi);
+    border-color: #fff;
 }
 
 .day-card h3 {
     margin: 0;
-    padding: 6px 12px;
+    padding: 7px 12px;
     text-align: center;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     font-weight: 700;
+    letter-spacing: .02em;
     background: var(--sp-head);
     border-bottom: 1px solid var(--sp-line);
 }
 
 .day-card__body {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 12px;
     padding: 12px 14px 14px;
     font-size: .85rem;
-    flex: 1;
 }
 
 .day-card__body--left {
@@ -350,6 +479,7 @@
 .day-card__none {
     margin: 6px 0;
     text-align: center;
+    color: var(--sp-muted);
 }
 
 .class-item {
@@ -359,18 +489,32 @@
 }
 
 .class-item + .class-item {
-    padding-top: 10px;
+    padding-top: 12px;
     border-top: 1px solid var(--sp-line-soft);
 }
 
+.class-item > span {
+    color: var(--sp-muted);
+}
+
+.class-item__tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 2px;
+}
+
 .class-item__name {
-    font-size: .95rem;
+    color: #fff;
+    font-size: 1rem;
+    font-weight: 700;
 }
 
 .class-item__actions {
     display: flex;
+    flex-wrap: wrap;
     gap: 8px;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
 .day-card__time {
@@ -382,20 +526,27 @@
 }
 
 .day-card__list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    font-weight: 600;
+    gap: 5px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
     font-size: .8rem;
+    font-weight: 600;
 }
 
 .day-card__list li {
     display: flex;
     align-items: flex-start;
     gap: 8px;
+}
+
+.tile-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    align-items: start;
+    gap: 16px;
 }
 
 .tile-row {
@@ -406,13 +557,8 @@
     margin-right: 4px;
 }
 
-.tile-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-    gap: 16px;
-}
-
 /* ---------- Class detail ---------- */
+
 .class-head {
     display: flex;
     align-items: center;
@@ -422,6 +568,7 @@
 }
 
 .class-head__icon {
+    flex: none;
     display: grid;
     place-items: center;
     width: 88px;
@@ -429,7 +576,6 @@
     border: 1px solid var(--sp-line);
     border-radius: 16px;
     background: rgba(132, 84, 142, .55);
-    flex: none;
 }
 
 .class-head--compact .class-head__icon {
@@ -449,7 +595,7 @@
 
 .class-meta {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: 12px;
     margin: 0;
     padding: 14px 8px;
@@ -457,14 +603,16 @@
 }
 
 .class-meta dt {
-    font-size: .72rem;
     color: var(--sp-muted);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .04em;
 }
 
 .class-meta dd {
     margin: 2px 0 0;
+    font-size: .92rem;
     font-weight: 700;
-    font-size: .9rem;
 }
 
 .class-cols {
@@ -475,11 +623,11 @@
 }
 
 .sp-box {
+    min-width: 0;
+    padding: 14px;
     border: 1px solid var(--sp-line);
     border-radius: 16px;
-    padding: 14px;
     background: var(--sp-glass);
-    min-width: 0;
 }
 
 .sp-box__head {
@@ -508,8 +656,8 @@
 }
 
 .sp-mini-search input {
-    height: 32px !important;
     width: 190px;
+    height: 32px !important;
     font-size: .8rem !important;
 }
 
@@ -522,43 +670,47 @@
 .sp-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: .8rem;
+    font-size: .82rem;
 }
 
 .sp-table th {
-    padding: 8px 10px;
+    padding: 9px 10px;
     text-align: left;
-    background: var(--sp-head);
     font-weight: 700;
+    background: var(--sp-head);
 }
 
 .sp-table td {
     padding: 9px 10px;
 }
 
+.sp-table tbody tr:hover {
+    background: var(--sp-glass-hi);
+}
+
 .sp-table--zebra tbody tr:nth-child(even) {
-    background: rgba(255, 255, 255, .08);
+    background: rgba(255, 255, 255, .06);
 }
 
 .sp-table__empty {
+    padding: 18px 10px;
     text-align: center;
     color: var(--sp-muted);
-    padding: 18px 10px;
 }
 
 .sp-pager {
     display: flex;
-    justify-content: center;
     flex-wrap: wrap;
+    justify-content: center;
     gap: 6px;
     margin-top: 12px;
     font-size: .85rem;
 }
 
 .sp-pager a {
-    min-width: 28px;
-    padding: 3px 8px;
-    border-radius: 6px;
+    min-width: 30px;
+    padding: 4px 9px;
+    border-radius: 8px;
     text-align: center;
     color: #fff;
     text-decoration: none;
@@ -579,29 +731,44 @@
     outline-offset: 2px;
 }
 
-/* ---------- Forms (Add modal + Edit page) ---------- */
+/* ---------- Forms (Add modal and Edit page) ---------- */
+
 .sp-form {
     display: flex;
     flex-direction: column;
     gap: 14px;
 }
 
+.sp-step {
+    margin: 8px 0 0;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--sp-line-soft);
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.sp-hint {
+    margin: 8px 0 0;
+    color: var(--sp-muted);
+    font-size: .8rem;
+}
+
 .sp-field {
     display: grid;
     grid-template-columns: 150px minmax(0, 1fr);
-    align-items: center;
+    align-items: start;
     gap: 12px;
+    min-width: 0;
     margin: 0;
     padding: 0;
     border: 0;
-    min-width: 0;
 }
 
 .sp-field > label,
 .sp-label {
+    padding: 9px 0 0;
     font-size: .85rem;
     font-weight: 700;
-    padding: 0;
 }
 
 .sp-field select {
@@ -614,55 +781,92 @@
 
 .sp-radios {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: 10px;
 }
 
-.sp-radio,
-.sp-check {
+.sp-radio {
     display: flex;
     align-items: center;
     gap: 8px;
-    cursor: pointer;
-    font-size: .82rem;
+    min-height: 38px;
+    padding: 6px 12px;
+    border: 1px solid var(--sp-line);
+    border-radius: 10px;
+    background: var(--sp-field);
+    font-size: .8rem;
     font-weight: 700;
+    cursor: pointer;
+    transition: background .15s;
 }
 
-.sp-radio {
-    padding: 0 12px;
-    height: 38px;
-    border: 1px solid var(--sp-line);
-    border-radius: 8px;
-    background: var(--sp-field);
+.sp-radio:hover {
+    background: var(--sp-glass-hi);
 }
 
 .sp-radio:has(input:checked) {
-    background: rgba(255, 255, 255, .85);
+    background: rgba(255, 255, 255, .88);
     color: #3a1450;
 }
 
-.sp-radio input,
-.sp-check input {
-    accent-color: var(--sp-accent);
+.sp-radio input {
     width: 16px;
     height: 16px;
     margin: 0;
+    accent-color: var(--sp-accent);
 }
 
-.sp-radio input:focus-visible,
-.sp-check input:focus-visible {
+.sp-radio input:focus-visible {
     outline: 2px solid #fff;
     outline-offset: 2px;
 }
 
 .sp-checks {
     display: grid;
-    flex-wrap: wrap;
-    gap: 8px 16px;
+    grid-template-columns: repeat(auto-fit, minmax(52px, 1fr));
+    align-items: start;
+    gap: 8px;
 }
 
 .sp-check {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 34px;
+    padding: 0 8px;
+    white-space: nowrap;
+    border: 1px solid var(--sp-line);
+    border-radius: 999px;
+    background: var(--sp-field);
+    font-size: .82rem;
     font-weight: 600;
+    cursor: pointer;
+    transition: background .15s;
+}
+
+.sp-check:hover {
+    background: var(--sp-glass-hi);
+}
+
+.sp-check:has(input:checked) {
+    background: rgba(255, 255, 255, .88);
+    color: #3a1450;
+}
+
+.sp-check:has(input:focus-visible) {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.sp-check input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
 }
 
 .sp-time {
@@ -673,25 +877,50 @@
     font-size: .85rem;
 }
 
-.sp-form__actions {
+.sp-weeks {
     display: flex;
-    justify-content: flex-end;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 10px;
-    padding-top: 14px;
-    border-top: 1px solid var(--sp-line-soft);
-    margin-top: 4px;
+    margin-top: 10px;
+    font-size: .85rem;
 }
 
-/* ---------- Modal ---------- */
+.sp-weeks[hidden] {
+    display: none;
+}
+
+.sp-weeks select {
+    width: auto;
+    min-width: 200px;
+}
+
+.sp-form__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 4px;
+    padding-top: 14px;
+    border-top: 1px solid var(--sp-line-soft);
+}
+
+.sp-form__actions .sp-btn--danger {
+    margin-right: auto;
+}
+
+/* ---------- Add Schedule modal ---------- */
+
 .sched-modal {
-    width: min(640px, calc(100vw - 32px));
+    width: min(680px, calc(100vw - 32px));
     max-height: calc(100vh - 32px);
-    overflow: auto;
     margin: auto;
     padding: 22px 26px 24px;
+    overflow: auto;
     border: 2px solid var(--sp-line);
     border-radius: 22px;
     background: linear-gradient(180deg, #c9a6d6 0%, #6a3a80 40%, #2b0c3c 100%);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, .45);
 }
 
 .sched-modal::backdrop {
@@ -714,18 +943,20 @@
 
 .sched-modal__head p {
     margin: 2px 0 0;
-    font-size: .8rem;
     color: var(--sp-muted);
+    font-size: .8rem;
 }
 
-/* ---------- Conflict alert ---------- */
+/* ---------- Conflict and delete popups ---------- */
+
 .sched-alert {
-    width: min(440px, calc(100vw - 32px));
+    width: min(460px, calc(100vw - 32px));
     margin: auto;
     padding: 20px 24px 22px;
     border: 1.5px solid var(--sp-line);
     border-radius: 18px;
     background: linear-gradient(180deg, #8a6a98 0%, #4a1f63 45%, #240838 100%);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, .45);
 }
 
 .sched-alert::backdrop {
@@ -755,15 +986,47 @@
 .sched-alert__list {
     margin: 10px 0 0;
     padding-left: 18px;
-    font-size: .8rem;
     color: var(--sp-muted);
+    font-size: .8rem;
 }
 
 .sched-alert__actions {
     display: flex;
+    flex-wrap: wrap;
     justify-content: flex-end;
     gap: 10px;
     margin-top: 18px;
+}
+
+.sched-modal[open],
+.sched-alert[open] {
+    animation: sp-pop .16s ease-out;
+}
+
+@keyframes sp-pop {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sched-modal[open],
+    .sched-alert[open] {
+        animation: none;
+    }
+
+    .sp-btn,
+    .day-card,
+    .sp-radio,
+    .sp-check {
+        transition: none;
+    }
 }
 
 @media (max-width: 1000px) {
@@ -778,29 +1041,42 @@
     .class-cols {
         grid-template-columns: 1fr;
     }
-
-    .class-meta {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
 }
 
 @media (max-width: 640px) {
     .sched-week {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 16px;
-    margin-top: 18px;
-    align-items: start;
-}
+        grid-template-columns: 1fr;
+    }
+
+    .sched-search__box {
+        flex: 1 1 100%;
+    }
+
+    .sched-filter {
+        flex: 1 1 100%;
+    }
+
+    .sched-filter select {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .sched-summary__tags {
+        margin-left: 0;
+    }
 
     .sp-field {
         grid-template-columns: 1fr;
         gap: 6px;
     }
 
-    .class-head__icon {
-        width: 60px;
-        height: 60px;
+    .sp-field > label,
+    .sp-label {
+        padding-top: 0;
+    }
+
+    .sp-radios {
+        grid-template-columns: 1fr;
     }
 
     .sp-time {
@@ -810,12 +1086,17 @@
     .sp-time > span {
         display: none;
     }
-}
-.sched-page select:disabled {
-    opacity: .65;
-    cursor: not-allowed;
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    background-image: none;
+
+    .class-head__icon {
+        width: 60px;
+        height: 60px;
+    }
+
+    .sched-modal {
+        padding: 16px;
+    }
+
+    .sched-title {
+        font-size: 1.25rem;
+    }
 }
