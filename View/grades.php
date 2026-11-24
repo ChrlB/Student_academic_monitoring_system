@@ -147,7 +147,7 @@ if ($isRegistrarAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act
     exit;
 }
 
-if ($isProfessorAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_grades') {
+if (in_array($accountRole, ['prof', 'dean'], true) && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_grades') {
     $semesterKey = $gradesLogic->selectedSemester($_POST['sem'] ?? '', $semesters);
     $semesterLabel = $gradesLogic->semesterLabelForKey($semesterKey, $semesters);
     $class = $gradesLogic->assignedClass($scheduleID, $semesterKey);
@@ -1507,7 +1507,7 @@ $csrf = $gradesLogic->csrfToken();
                     <noscript><button class="term-btn" type="submit">Show Term</button></noscript>
                   </form>
                 <?php endif; ?>
-                <?php if ($isFacultyAccount && $accountRole !== 'dean' && $view === 'preview'): ?>
+                <?php if ($isFacultyAccount && $view === 'preview'): ?>
                   <?php
                     $gradebookParams = ['view' => 'gradebook', 'sem' => $semesterKey];
                     if (!empty($classPreview)) {
