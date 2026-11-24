@@ -284,6 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (evDlg) {
     const f = id => document.getElementById(id);
     const form = f('ev-form'), fields = [...evDlg.querySelectorAll('input[type=text],input[type=date],input[type=time],select')];
+    let currentEventData = null;
 
     (() => {
       const inp = f('ev-coord'), list = f('ev-coord-list'), caret = f('ev-caret'), combo = f('ev-combo');
@@ -327,7 +328,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* Open event dialog in appropriate mode (add, edit, view, review) */
     const isDean = evDlg.dataset.dean === '1';
+    const editBtn = f('ev-edit');
     const openDlg = (mode, d = {}) => {
+      currentEventData = d;
+      const canEdit = d.canEdit === true || d.canEdit === '1';
       form.noValidate = false;
       f('ev-action').value = mode === 'edit' ? 'edit_event' : 'add_event';
       f('ev-id').value     = d.id || '';
@@ -356,6 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!isDean) { f('ev-status').disabled = true; f('ev-coord').disabled = true; if (mode === 'edit') { f('ev-name').disabled = true; f('ev-program').disabled = true; } }
       f('ev-note').hidden    = isDean || locked;
       f('ev-ok').hidden      = locked;
+      if (editBtn) editBtn.hidden = !(mode === 'view' && canEdit);
       f('ev-approve').hidden = mode !== 'review';
       f('ev-reject').hidden  = mode !== 'review';
       f('ev-delete').hidden  = mode !== 'edit';
@@ -365,12 +370,21 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!locked) (f('ev-name').disabled ? f('ev-date') : f('ev-name')).focus();
     };
 
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        if (currentEventData && (currentEventData.canEdit === true || currentEventData.canEdit === '1')) {
+          openDlg('edit', currentEventData);
+        }
+      });
+    }
+
     const add = f('ev-add');
     if (add) add.addEventListener('click', () => openDlg('add'));
 
-    const openRow = row => openDlg(row.dataset.review === '1' ? 'review' : (row.dataset.edit === '1' ? 'edit' : 'view'), {
+    const openRow = row => openDlg(row.dataset.review === '1' ? 'review' : 'view', {
       id: row.dataset.id, name: row.dataset.name, date: row.dataset.date, status: row.dataset.status,
-      start: row.dataset.start, end: row.dataset.end, coord: row.dataset.coord, program: row.dataset.program, att: row.dataset.att, remark: row.dataset.remark
+      start: row.dataset.start, end: row.dataset.end, coord: row.dataset.coord, program: row.dataset.program,
+      att: row.dataset.att, remark: row.dataset.remark, canEdit: row.dataset.edit === '1'
     });
     document.querySelectorAll('.ev-row').forEach(row => {
       row.addEventListener('click', () => openRow(row));

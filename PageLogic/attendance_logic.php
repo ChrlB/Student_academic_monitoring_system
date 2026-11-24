@@ -119,7 +119,7 @@ $attCanEdit = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($
 $attCanScan = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($attPos, ['coordinator', 'faculty', 'dean'], true);
 $attIsDean  = ($attPos === 'dean');
 $attScoped  = ($attPos === 'coordinator');
-# Dean only manages their own department (admin stays unrestricted)
+# Dean and registrar only manage their own department, and faculty is department-scoped (admin stays unrestricted)
 $attDeptScoped = (in_array($attPos, ['dean', 'registrar'], true) && (string)$attMyDept !== '') || $attPos === 'faculty';
 $evpage     = ($attGroup !== 'student' && (!empty($_GET['events']) || !empty($_POST['events'])));
 if ($evpage) $_SESSION["page"] = "EVENTS | " . $attLabel;
@@ -292,7 +292,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
 $ATT_DEPT_COURSES = [];
 foreach ($db_connection->query("SELECT program, department FROM programs WHERE program IS NOT NULL AND program <> ''")->fetchAll(PDO::FETCH_ASSOC) as $p) {
   $d = strtoupper(trim((string)($p['department'] ?? '')));
-  $c = strtoupper(trim((string)$p['program']));
+  $c = strtoupper(trim((string)($p['program'])));
   if ($d !== '' && !in_array($c, $ATT_DEPT_COURSES[$d] ?? [], true)) $ATT_DEPT_COURSES[$d][] = $c;
 }
 if ($attScoped) {
@@ -581,6 +581,7 @@ function att_events(): array {
     $status = strtoupper((string)$r['status']);
     $prog = strtoupper(trim((string)($r['program'] ?? '')));
     $dept = strtoupper(trim((string)($r['department'] ?? '')));
+    $coordMatch = (!$scoped || ($myProg !== '' && $prog === $myProg) || ($prog === '' && ($dept === '' || $dept === $myDept)));
     $out[] = [
       'id' => (int)$r['eventID'], 'name' => $r['eventName'],
       'scope' => $prog ?: ($dept ?: 'ALL'), 'program' => $prog,
@@ -592,7 +593,7 @@ function att_events(): array {
       'coord' => ($r['eventCoordinator'] && trim((string)$r['coord_name']) !== '') ? att_title(preg_replace('/\s+/', ' ', $r['coord_name'])) : '',
       'att' => (int)$r['att_count'],
       'remark' => (string)($r['edit_remark'] ?? ''),
-      'canEdit' => $canEdit && (!$scoped || $prog === $myProg) && ($isDean || ((int)$r['eventCoordinator'] === $facID && $status !== 'FINISHED')),
+      'canEdit' => $canEdit && $coordMatch && ($isDean || ((int)$r['eventCoordinator'] === $facID && $status !== 'FINISHED')),
       'review' => $isDean && $status === 'PENDING',
     ];
   }
@@ -649,9 +650,9 @@ function att_handle_event_action(PDO $db, string $act): void {
       $existing = $q->fetch(PDO::FETCH_ASSOC);
       if (!$existing) { $_SESSION['error'] = 'That event no longer exists.'; return; }
       $exProg = strtoupper(trim((string)($existing['program'] ?? '')));
-      $owns = $isDean || ((int)$existing['eventCoordinator'] === $facID && strtoupper((string)$existing['status']) !== 'FINISHED');
-      $inScope = !$scoped || ($myProg !== '' && $exProg === $myProg);
       $exDept  = strtoupper(trim((string)($existing['department'] ?? '')));
+      $owns = $isDean || ((int)$existing['eventCoordinator'] === $facID && strtoupper((string)$existing['status']) !== 'FINISHED');
+      $inScope = !$scoped || ($myProg !== '' && $exProg === $myProg) || ($exProg === '' && ($exDept === '' || $exDept === $myDept));
       if ($deptScoped && $exDept !== '' && $exDept !== $myDept) $inScope = false;
       if (!$owns || !$inScope) { $_SESSION['error'] = 'You are not allowed to modify this event.'; return; }
     }
@@ -683,7 +684,10 @@ function att_handle_event_action(PDO $db, string $act): void {
     if (!$d || $d->format('Y-m-d') !== $date)   { $_SESSION['error'] = 'Enter a valid date.'; return; }
     if (!$timeOk($start) || !$timeOk($end))     { $_SESSION['error'] = 'Enter the start and end time.'; return; }
     if ($end <= $start)                         { $_SESSION['error'] = 'The end time must be after the start time.'; return; }
-    if ($scoped && ($myProg === '' || $prog !== $myProg)) {
+    $exProgEdit = $existing ? strtoupper(trim((string)($existing['program'] ?? ''))) : '';
+    $exDeptEdit = $existing ? strtoupper(trim((string)($existing['department'] ?? ''))) : '';
+    $allowedCoordProg = ($act === 'edit_event' && $existing && $exProgEdit === '' && ($exDeptEdit === '' || $exDeptEdit === $myDept) && $prog === '');
+    if ($scoped && !$allowedCoordProg && ($myProg === '' || $prog !== $myProg)) {
       $_SESSION['error'] = 'You can only manage events for your own program.';
       return;
     }
