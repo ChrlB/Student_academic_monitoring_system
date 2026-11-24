@@ -81,7 +81,7 @@ $eventPrograms   = $ATT_PROGRAMS ?? [];
                   <span><?= e($ev['date']) ?></span>
                   <span><?= e($ev['start']) ?></span>
                   <span><?= e($ev['end']) ?></span>
-                  <span class="ev-st st-<?= e(strtolower($ev['status'])) ?>"><?= e(ucfirst(strtolower($ev['status']))) ?></span>
+                  <span class="ev-st st-<?= e(strtolower($ev['shown'])) ?>"><?= e(ucfirst(strtolower($ev['shown']))) ?></span>
                 </div>
               <?php endforeach; endif; ?>
             </div></div>

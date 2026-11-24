@@ -549,6 +549,7 @@ function att_events(): array {
   $sql = "
     SELECT e.eventID, e.eventName, e.program, e.department, e.datetime_Start, e.datetime_End,
            e.eventCoordinator, e.status, e.edit_remark,
+           (DATE(e.datetime_Start) > CURDATE()) AS is_future,
            TRIM(CONCAT_WS(' ', f.first_name, f.middle_name, f.last_name)) AS coord_name,
            (SELECT COUNT(*) FROM attendance a WHERE a.eventID = e.eventID) AS att_count
     FROM events e LEFT JOIN faculty f ON f.facultyID = e.eventCoordinator
@@ -587,6 +588,7 @@ function att_events(): array {
       'start' => $s->format('g:iA'), 'end' => $en ? $en->format('g:iA') : '--',
       'start24' => $s->format('H:i'), 'end24' => $en ? $en->format('H:i') : '',
       'status' => $status,
+      'shown'  => ($status === 'ACTIVE' && !empty($r['is_future'])) ? 'INACTIVE' : $status,
       'coord' => ($r['eventCoordinator'] && trim((string)$r['coord_name']) !== '') ? att_title(preg_replace('/\s+/', ' ', $r['coord_name'])) : '',
       'att' => (int)$r['att_count'],
       'remark' => (string)($r['edit_remark'] ?? ''),
