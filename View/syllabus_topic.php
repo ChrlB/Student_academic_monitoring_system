@@ -17,7 +17,7 @@ $taskID       = (int) ($_GET['id'] ?? 0);
 $setupError   = false;
 $topic        = null;
 $contents     = [];
-$assess       = ['quiz' => null, 'exam' => null];
+$assess       = ['quiz' => null];
 $progress     = null;
 $flow         = null;
 $progressRows = [];
@@ -68,7 +68,7 @@ $badgeClass  = ['completed' => 'status-completed', 'progress' => 'status-progres
 $kindIcon    = ['pdf' => '&#128196;', 'video' => '&#127916;', 'note' => '&#128221;'];
 $kindLabel   = ['pdf' => 'PDF document', 'video' => 'Video', 'note' => 'Note'];
 $stateLabel  = ['not-started' => 'Not started', 'progress' => 'In progress', 'completed' => 'Completed', 'restudy' => 'Must study again'];
-$modeName    = ['standard' => 'Standard', 'instant' => 'Instant feedback', 'timed' => 'Timed exam', 'confidence' => 'Confidence marking', 'adaptive' => 'Adaptive', 'survival' => 'Survival'];
+$modeName    = ['standard' => 'Standard', 'instant' => 'Instant feedback', 'timed' => 'Timed quiz', 'confidence' => 'Confidence marking', 'adaptive' => 'Adaptive', 'survival' => 'Survival'];
 
 // the badge in the header
 $headBadge = 'not-started';
@@ -93,11 +93,8 @@ if ($topic && !$lockedForMe) {
 // professor checklist
 $lessonDone = ($lessonHtml !== '');
 $matsDone   = (count($contents) > 0);
-$quizDone   = false;
-foreach (['quiz', 'exam'] as $kk) {
-    $qq = $assess[$kk];
-    if ($qq && (int) $qq['is_published'] === 1 && (int) $qq['question_count'] >= 1) $quizDone = true;
-}
+$qq         = $assess['quiz'];
+$quizDone   = ($qq && (int) $qq['is_published'] === 1 && (int) $qq['question_count'] >= 1);
 
 // Prefer a local copy of Quill (View/lib/quill/) so the editor works offline; fall back to the CDN.
 $quillLocal = is_file(__DIR__ . '/lib/quill/quill.js') && is_file(__DIR__ . '/lib/quill/quill.snow.css');
@@ -216,14 +213,14 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                 <div class="next-step">
                     <div>
                         <strong>Next step</strong>
-                        <?php if ($flow['next']): $nq = $assess[$flow['next']]; ?>
-                            <div>Read the lesson and materials, then take the <?= $flow['next'] === 'exam' ? 'mock exam' : 'quiz' ?>.</div>
+                        <?php if ($flow['next']): $nq = $assess['quiz']; ?>
+                            <div>Read the lesson and materials, then take the quiz.</div>
                         <?php else: ?>
                             <div>Read the lesson and materials, then mark the topic as finished.</div>
                         <?php endif; ?>
                     </div>
                     <?php if ($flow['next']): ?>
-                        <button type="button" class="syl-btn primary" data-action="start-quiz" data-quiz="<?= (int) $nq['quizID'] ?>"><?= $nq['attempts'] > 0 ? 'Retake' : 'Take' ?> the <?= $flow['next'] === 'exam' ? 'mock exam' : 'quiz' ?></button>
+                        <button type="button" class="syl-btn primary" data-action="start-quiz" data-quiz="<?= (int) $nq['quizID'] ?>"><?= $nq['attempts'] > 0 ? 'Retake' : 'Take' ?> the quiz</button>
                     <?php else: ?>
                         <button type="button" class="syl-btn primary" data-action="mark-finished" data-task="<?= (int) $topic['taskID'] ?>">Mark as finished</button>
                     <?php endif; ?>
@@ -369,9 +366,22 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             <?php endif; ?>
 
                             <?php if ($c['kind'] === 'video'): ?>
-                                <video class="ci-video" controls preload="none" data-src="<?= $e($fileUrl($c['contentID'])) ?>">
-                                    Your browser cannot play this video.
-                                </video>
+                                <?php if ((int) $c['has_file'] === 1): ?>
+                                    <video class="ci-video" controls preload="none" data-src="<?= $e($fileUrl($c['contentID'])) ?>">
+                                        Your browser cannot play this video.
+                                    </video>
+                                <?php else: $vl = SyllabusLogic::parseVideoLink((string) $c['body']); ?>
+                                    <?php if ($vl['embed']): ?>
+                                    <div class="ci-embed">
+                                        <iframe src="<?= $e($vl['embed']) ?>" title="<?= $e($c['title']) ?>" loading="lazy" allowfullscreen
+                                                allow="accelerometer; encrypted-media; picture-in-picture; fullscreen"
+                                                referrerpolicy="strict-origin-when-cross-origin"></iframe>
+                                    </div>
+                                    <?php endif; ?>
+                                    <?php if ($vl['ok']): ?>
+                                    <a class="ci-link" href="<?= $e($vl['url']) ?>" target="_blank" rel="noopener noreferrer"><?= $vl['embed'] ? 'Open in a new tab' : 'Open the recording' ?> &rsaquo;</a>
+                                    <?php endif; ?>
+                                <?php endif; ?>
                             <?php elseif ($c['kind'] === 'note'): ?>
                                 <div class="ci-note"><?= nl2br($e($c['body'])) ?></div>
                             <?php endif; ?>
@@ -380,6 +390,9 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             <div class="ci-edit">
                                 <input class="syl-input grow" type="text" name="title" maxlength="200" value="<?= $e($c['title']) ?>" aria-label="Material title">
                                 <input class="syl-input grow" type="text" name="description" maxlength="500" value="<?= $e($c['description']) ?>" placeholder="Short description (optional)" aria-label="Description">
+                                <?php if ($c['kind'] === 'video' && (int) $c['has_file'] !== 1): ?>
+                                <input class="syl-input grow" type="url" name="url" maxlength="500" value="<?= $e($c['body']) ?>" placeholder="Video link" aria-label="Video link">
+                                <?php endif; ?>
                                 <?php if ($c['kind'] === 'note'): ?>
                                 <textarea class="syl-input" name="body" maxlength="20000" aria-label="Note text"><?= $e($c['body']) ?></textarea>
                                 <?php endif; ?>
@@ -396,14 +409,18 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             <div class="cf-row">
                                 <select class="syl-input" name="kind" aria-label="Material type">
                                     <option value="pdf">PDF document</option>
-                                    <option value="video">Video (MP4 / WebM)</option>
+                                    <option value="video">Recorded lesson (video link)</option>
                                 </select>
                                 <input class="syl-input grow" type="text" name="title" maxlength="200" placeholder="Title (e.g. Lecture slides)" aria-label="Material title">
                             </div>
                             <input class="syl-input" type="text" name="description" maxlength="500" placeholder="Short description for students (optional)" aria-label="Description">
                             <div class="cf-file">
                                 <input class="syl-input file" type="file" name="file" accept=".pdf,application/pdf" aria-label="Choose file">
-                                <div class="hint">PDF up to 50 MB. Video: MP4 (H.264) or WebM up to 500 MB, and never above your server's upload limit.</div>
+                                <div class="hint">PDF up to 50 MB.</div>
+                            </div>
+                            <div class="cf-url is-hidden">
+                                <input class="syl-input" type="url" name="url" maxlength="500" placeholder="Paste a YouTube, Vimeo or Google Drive link" aria-label="Video link">
+                                <div class="hint">Recorded lessons play from a link, so nothing is stored on the school server. YouTube: set the video to Unlisted. Google Drive: share it as &ldquo;Anyone with the link&rdquo;. Any other link (Zoom, Teams) opens in a new tab.</div>
                             </div>
                             <div class="cf-row">
                                 <button type="submit" class="syl-btn inline">Add material</button>
@@ -414,12 +431,12 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                         <?php endif; ?>
                     </div>
 
-                    <?php if ($mode === 'student' && $flow && ($assess['quiz'] || $assess['exam'] || $practice['pool'] > 0)): ?>
+                    <?php if ($mode === 'student' && $flow && ($assess['quiz'] || $practice['pool'] > 0)): ?>
                     <!-- student: quiz + practice, one place -->
                     <div class="syl-widget checkpoint-card" id="quiz">
                         <h3>Quiz &amp; practice</h3>
 
-                        <?php foreach (['quiz', 'exam'] as $k):
+                        <?php foreach (['quiz'] as $k):
                             $q = $assess[$k];
                             if (!$q) continue;
                             $st = $flow['state'][$k];
@@ -459,10 +476,10 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                     </div>
 
                     <?php elseif ($mode === 'preview' || $mode === 'observer'): ?>
-                        <?php if ($assess['quiz'] || $assess['exam']): ?>
+                        <?php if ($assess['quiz']): ?>
                         <div class="syl-widget">
                             <h3>Quiz</h3>
-                            <?php foreach (['quiz', 'exam'] as $k): if (!$assess[$k]) continue; ?>
+                            <?php foreach (['quiz'] as $k): if (!$assess[$k]) continue; ?>
                                 <div class="stats-text"><?= $k === 'quiz' ? '&#129514;' : '&#128221;' ?> <?= $e($assess[$k]['title']) ?> <span class="chip"><?= $e($modeName[$assess[$k]['mode']] ?? 'Standard') ?></span> &middot; pass mark <?= (int) $assess[$k]['pass_percent'] ?>%</div>
                             <?php endforeach; ?>
                             <div class="milestone-subtext">Students take these here. Quizzes are not available in preview.</div>
@@ -479,28 +496,25 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
             <div class="hint" style="margin-bottom:6px;">Add a quiz, paste or type a few questions, tick &ldquo;Published to students&rdquo;, and save. That is all students need.</div>
 
             <div class="assess-wrap">
-                <?php foreach (['quiz', 'exam'] as $k):
+                <?php foreach (['quiz'] as $k):
                     $q = $assess[$k];
-                    $curMode   = $q ? $q['mode'] : ($k === 'exam' ? 'timed' : 'instant');
-                    $allowPrac = $q ? ((int) $q['allow_practice'] === 1) : ($k === 'quiz');
-                    $modeOpts  = ['standard' => 'Standard', 'instant' => 'Instant feedback', 'timed' => 'Timed exam'];
+                    $curMode   = $q ? $q['mode'] : 'instant';
+                    $allowPrac = $q ? ((int) $q['allow_practice'] === 1) : true;
+                    $modeOpts  = ['standard' => 'Standard', 'instant' => 'Instant feedback', 'timed' => 'Timed quiz'];
                     if ($q && !isset($modeOpts[$q['mode']])) $modeOpts[$q['mode']] = ($modeName[$q['mode']] ?? $q['mode']) . ' (older mode)';
-                    $hide = ($k === 'exam' && !$q);
                 ?>
-                <div class="assess-card<?= $hide ? ' is-hidden' : '' ?>" id="card-<?= $k ?>" data-kind="<?= $k ?>" data-quiz="<?= $q ? (int) $q['quizID'] : 0 ?>">
+                <div class="assess-card" id="card-<?= $k ?>" data-kind="<?= $k ?>" data-quiz="<?= $q ? (int) $q['quizID'] : 0 ?>">
                     <h3>
-                        <?= $k === 'quiz' ? '&#129514; Quiz' : '&#128221; Mock exam' ?>
+                        &#129514; Quiz
                         <?php if ($q): ?><?= (int) $q['is_published'] === 1 ? '<span class="chip ok">Published</span>' : '<span class="chip warn">Draft</span>' ?><?php endif; ?>
                     </h3>
                     <div class="hint" style="margin-bottom:10px;">
-                        <?= $k === 'quiz'
-                            ? 'Students take this after studying. Passing it completes the topic (or unlocks the mock exam, if you add one).'
-                            : 'Optional. Students must pass the quiz first, then pass this exam to complete the topic.' ?>
+                        Students take this after studying. Passing it completes the topic.
                     </div>
 
                     <form class="quiz-settings" data-task="<?= (int) $topic['taskID'] ?>" data-kind="<?= $k ?>">
                         <label class="mini" style="flex-basis:100%;">Title
-                            <input class="syl-input" type="text" name="title" maxlength="200" value="<?= $q ? $e($q['title']) : '' ?>" placeholder="<?= $k === 'exam' ? 'Mock exam' : 'Quiz' ?>">
+                            <input class="syl-input" type="text" name="title" maxlength="200" value="<?= $q ? $e($q['title']) : '' ?>" placeholder="Quiz">
                         </label>
                         <label class="mini" style="flex-basis:100%;">How is it run?
                             <select class="syl-input mode-select" name="mode">
@@ -532,7 +546,7 @@ $quillJs    = $quillLocal ? BASE_PATH . '/View/lib/quill/quill.js'       : 'http
                             </div>
                         </details>
 
-                        <button type="submit" class="syl-btn inline"><?= $q ? 'Save settings' : 'Create ' . ($k === 'exam' ? 'mock exam' : 'quiz') ?></button>
+                        <button type="submit" class="syl-btn inline"><?= $q ? 'Save settings' : 'Create quiz' ?></button>
                         <?php if ($q): ?><button type="button" class="icon-btn" data-action="delete-quiz" data-quiz="<?= (int) $q['quizID'] ?>">Delete</button><?php endif; ?>
                     </form>
 
@@ -613,12 +627,6 @@ Explanation: Basic addition.</pre>
                 <?php endforeach; ?>
             </div>
 
-            <?php if (!$assess['exam']): ?>
-            <div style="margin-top:14px;">
-                <button type="button" class="syl-btn inline" id="showExamBtn" data-action="show-exam" style="width:auto;">+ Add a mock exam (optional)</button>
-            </div>
-            <?php endif; ?>
-
             <!-- Faculty: how the class is doing on this topic -->
             <div class="progress-card">
                 <h3>Student progress on this topic</h3>
@@ -627,14 +635,14 @@ Explanation: Basic addition.</pre>
                 <?php else: ?>
                 <table class="progress-table">
                     <thead>
-                        <tr><th>Student</th><th>Status</th><th>Quiz</th><th>Mock exam</th><th>Last opened</th></tr>
+                        <tr><th>Student</th><th>Status</th><th>Quiz</th><th>Last opened</th></tr>
                     </thead>
                     <tbody>
                         <?php foreach ($progressRows as $pr): ?>
                         <tr>
                             <td><?= $e($pr['name']) ?></td>
                             <td><span class="chip <?= $pr['state'] === 'completed' ? 'ok' : ($pr['state'] === 'restudy' ? 'warn' : '') ?>"><?= $e($stateLabel[$pr['state']]) ?></span></td>
-                            <?php foreach (['quiz', 'exam'] as $k): $a = $pr[$k]; ?>
+                            <?php foreach (['quiz'] as $k): $a = $pr[$k]; ?>
                             <td><?php if ($a): ?><?= (int) $a['best'] ?>% <span class="milestone-subtext">(<?= (int) $a['n'] ?> tr<?= (int) $a['n'] === 1 ? 'y' : 'ies' ?>)</span> <?= (int) $a['passed'] === 1 ? '<span class="chip ok">Passed</span>' : '<span class="chip bad">Not passed</span>' ?><?php else: ?>&mdash;<?php endif; ?></td>
                             <?php endforeach; ?>
                             <td><?= $pr['last'] ? $e(date('M j, g:i A', strtotime($pr['last']))) : '&mdash;' ?></td>
