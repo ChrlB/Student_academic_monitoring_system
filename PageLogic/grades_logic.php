@@ -122,7 +122,7 @@ class GradesLogic
              FROM enrolled_subjects es
              JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
              WHERE es.studentID = :studentID
-               AND es.status = 'approved'
+               AND es.status IN ('approved', 'enrolled')
              ORDER BY ep.acad_year DESC, ep.sem ASC",
             [':studentID' => $studentID]
         );
@@ -154,7 +154,7 @@ class GradesLogic
              JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
              JOIN subjects s ON TRIM(s.subjectID) = TRIM(es.subjectID)
              WHERE es.studentID = :studentID
-               AND es.status = 'approved'
+               AND es.status IN ('approved', 'enrolled')
                AND ep.acad_year = :acadYear
                AND ep.sem = :sem
              ORDER BY es.subjectID",
@@ -224,7 +224,7 @@ class GradesLogic
              FROM enrolled_subjects es
              JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
              WHERE es.studentID = :studentID
-               AND es.status = 'approved'
+               AND es.status IN ('approved', 'enrolled')
                AND es.final_grade IS NOT NULL
              ORDER BY ep.acad_year DESC, ep.sem DESC",
             [':studentID' => $studentID]
@@ -408,23 +408,52 @@ class GradesLogic
                 COUNT(DISTINCT CASE
                     WHEN es.enrolled_subjectID IS NOT NULL
                      AND (es.midterm_grade IS NULL OR es.final_grade IS NULL)
+                     AND NOT EXISTS (
+                         SELECT 1
+                         FROM enrolled_subjects completed_es
+                         JOIN enrollment_period completed_ep
+                           ON completed_ep.enrollmentID = completed_es.enrollmentID
+                         JOIN students completed_st
+                           ON completed_st.studentID = completed_es.studentID
+                         WHERE completed_es.studentID = es.studentID
+                           AND TRIM(completed_es.subjectID) = TRIM(ss.subjectID)
+                           AND completed_es.status IN ('approved', 'enrolled')
+                           AND completed_es.midterm_grade IS NOT NULL
+                           AND completed_es.final_grade IS NOT NULL
+                           AND completed_ep.program = ep.program
+                           AND completed_ep.acad_year = ep.acad_year
+                           AND completed_ep.sem = ep.sem
+                           AND completed_st.program = ep.program
+                           AND (
+                               completed_es.selected_schedID = ss.schedID
+                               OR (completed_es.selected_schedID IS NULL AND completed_st.block = ss.block)
+                           )
+                     )
                     THEN es.studentID END) AS missing_grades
              FROM subject_schedules ss
              JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
              JOIN subjects s ON TRIM(s.subjectID) = TRIM(ss.subjectID)
              LEFT JOIN (
-                SELECT es.enrolled_subjectID, es.studentID, es.enrollmentID,
+                SELECT es.enrolled_subjectID, es.studentID,
                        TRIM(es.subjectID) AS subject_code,
                        es.midterm_grade, es.final_grade,
-                       st.program AS student_program, st.block AS student_block
+                      es.selected_schedID,
+                       st.program AS student_program, st.block AS student_block,
+                       student_ep.acad_year AS student_acad_year,
+                       student_ep.sem AS student_sem
                 FROM enrolled_subjects es
                 JOIN students st ON st.studentID = es.studentID
-                WHERE es.status = 'approved'
+                JOIN enrollment_period student_ep ON student_ep.enrollmentID = es.enrollmentID
+               WHERE es.status IN ('approved', 'enrolled')
              ) es
-                ON es.enrollmentID = ss.enrollmentID
-               AND es.subject_code = TRIM(ss.subjectID)
+                ON es.subject_code = TRIM(ss.subjectID)
                AND es.student_program = ep.program
-               AND es.student_block = ss.block
+               AND es.student_acad_year = ep.acad_year
+               AND es.student_sem = ep.sem
+               AND (
+                   es.selected_schedID = ss.schedID
+                   OR (es.selected_schedID IS NULL AND es.student_block = ss.block)
+              )
              WHERE ss.facultyID = :facultyID
                AND ep.acad_year = :acadYear
                AND ep.sem = :sem
@@ -483,27 +512,57 @@ class GradesLogic
 
     public function classStudents(array $class, $page, $perPage = 10)
     {
-        $where = "ss.schedID = :scheduleID
-                  AND ss.facultyID = :facultyID
-                  AND es.enrollmentID = :enrollmentID
-                  AND TRIM(es.subjectID) = :subjectID
-                  AND es.status = 'approved'
-                  AND ep.program = :program
-                  AND st.program = ep.program
-                  AND st.block = ss.block";
+        // Prefer the schedule's enrollment period, then the newest same-term record.
+        $where = "ss.facultyID = :facultyID
+                  AND TRIM(ss.subjectID) = :subjectID
+                  AND TRIM(es.subjectID) = TRIM(ss.subjectID)
+                  AND es.status IN ('approved', 'enrolled')
+                  AND class_ep.program = :program
+                  AND class_ep.acad_year = :acadYear
+                  AND class_ep.sem = :sem
+                  AND student_ep.program = class_ep.program
+                  AND student_ep.acad_year = class_ep.acad_year
+                  AND student_ep.sem = class_ep.sem
+                  AND st.program = student_ep.program
+                  AND (
+                      es.selected_schedID = ss.schedID
+                      OR (es.selected_schedID IS NULL AND st.block = ss.block)
+                  )
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM enrolled_subjects es2
+                      JOIN enrollment_period ep2 ON ep2.enrollmentID = es2.enrollmentID
+                      WHERE es2.studentID = es.studentID
+                        AND TRIM(es2.subjectID) = TRIM(es.subjectID)
+                        AND es2.status IN ('approved', 'enrolled')
+                        AND ep2.program = student_ep.program
+                        AND ep2.acad_year = student_ep.acad_year
+                        AND ep2.sem = student_ep.sem
+                        AND (
+                            es2.selected_schedID = ss.schedID
+                            OR (es2.selected_schedID IS NULL AND st.block = ss.block)
+                        )
+                        AND (
+                            (es2.enrollmentID = :classEnrollmentID AND es.enrollmentID <> :otherEnrollmentID)
+                            OR (es.enrollmentID <> :latestEnrollmentID AND es2.enrollmentID > es.enrollmentID)
+                        )
+                  )";
         $params = [
             ':scheduleID' => (int)$class['schedID'],
             ':facultyID' => $this->currentUserID(),
-            ':enrollmentID' => $class['enrollmentID'],
+            ':classEnrollmentID' => (int)$class['enrollmentID'],
+            ':otherEnrollmentID' => (int)$class['enrollmentID'],
+            ':latestEnrollmentID' => (int)$class['enrollmentID'],
             ':subjectID' => $class['subject_code'],
             ':program' => $class['program'],
+            ':acadYear' => $class['acad_year'],
+            ':sem' => (int)$class['sem'],
         ];
         $from = "FROM enrolled_subjects es
                  JOIN students st ON st.studentID = es.studentID
-                 JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
-                 JOIN subject_schedules ss
-                   ON ss.enrollmentID = es.enrollmentID
-                  AND TRIM(ss.subjectID) = TRIM(es.subjectID)
+                 JOIN enrollment_period student_ep ON student_ep.enrollmentID = es.enrollmentID
+                 JOIN subject_schedules ss ON ss.schedID = :scheduleID
+                 JOIN enrollment_period class_ep ON class_ep.enrollmentID = ss.enrollmentID
                  WHERE $where";
 
         $countRows = $this->all("SELECT COUNT(*) AS total $from", $params);
@@ -513,7 +572,7 @@ class GradesLogic
         $offset = ($page - 1) * $perPage;
 
         $rows = $this->all(
-            "SELECT es.enrolled_subjectID, es.midterm_grade, es.final_grade,
+            "SELECT es.enrolled_subjectID, es.enrollmentID, es.midterm_grade, es.final_grade,
                     st.studentID,
                     CONCAT(YEAR(st.date_created), LPAD(st.studentID, 5, '0')) AS display_student_id,
                     st.first_name, st.middle_name, st.last_name
@@ -636,6 +695,7 @@ class GradesLogic
             $student = $allowedRows[(string)$enrolledSubjectID];
             $gradeData[] = [
                 'enrolled_subjectID' => (int)$enrolledSubjectID,
+                'enrollmentID' => (int)$student['enrollmentID'],
                 'studentID' => (int)$student['studentID'],
                 'display_student_id' => (string)$student['display_student_id'],
                 'student_name' => (string)$student['name'],
@@ -924,24 +984,31 @@ class GradesLogic
         $validDepartment = in_array($department, array_column($departmentOptions, 'department'), true);
         $eligibility = "
             FROM subject_schedules ss
-            JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
-            JOIN programs p ON TRIM(p.program) = TRIM(ep.program)
+            JOIN enrollment_period schedule_ep ON schedule_ep.enrollmentID = ss.enrollmentID
+            JOIN programs p ON TRIM(p.program) = TRIM(schedule_ep.program)
             JOIN enrolled_subjects es
-              ON es.enrollmentID = ss.enrollmentID
-             AND TRIM(es.subjectID) = TRIM(ss.subjectID)
-             AND es.status = 'approved'
+              ON TRIM(es.subjectID) = TRIM(ss.subjectID)
+             AND es.status IN ('approved', 'enrolled')
+            JOIN enrollment_period student_ep
+              ON student_ep.enrollmentID = es.enrollmentID
+             AND student_ep.program = schedule_ep.program
+             AND student_ep.acad_year = schedule_ep.acad_year
+             AND student_ep.sem = schedule_ep.sem
             JOIN students st
               ON st.studentID = es.studentID
-             AND st.program = ep.program
-             AND st.block = ss.block
+             AND st.program = student_ep.program
+             AND (
+                  es.selected_schedID = ss.schedID
+                  OR (es.selected_schedID IS NULL AND st.block = ss.block)
+             )
              AND st.status = 'active'";
 
         $programOptions = $validDepartment
             ? $this->all(
-                "SELECT DISTINCT ep.program
+                "SELECT DISTINCT schedule_ep.program
                  $eligibility
                  WHERE p.department = :department
-                 ORDER BY ep.program",
+                 ORDER BY schedule_ep.program",
                 [':department' => $department]
             )
             : [];
@@ -954,7 +1021,7 @@ class GradesLogic
                  $eligibility
                  JOIN faculty f ON f.facultyID = ss.facultyID
                  WHERE p.department = :department
-                   AND ep.program = :program
+                   AND schedule_ep.program = :program
                  ORDER BY faculty_name",
                 [':department' => $department, ':program' => $program]
             )
@@ -967,12 +1034,12 @@ class GradesLogic
         ];
         $academicYearOptions = $validProgram && $facultyID > 0
             ? $this->all(
-                "SELECT DISTINCT ep.acad_year
+                "SELECT DISTINCT schedule_ep.acad_year
                  $eligibility
                  WHERE p.department = :department
-                   AND ep.program = :program
+                   AND schedule_ep.program = :program
                    AND ss.facultyID = :facultyID
-                 ORDER BY ep.acad_year DESC",
+                 ORDER BY schedule_ep.acad_year DESC",
                 $yearParams
             )
             : [];
@@ -980,13 +1047,13 @@ class GradesLogic
         $validAcademicYear = in_array($academicYear, array_column($academicYearOptions, 'acad_year'), true);
         $semesterOptions = $validProgram && $facultyID > 0 && $validAcademicYear
             ? $this->all(
-                "SELECT DISTINCT ep.sem
+                "SELECT DISTINCT schedule_ep.sem
                  $eligibility
                  WHERE p.department = :department
-                   AND ep.program = :program
+                   AND schedule_ep.program = :program
                    AND ss.facultyID = :facultyID
-                   AND ep.acad_year = :acadYear
-                 ORDER BY ep.sem",
+                   AND schedule_ep.acad_year = :acadYear
+                 ORDER BY schedule_ep.sem",
                 [
                     ':department' => $department,
                     ':program' => $program,
@@ -1014,29 +1081,37 @@ class GradesLogic
             $scheduleOptions = $this->all(
                 "SELECT ss.schedID, TRIM(ss.subjectID) AS subject_code,
                         TRIM(s.name) AS subject_name, ss.block,
-                        ep.program, ep.acad_year, ep.sem,
+                        schedule_ep.program, schedule_ep.acad_year, schedule_ep.sem,
                         ss.day, ss.time_start, ss.time_end, ss.roomID,
                         COUNT(DISTINCT st.studentID) AS student_count
                  FROM subject_schedules ss
-                 JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
+                 JOIN enrollment_period schedule_ep ON schedule_ep.enrollmentID = ss.enrollmentID
                  JOIN subjects s ON TRIM(s.subjectID) = TRIM(ss.subjectID)
                  LEFT JOIN enrolled_subjects es
-                   ON es.enrollmentID = ss.enrollmentID
-                  AND TRIM(es.subjectID) = TRIM(ss.subjectID)
-                  AND es.status = 'approved'
+                   ON TRIM(es.subjectID) = TRIM(ss.subjectID)
+                  AND es.status IN ('approved', 'enrolled')
+                 LEFT JOIN enrollment_period student_ep
+                   ON student_ep.enrollmentID = es.enrollmentID
+                  AND student_ep.program = schedule_ep.program
+                  AND student_ep.acad_year = schedule_ep.acad_year
+                  AND student_ep.sem = schedule_ep.sem
                  LEFT JOIN students st
                    ON st.studentID = es.studentID
-                  AND st.program = ep.program
-                  AND st.block = ss.block
+                  AND st.program = student_ep.program
+                  AND student_ep.enrollmentID IS NOT NULL
+                  AND (
+                       es.selected_schedID = ss.schedID
+                       OR (es.selected_schedID IS NULL AND st.block = ss.block)
+                  )
                   AND st.status = 'active'
-                 WHERE ep.program = :program
+                 WHERE schedule_ep.program = :program
                    AND ss.facultyID = :facultyID
-                   AND ep.acad_year = :acadYear
-                   AND ep.sem = :semester
+                   AND schedule_ep.acad_year = :acadYear
+                   AND schedule_ep.sem = :semester
                  GROUP BY ss.schedID, ss.subjectID, s.name, ss.block,
-                          ep.program, ep.acad_year, ep.sem, ss.day,
+                          schedule_ep.program, schedule_ep.acad_year, schedule_ep.sem, ss.day,
                           ss.time_start, ss.time_end, ss.roomID
-                 ORDER BY ep.sem, ep.program, ss.block, subject_code, ss.day, ss.time_start",
+                 ORDER BY schedule_ep.sem, schedule_ep.program, ss.block, subject_code, ss.day, ss.time_start",
                 [
                     ':program' => $program,
                     ':facultyID' => $facultyID,
@@ -1068,29 +1143,35 @@ class GradesLogic
                     ':scheduleID' => $scheduleID,
                 ];
                 $matchingConditions = "
-                    es.status = 'approved'
+                    es.status IN ('approved', 'enrolled')
                     AND st.status = 'active'
                     AND st.program = :program
-                    AND ep.program = st.program
-                    AND ep.acad_year = :acadYear
-                    AND ep.sem = :semester
+                    AND student_ep.program = st.program
+                    AND student_ep.acad_year = :acadYear
+                    AND student_ep.sem = :semester
                     AND EXISTS (
                         SELECT 1
                         FROM subject_schedules ss
-                        WHERE ss.enrollmentID = es.enrollmentID
-                          AND TRIM(ss.subjectID) = TRIM(es.subjectID)
-                          AND ss.block = st.block
+                        JOIN enrollment_period schedule_ep ON schedule_ep.enrollmentID = ss.enrollmentID
+                        WHERE TRIM(ss.subjectID) = TRIM(es.subjectID)
+                          AND (
+                               es.selected_schedID = ss.schedID
+                               OR (es.selected_schedID IS NULL AND ss.block = st.block)
+                          )
                           AND ss.facultyID = :facultyID
                           AND ss.schedID = :scheduleID
+                          AND schedule_ep.program = student_ep.program
+                          AND schedule_ep.acad_year = student_ep.acad_year
+                          AND schedule_ep.sem = student_ep.sem
                     )";
                 $rows = $this->all(
                     "SELECT DISTINCT st.studentID,
                             CONCAT(YEAR(st.date_created), LPAD(st.studentID, 5, '0')) AS display_student_id,
                             st.first_name, st.middle_name, st.last_name,
-                            st.program, st.year_level, st.block, ep.acad_year
+                            st.program, st.year_level, st.block, student_ep.acad_year
                      FROM enrolled_subjects es
                      JOIN students st ON st.studentID = es.studentID
-                     JOIN enrollment_period ep ON ep.enrollmentID = es.enrollmentID
+                     JOIN enrollment_period student_ep ON student_ep.enrollmentID = es.enrollmentID
                      WHERE $matchingConditions
                      ORDER BY st.program, st.year_level, st.block,
                               st.last_name, st.first_name, st.studentID",
@@ -1261,23 +1342,31 @@ class GradesLogic
                  WHERE enrolled_subjectID = :enrolledSubjectID
                    AND enrollmentID = :enrollmentID
                    AND TRIM(subjectID) = :subjectID
-                   AND status = 'approved'"
+                   AND status IN ('approved', 'enrolled')"
             );
 
             foreach ($gradeData as $grade) {
+                $studentEnrollmentID = (int)($grade['enrollmentID'] ?? $submission['enrollmentID']);
                 $match = $this->pdo->prepare(
-                    "SELECT enrolled_subjectID
-                     FROM enrolled_subjects
-                     WHERE enrolled_subjectID = :enrolledSubjectID
-                       AND enrollmentID = :enrollmentID
-                       AND TRIM(subjectID) = :subjectID
-                       AND status = 'approved'
+                     "SELECT es.enrolled_subjectID
+                      FROM enrolled_subjects es
+                      JOIN enrollment_period student_ep ON student_ep.enrollmentID = es.enrollmentID
+                      WHERE es.enrolled_subjectID = :enrolledSubjectID
+                        AND es.enrollmentID = :studentEnrollmentID
+                        AND TRIM(es.subjectID) = :subjectID
+                        AND es.status IN ('approved', 'enrolled')
+                        AND student_ep.program = :program
+                        AND student_ep.acad_year = :acadYear
+                        AND student_ep.sem = :sem
                      LIMIT 1"
                 );
                 $match->execute([
                     ':enrolledSubjectID' => (int)$grade['enrolled_subjectID'],
-                    ':enrollmentID' => (int)$submission['enrollmentID'],
+                    ':studentEnrollmentID' => $studentEnrollmentID,
                     ':subjectID' => $submission['subjectID'],
+                    ':program' => $submission['program'],
+                    ':acadYear' => $submission['acad_year'],
+                    ':sem' => (int)$submission['sem'],
                 ]);
                 if (!$match->fetch(PDO::FETCH_ASSOC)) {
                     throw new RuntimeException('A student enrollment changed before final verification.');
@@ -1287,7 +1376,7 @@ class GradesLogic
                     ':midterm' => $grade['midterm'] !== null ? (float)$grade['midterm'] : null,
                     ':final' => $grade['final'] !== null ? (float)$grade['final'] : null,
                     ':enrolledSubjectID' => (int)$grade['enrolled_subjectID'],
-                    ':enrollmentID' => (int)$submission['enrollmentID'],
+                    ':enrollmentID' => $studentEnrollmentID,
                     ':subjectID' => $submission['subjectID'],
                 ]);
             }
@@ -1334,18 +1423,31 @@ class GradesLogic
         }
 
         $facultyID = $this->currentUserID();
-        $sql = "UPDATE enrolled_subjects
-                SET midterm_grade = :midterm, final_grade = :final
-                WHERE enrolled_subjectID = :enrolledSubjectID
-                  AND enrollmentID = :enrollmentID
-                  AND TRIM(subjectID) = :subjectID
-                  AND status = 'approved'
+        $sql = "UPDATE enrolled_subjects es
+                JOIN enrollment_period student_ep ON student_ep.enrollmentID = es.enrollmentID
+                SET es.midterm_grade = :midterm, es.final_grade = :final
+                WHERE es.enrolled_subjectID = :enrolledSubjectID
+                  AND es.enrollmentID = :studentEnrollmentID
+                  AND TRIM(es.subjectID) = :subjectID
+                  AND es.status IN ('approved', 'enrolled')
+                  AND student_ep.program = :program
+                  AND student_ep.acad_year = :acadYear
+                  AND student_ep.sem = :sem
                   AND EXISTS (
-                      SELECT 1 FROM subject_schedules ss
+                      SELECT 1
+                      FROM subject_schedules ss
+                      JOIN enrollment_period class_ep ON class_ep.enrollmentID = ss.enrollmentID
+                      JOIN students st ON st.studentID = es.studentID
                       WHERE ss.schedID = :scheduleID
                         AND ss.facultyID = :facultyID
-                        AND ss.enrollmentID = enrolled_subjects.enrollmentID
-                        AND TRIM(ss.subjectID) = TRIM(enrolled_subjects.subjectID)
+                        AND TRIM(ss.subjectID) = TRIM(es.subjectID)
+                        AND class_ep.program = student_ep.program
+                        AND class_ep.acad_year = student_ep.acad_year
+                        AND class_ep.sem = student_ep.sem
+                        AND (
+                            es.selected_schedID = ss.schedID
+                            OR (es.selected_schedID IS NULL AND st.block = ss.block)
+                        )
                   )";
 
         try {
@@ -1357,8 +1459,11 @@ class GradesLogic
                     ':midterm' => $this->normalizedGrade($grades['midterm'] ?? '', 'Midterm', $student['display_student_id']),
                     ':final' => $this->normalizedGrade($grades['final'] ?? '', 'Final', $student['display_student_id']),
                     ':enrolledSubjectID' => (int)$enrolledSubjectID,
-                    ':enrollmentID' => $class['enrollmentID'],
+                    ':studentEnrollmentID' => (int)$student['enrollmentID'],
                     ':subjectID' => $class['subject_code'],
+                    ':program' => $class['program'],
+                    ':acadYear' => $class['acad_year'],
+                    ':sem' => (int)$class['sem'],
                     ':scheduleID' => $class['schedID'],
                     ':facultyID' => $facultyID,
                 ]);
@@ -1369,22 +1474,36 @@ class GradesLogic
                 $check = $this->pdo->prepare(
                     "SELECT es.enrolled_subjectID
                      FROM enrolled_subjects es
-                     JOIN subject_schedules ss
-                       ON ss.schedID = :scheduleID
-                      AND ss.facultyID = :facultyID
-                      AND ss.enrollmentID = es.enrollmentID
-                      AND TRIM(ss.subjectID) = TRIM(es.subjectID)
+                     JOIN enrollment_period student_ep ON student_ep.enrollmentID = es.enrollmentID
+                     JOIN subject_schedules ss ON ss.schedID = :scheduleID
+                     JOIN enrollment_period class_ep ON class_ep.enrollmentID = ss.enrollmentID
+                     JOIN students st ON st.studentID = es.studentID
                      WHERE es.enrolled_subjectID = :id
-                       AND es.enrollmentID = :enrollmentID
+                       AND es.enrollmentID = :studentEnrollmentID
                        AND TRIM(es.subjectID) = :subjectID
-                       AND es.status = 'approved'"
+                       AND es.status IN ('approved', 'enrolled')
+                       AND ss.facultyID = :facultyID
+                       AND TRIM(ss.subjectID) = TRIM(es.subjectID)
+                       AND student_ep.program = :program
+                       AND student_ep.acad_year = :acadYear
+                       AND student_ep.sem = :sem
+                       AND class_ep.program = student_ep.program
+                       AND class_ep.acad_year = student_ep.acad_year
+                       AND class_ep.sem = student_ep.sem
+                       AND (
+                           es.selected_schedID = ss.schedID
+                           OR (es.selected_schedID IS NULL AND st.block = ss.block)
+                       )"
                 );
                 $check->execute([
                     ':scheduleID' => $class['schedID'],
                     ':facultyID' => $facultyID,
                     ':id' => (int)$enrolledSubjectID,
-                    ':enrollmentID' => $class['enrollmentID'],
+                    ':studentEnrollmentID' => (int)$student['enrollmentID'],
                     ':subjectID' => $class['subject_code'],
+                    ':program' => $class['program'],
+                    ':acadYear' => $class['acad_year'],
+                    ':sem' => (int)$class['sem'],
                 ]);
                 if (!$check->fetch(PDO::FETCH_ASSOC)) {
                     throw new RuntimeException('A student enrollment changed while saving grades. Reload the page and try again.');
