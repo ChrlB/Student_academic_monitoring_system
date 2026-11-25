@@ -88,12 +88,13 @@ class ScheduleLogic
         return null;
     }
 
+    // Coordinators share the exact same personal teaching schedule view as faculty/professors.
     public static function roleGroup($role)
     {
         $r = strtolower(trim((string)$role));
         if (strpos($r, 'registrar') !== false) return 'none';
-        if (preg_match('/coordinator|dean|admin/', $r)) return 'manager';
-        if (preg_match('/prof|faculty|instructor|teacher/', $r))  return 'faculty';
+        if (preg_match('/dean|admin/', $r)) return 'manager';
+        if (preg_match('/coordinator|prof|faculty|instructor|teacher/', $r)) return 'faculty';
         return 'student';
     }
 
@@ -118,23 +119,19 @@ class ScheduleLogic
         return $this->assigned;
     }
 
-    // Dean sees everything. Coordinator sees deployed schedules of the assigned program.
+    // Dean sees everything in their department.
     public function canAccess(array $row)
     {
         if ($this->isDean()) {
             return $this->assignedDepartment() !== '' && $row['department'] === $this->assignedDepartment();
         }
-        if ($this->isCoordinator()) {
-            return $this->assignedProgram() !== ''
-                && $row['program'] === $this->assignedProgram()
-                && $row['status'] === 'deployed';
-        }
         return false;
     }
+
     public function isDean()
-   {
-    return strpos($this->role, 'dean') !== false;
-   }
+    {
+        return strpos($this->role, 'dean') !== false;
+    }
 
     // Department handled by the dean (faculty record, else the login session).
     public function assignedDepartment()
@@ -161,7 +158,6 @@ class ScheduleLogic
 
     // Day codes / formatting helpers
 
-    // Day codes or names to a list of weekdays.
     public static function parseDays($raw)
     {
         $found = [];
@@ -221,7 +217,6 @@ class ScheduleLogic
         return preg_match('/L$/i', trim((string)$subjectID)) ? 'LAB' : 'LEC';
     }
 
-    // onsite = every week. blended_odd / blended_even = alternating online and onsite, onsite on odd / even weeks.
     public static function formatLabel($f)
     {
         if ($f === 'blended_odd')  return 'Alternating online/onsite (onsite on odd weeks)';
@@ -229,7 +224,6 @@ class ScheduleLogic
         return 'Full onsite';
     }
 
-    // Two classes need the room in the same week unless both are alternating on opposite weeks.
     public static function weeksOverlap($a, $b)
     {
         if ($a === 'onsite' || $b === 'onsite') return true;
@@ -278,7 +272,6 @@ class ScheduleLogic
         return $rows;
     }
 
-    // Valid semester key, else the default.
     public function selectedSemester($requested)
     {
         $list = $this->semesters();
@@ -313,7 +306,6 @@ class ScheduleLogic
         return [$p[0] ?? '', (int)($p[1] ?? 0)];
     }
 
-    // Program + block pairs.
     public function blocks()
     {
         $rows = $this->all(
@@ -327,12 +319,6 @@ class ScheduleLogic
             $allowed = array_column($this->programs(), 'program');
             $rows = array_values(array_filter($rows, function ($r) use ($allowed) {
                 return in_array($r['program'], $allowed, true);
-            }));
-        }
-        if ($this->isCoordinator()) {
-            $mine = $this->assignedProgram();
-            $rows = array_values(array_filter($rows, function ($r) use ($mine) {
-                return $r['program'] === $mine;
             }));
         }
         foreach ($rows as &$r) {
@@ -377,15 +363,8 @@ class ScheduleLogic
         return $this->all("SELECT roomID FROM rooms ORDER BY roomID");
     }
 
-    private function studentInfo()
-    {
-        $r = $this->all("SELECT program, block FROM students WHERE studentID = :id", [':id' => $this->userID]);
-        return $r[0] ?? null;
-    }
-
     // Schedule reads
 
-    // Students see every class of their own program + block.
     const STUDENT_JOIN = " JOIN students st ON st.program = ep.program AND st.block = ss.block";
 
     const BASE_SELECT =
@@ -440,29 +419,14 @@ class ScheduleLogic
             $params[':ddept'] = $d !== '' ? $d : '__none__';
         }
 
-        if ($this->isCoordinator()) {
-            $mine = $this->assignedProgram();
-            $sql .= " AND ep.program = :cprog";
-            $params[':cprog'] = $mine !== '' ? $mine : '__none__';
-        }
-
-        // The dean filters with dropdowns (program, block, status, instructor), not with text search.
         if ($this->isDean() && $filters) {
             $sql .= $this->deanFilterSql($filters, $params, true);
         }
 
         if ($search !== '' && !$this->isDean()) {
-            if ($this->group === 'manager') {
-                // Coordinator: block of the assigned program (e.g. "BSCS 1A"), subject, room or instructor.
-                $sql .= " AND (CONCAT(ep.program, ss.block) LIKE :qb OR ss.subjectID LIKE :q OR s.name LIKE :q
-                               OR ss.roomID LIKE :q OR CONCAT(f.first_name, ' ', f.last_name) LIKE :q)";
-                $params[':q']  = '%' . str_replace(['%', '_'], '', $search) . '%';
-                $params[':qb'] = '%' . str_replace([' ', '%', '_'], '', $search) . '%';
-            } else {
-                $sql .= " AND (ss.subjectID LIKE :q OR s.name LIKE :q OR ss.roomID LIKE :q OR ss.block LIKE :q
-                               OR CONCAT(f.first_name, ' ', f.last_name) LIKE :q)";
-                $params[':q'] = '%' . str_replace(['%', '_'], '', $search) . '%';
-            }
+            $sql .= " AND (ss.subjectID LIKE :q OR s.name LIKE :q OR ss.roomID LIKE :q OR ss.block LIKE :q
+                           OR CONCAT(f.first_name, ' ', f.last_name) LIKE :q)";
+            $params[':q'] = '%' . str_replace(['%', '_'], '', $search) . '%';
         }
         $sql .= " ORDER BY ss.time_start, ss.schedID";
         return array_map([$this, 'decorate'], $this->all($sql, $params));
@@ -470,8 +434,6 @@ class ScheduleLogic
 
     // Dean filters
 
-    // Validated filters of the dean: program, block ("PROGRAM|BLOCK" or "none"), status, instructor (id or "none").
-    // Sent filters are remembered in the session, so the list keeps them after deploying, editing or deleting.
     public function deanFilters(array $get, $semKey)
     {
         $empty = ['program' => '', 'block' => '', 'status' => '', 'instructor' => ''];
@@ -505,7 +467,7 @@ class ScheduleLogic
             $parts = explode('|', $b, 2);
             if (count($parts) === 2 && $parts[1] !== '' && in_array($parts[0], $allowed, true)) {
                 if ($f['program'] === '') $f['program'] = $parts[0];
-                if ($parts[0] === $f['program']) $f['block'] = $b;   // block of another program is dropped
+                if ($parts[0] === $f['program']) $f['block'] = $b;
             }
         }
 
@@ -550,7 +512,6 @@ class ScheduleLogic
         return $sql;
     }
 
-    // Blocks for the filter dropdown (real blocks only, of the dean's programs).
     public function filterBlocks()
     {
         return array_values(array_filter($this->blocks(), function ($b) {
@@ -558,7 +519,6 @@ class ScheduleLogic
         }));
     }
 
-    // Instructors that have a class in the dean's department for the semester.
     public function scheduleInstructors($semKey)
     {
         list($acad, $sem) = self::splitSemester($semKey);
@@ -575,7 +535,6 @@ class ScheduleLogic
         );
     }
 
-    // Draft / assigned / deployed totals for the current filters (the status filter itself is ignored).
     public function statusCounts($semKey, array $f)
     {
         $counts = array_fill_keys(array_keys(self::STATUSES), 0);
@@ -602,7 +561,6 @@ class ScheduleLogic
         return $rows ? $this->decorate($rows[0]) : null;
     }
 
-    // Group rows by weekday.
     public function week(array $rows)
     {
         $w = array_fill_keys(self::WEEK, []);
@@ -612,7 +570,6 @@ class ScheduleLogic
         return $w;
     }
 
-    // Paginated student roster.
     public function classStudents(array $row, $q, $page, $per = 6)
     {
         if (empty($row['block'])) {
@@ -687,7 +644,6 @@ class ScheduleLogic
         return array_values(array_unique($out));
     }
 
-    // Create (id null) or update. Subject, instructor and block are optional until Step 2.
     public function save($id, array $in)
     {
         $errors  = [];
@@ -802,7 +758,6 @@ class ScheduleLogic
         return ['ok' => true, 'errors' => [], 'id' => $id ? (int)$id : (int)$this->pdo->lastInsertId()];
     }
 
-    // Step 3: deploy (assigned -> deployed) or undeploy (deployed -> assigned). Returns an error message or ''.
     public function setStatus($id, $to)
     {
         $row = $this->find($id);
@@ -829,14 +784,11 @@ class ScheduleLogic
         return '';
     }
 
-    // Syllabus modules linked to a schedule (they are deleted together with it).
     public function syllabusCount($schedID)
     {
         $r = $this->all("SELECT COUNT(*) AS n FROM syllabus_modules WHERE schedID = :id", [':id' => (int)$schedID]);
         return (int)($r[0]['n'] ?? 0);
     }
-
-    // Request handling (POST -> redirect -> GET), flash + CSRF
 
     public function csrf()
     {
@@ -878,7 +830,6 @@ class ScheduleLogic
         }
     }
 
-    // Run before any output.
     public function handlePost()
     {
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') return;

@@ -41,8 +41,9 @@ if (!function_exists('enroll_badge')) {
     function enroll_badge($status) {
         if ($status === 'approved') $status = 'enrolled';
         $status = strtolower(trim((string)$status));
-        $variant = in_array($status, ['pending','enrolled','credited','passed','failed','rejected','finished'], true) ? $status : 'neutral';
-        return '<span class="enrollment-result result-' . $variant . '">' . enroll_e(ucfirst($status)) . '</span>';
+        $variant = in_array($status, ['pending','enrolled','credited','passed','failed','rejected','finished','awaiting_grade_verification'], true) ? $status : 'neutral';
+        $label = $status === 'awaiting_grade_verification' ? 'Awaiting Grade Verification' : ucfirst($status);
+        return '<span class="enrollment-result result-' . $variant . '">' . enroll_e($label) . '</span>';
     }
 }
 
@@ -696,19 +697,19 @@ $csrf = $logic->csrf();
                             <div class="dean-filter-row">
                                 <input class="form-control dean-local-filter" data-target="dean-student-table" data-field="search" placeholder="Search name, student ID or subject">
                                 <select class="form-control dean-local-filter" data-target="dean-student-table" data-field="type"><option value="">All student types</option><option value="regular">Regular</option><option value="irregular">Irregular</option></select>
-                                <select class="form-control dean-local-filter" data-target="dean-student-table" data-field="status"><option value="">All statuses</option><option value="pending">Pending</option><option value="enrolled">Enrolled</option><option value="rejected">Rejected</option><option value="credited">Credited</option><option value="passed">Passed</option><option value="failed">Failed</option></select>
+                                <select class="form-control dean-local-filter" data-target="dean-student-table" data-field="status"><option value="">All statuses</option><option value="pending">Pending</option><option value="enrolled">Enrolled</option><option value="awaiting_grade_verification">Awaiting Grade Verification</option><option value="rejected">Rejected</option><option value="credited">Credited</option><option value="passed">Passed</option><option value="failed">Failed</option></select>
                             </div>
                             <div class="table-responsive"><table id="dean-student-table" class="enroll-table">
                             <thead><tr><th>Student</th><th>Year / Block</th><th>Type</th><th>Subject</th><th>Status</th></tr></thead><tbody>
                             <?php foreach ($logic->deanStudents as $r): ?>
-                            <tr data-program="<?= enroll_e($r['program']) ?>" data-type="<?= enroll_e($r['student_type']) ?>" data-status="<?= enroll_e($r['status']) ?>">
+                            <tr data-program="<?= enroll_e($r['program']) ?>" data-type="<?= enroll_e($r['student_type']) ?>" data-status="<?= enroll_e($r['display_status']) ?>">
                                 <td><?= enroll_e($r['last_name'].', '.$r['first_name']) ?> · #<?= (int)$r['studentID'] ?></td>
                                 <td><?= (int)$r['year_level'] ?> · <?= enroll_e(preg_replace('/^'.(int)$r['year_level'].'(?=[A-Za-z])/', '', trim((string)$r['block']))) ?></td>
                                 <td><?= enroll_e($r['student_type']) ?></td>
                                 <td><?= enroll_e(trim($r['subjectID']).' · '.($r['subject_name'] ?? '')) ?></td>
-                                <td><?= enroll_badge($r['status']) ?><?= $r['rejection_remarks'] ? '<small>'.enroll_e($r['rejection_remarks']).'</small>' : '' ?></td>
+                                <td><?= enroll_badge($r['display_status']) ?><?= $r['rejection_remarks'] ? '<small>'.enroll_e($r['rejection_remarks']).'</small>' : '' ?></td>
                             </tr><?php endforeach; ?>
-                            <?php if (!$logic->deanStudents): ?><tr><td colspan="5">No student enrollment records.</td></tr><?php endif; ?>
+                            <tr id="dean-student-empty" <?= $logic->deanStudents ? 'hidden' : '' ?>><td colspan="5">No student enrollment records match the selected filters.</td></tr>
                             </tbody></table></div>
                         </div>
                     <?php elseif ($deanTab === 'subjects'): ?>
@@ -784,6 +785,7 @@ $csrf = $logic->csrf();
                             const table = document.getElementById(control.dataset.target);
                             if (!table) return;
                             const filters = controls.filter(c => c.dataset.target === control.dataset.target);
+                            let visible = 0;
                             table.querySelectorAll('tbody tr[data-status]').forEach(row => {
                                 const show = filters.every(f => {
                                     const value = f.value.trim().toLowerCase();
@@ -794,7 +796,10 @@ $csrf = $logic->csrf();
                                     return field === 'search' ? normalized.includes(value) : normalized === value;
                                 });
                                 row.hidden = !show;
+                                if (show) visible++;
                             });
+                            const empty = table.querySelector('#dean-student-empty');
+                            if (empty) empty.hidden = visible !== 0;
                         };
                         control.addEventListener(control.tagName === 'INPUT' ? 'input' : 'change', update);
                     });
@@ -1417,7 +1422,8 @@ body[data-page="ENROLLMENT"] .enrollment-page{--en-bg:rgba(80,38,108,.35);--en-p
 .enrollment-page .enroll-table tbody tr:hover td{background:#ffffff08;}
 .enrollment-page .enroll-table tbody tr.is-editing td{background:#aa83ed20;}
 .enrollment-page .enrollment-result,.enrollment-page .status-badge,.enrollment-page .locked-badge{display:inline-flex;align-items:center;justify-content:center;border:1px solid #ffffff20;border-radius:6px;padding:4px 9px;font-size:11px;font-weight:650;line-height:1.2;white-space:nowrap;background:#ffffff10;color:#e3d9ef;}
-.enrollment-page .result-pending{background:#f5c46b18;color:#f8d599;border-color:#f5c46b33;}
+.enrollment-page .dean-grade-note{font-size:12px;color:var(--en-muted,#e3d9ef);margin:0 0 12px;}
+.enrollment-page .result-pending,.enrollment-page .result-awaiting_grade_verification{background:#f5c46b18;color:#f8d599;border-color:#f5c46b33;}
 .enrollment-page .result-enrolled,.enrollment-page .result-passed,.enrollment-page .status-badge:not(.closed){background:#51d4ae19;color:#a2efd7;border-color:#51d4ae33;}
 .enrollment-page .result-credited{background:#88b5ff1c;color:#b9d4ff;border-color:#88b5ff40;}
 .enrollment-page .result-failed,.enrollment-page .result-rejected,.enrollment-page .status-badge.closed{background:#f18da51a;color:#ffc3d0;border-color:#f18da533;}

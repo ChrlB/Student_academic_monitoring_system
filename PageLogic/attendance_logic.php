@@ -7,6 +7,7 @@ if (!defined('ATT_DEBUG')) define('ATT_DEBUG', false);
 if (ATT_DEBUG) { ini_set('display_errors', 1); error_reporting(E_ALL); }
 
 const ATT_GRACE_MIN = 15;
+const ATT_TIMEOUT_ELAPSED_RATIO = 0.60;
 const ATT_EVENT_STATUSES = ['ACTIVE', 'INACTIVE', 'FINISHED', 'RESCHEDULE', 'PENDING'];
 
 # Escape output strings safely for HTML rendering
@@ -21,6 +22,9 @@ global $db_connection;
 
 # Send a JSON response and terminate execution immediately
 function att_json(array $payload): void {
+  while (ob_get_level() > 0) {
+    ob_end_clean();
+  }
   header('Content-Type: application/json');
   echo json_encode($payload);
   exit;
@@ -52,6 +56,56 @@ function att_role_group(string $role): string {
   if (preg_match('/coordinator|dean|registrar/', $r)) return 'manager';
   if (preg_match('/prof|faculty|instructor|teacher/', $r))  return 'faculty';
   return 'student';
+}
+
+# Check whether at least $ratio (e.g. 0.60) of [start, end] duration has elapsed
+function att_has_elapsed_ratio(PDO $db, $startVal, $endVal, float $ratio = ATT_TIMEOUT_ELAPSED_RATIO): bool {
+  if (empty($startVal) || empty($endVal)) return false;
+  $st = $db->prepare("
+    SELECT
+      TIMESTAMPDIFF(SECOND, ?, ?) AS total_sec,
+      TIMESTAMPDIFF(SECOND, ?, NOW()) AS elapsed_sec
+  ");
+  $st->execute([$startVal, $endVal, $startVal]);
+  $row = $st->fetch(PDO::FETCH_ASSOC);
+  if (!$row) return false;
+
+  $totalSec   = (int)($row['total_sec'] ?? 0);
+  $elapsedSec = (int)($row['elapsed_sec'] ?? 0);
+  if ($totalSec <= 0) return true;
+
+  return $elapsedSec >= ($totalSec * $ratio);
+}
+
+# Time-out window is open only once at least 60% of [start, end] duration has elapsed
+function att_record_timeout(PDO $db, int $attendanceID, $startVal, $endVal, string $who, float $ratio = ATT_TIMEOUT_ELAPSED_RATIO): array {
+  if (!att_has_elapsed_ratio($db, $startVal, $endVal, $ratio)) {
+    $msg = 'Time-out window is not open yet: at least 60% of the event duration must elapse first.';
+    try {
+      $startDt  = new DateTime((string)$startVal);
+      $endDt    = new DateTime((string)$endVal);
+      $totalSec = max(0, $endDt->getTimestamp() - $startDt->getTimestamp());
+      $openSec  = (int)ceil($totalSec * $ratio);
+      $openDt   = (clone $startDt)->modify("+{$openSec} seconds");
+      $msg      = 'Event Time-Out window: (' . $openDt->format('g:i A') . ')';
+    } catch (Throwable $e) {
+      // keep fallback message if date parsing fails
+    }
+
+    return [
+      'status'  => 'error',
+      'message' => $msg,
+    ];
+  }
+
+  $db->prepare("UPDATE attendance SET timeout = NOW() WHERE attendanceID = ? AND timeout IS NULL")
+     ->execute([$attendanceID]);
+
+  return [
+    'status'  => 'success',
+    'message' => "Time-out recorded for $who.",
+    'type'    => 'timeout',
+  ];
 }
 
 # Sync ACTIVE event statuses based on current time (past end -> FINISHED)
@@ -88,7 +142,14 @@ $validDepartments = array_values(array_unique(array_map(
 $attRole       = strtolower(trim($_SESSION['role'] ?? 'student'));
 $attUserRaw    = trim((string)($_SESSION['userID'] ?? ''));
 $attGroup      = att_role_group($attRole);
-$attFacultyID  = ($attGroup !== 'student') ? (int)($_SESSION['real_userID'] ?? substr($attUserRaw, 5)) : 0;
+$attFacultyID = 0;
+if ($attGroup !== 'student') {
+  if (isset($_SESSION['real_userID']) && is_numeric($_SESSION['real_userID'])) {
+    $attFacultyID = (int)$_SESSION['real_userID'];
+  } elseif (preg_match('/(\d+)$/', $attUserRaw, $idMatch)) {
+    $attFacultyID = (int)$idMatch[1];
+  }
+}
 $attStudentKey = ($attGroup === 'student' && preg_match('/^\d{9}$/', $attUserRaw)) ? $attUserRaw : null;
 
 $attPos = 'student';
@@ -115,11 +176,10 @@ if ($attGroup !== 'student' && $attFacultyID > 0) {
 }
 
 $isAuthorizedDepartment = ($attGroup === 'student') || ($attMyDept !== '' && in_array($attMyDept, $validDepartments, true));
-$attCanEdit = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($attPos, ['coordinator', 'dean'], true);   # only coordinator (own program) and dean (own department) manage events
+$attCanEdit = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($attPos, ['coordinator', 'dean'], true);
 $attCanScan = ($attGroup !== 'student') && $isAuthorizedDepartment && in_array($attPos, ['coordinator', 'faculty', 'dean'], true);
 $attIsDean  = ($attPos === 'dean');
 $attScoped  = ($attPos === 'coordinator');
-# Dean and registrar only manage their own department, and faculty is department-scoped
 $attDeptScoped = (in_array($attPos, ['dean', 'registrar'], true) && (string)$attMyDept !== '') || $attPos === 'faculty';
 $evpage     = ($attGroup !== 'student' && (!empty($_GET['events']) || !empty($_POST['events'])));
 if ($evpage) $_SESSION["page"] = "EVENTS | " . $attLabel;
@@ -202,7 +262,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
     exit;
   }
 
-  # Process QR/ID scan for time-in / time-out with department, event, and window checks
+  # Process QR/ID scan for time-in / time-out with event restriction checked before scope
   if ($attGroup !== 'student' && $act === 'scan') {
     att_sync_elapsed_events($db_connection);
     if (!$attCanScan || !$isAuthorizedDepartment) {
@@ -231,15 +291,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
       $who = att_title($stuRow['first_name'] . ' ' . $stuRow['last_name']);
       $studentProgram = strtoupper(trim((string)($stuRow['program'] ?? '')));
       $studentDept = strtoupper(trim((string)($stuRow['department'] ?? '')));
-      if ($attDeptScoped && $studentDept !== strtoupper(trim((string)$attMyDept))) {
-        att_json(['status' => 'error', 'message' => "$who is not in your department."]);
-      }
-      if ($attScoped && $studentProgram !== strtoupper(trim((string)$attMyProgram))) {
-        att_json(['status' => 'error', 'message' => "$who is not in your assigned program."]);
-      }
 
       $ev = $db_connection->prepare("
-        SELECT eventID, status, program, department,
+        SELECT eventID, status, program, department, datetime_Start, datetime_End,
                (NOW() BETWEEN datetime_Start - INTERVAL 30 MINUTE AND COALESCE(datetime_End, datetime_Start + INTERVAL 12 HOUR)) AS in_window
         FROM events WHERE eventID = ? OR eventName = ?
         ORDER BY (eventID = ?) DESC,
@@ -263,6 +317,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
         att_json(['status' => 'error', 'message' => "$who belongs to department '$studentDept', but this event is restricted to department '$eventDept'."]);
       }
 
+      if ($attDeptScoped && $studentDept !== strtoupper(trim((string)$attMyDept))) {
+        att_json(['status' => 'error', 'message' => "$who is not in your department."]);
+      }
+      if ($attScoped && $studentProgram !== strtoupper(trim((string)$attMyProgram))) {
+        att_json(['status' => 'error', 'message' => "$who is not in your assigned program."]);
+      }
+
       $chk = $db_connection->prepare("
         SELECT attendanceID, timeout, TIMESTAMPDIFF(SECOND, timein, NOW()) AS secs
         FROM attendance WHERE studentID = ? AND eventID = ? ORDER BY attendanceID DESC LIMIT 1
@@ -279,9 +340,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $act !== '') {
         if ((int)$row['secs'] < 60) {
           att_json(['status' => 'info', 'message' => "$who just timed in. Scan again later to time out."]);
         }
-        $db_connection->prepare("UPDATE attendance SET timeout = NOW() WHERE attendanceID = ?")
-                      ->execute([(int)$row['attendanceID']]);
-        att_json(['status' => 'success', 'message' => "Time-out recorded for $who.", 'type' => 'timeout']);
+        att_json(att_record_timeout(
+          $db_connection,
+          (int)$row['attendanceID'],
+          $event['datetime_Start'],
+          $event['datetime_End'],
+          $who
+        ));
       }
       att_json(['status' => 'info', 'message' => "$who has already completed time-in and time-out for this event."]);
     } catch (Throwable $e) {
@@ -418,12 +483,10 @@ function att_student_scope_filters(PDO $db, array $stu): array {
     $evDept = strtoupper(trim((string)($r['department'] ?? '')));
     $evProg = strtoupper(trim((string)($r['program'] ?? '')));
 
-    # 1. Department check first
     if ($evDept !== '') {
       if ($dept === '' || $evDept !== $dept) continue;
     }
 
-    # 2. Program check second (if program is specified on the event, it must match student's program)
     if ($evProg !== '') {
       if ($prog === '' || $evProg !== $prog) continue;
     }
@@ -674,8 +737,6 @@ function att_handle_event_action(PDO $db, string $act): void {
     $remark = mb_substr(trim((string)($_POST['remark'] ?? '')), 0, 500);
     $remarkVal = null;
     $prog = strtoupper(trim((string)($_POST['program'] ?? '')));
-    # The dialog locks name/program for non-deans when editing; disabled fields are never submitted,
-    # so keep the stored values (otherwise every edit fails with "Enter the event name.")
     if (!$isDean && $act === 'edit_event' && $existing) {
       $name = (string)$existing['eventName'];
       $prog = strtoupper(trim((string)($existing['program'] ?? '')));
@@ -764,7 +825,6 @@ if ($course && !$dept) {
 $view  = ($getStr('view') === 'list') ? 'list' : 'grid';
 $sid   = $getStr('student');
 $stu   = ($sid !== '' && isset($students[$sid])) ? $students[$sid] : null;
-# Event filter lists only events that apply to this student's department/program (not every event in the system)
 if ($stu) $ATT_EVENT_NAMES = att_student_scope_filters($db_connection, $stu)['events'];
 $event = in_array($getStr('event'), $ATT_EVENT_NAMES, true) ? $getStr('event') : null;
 $yr    = (int)($_GET['year'] ?? 0);
@@ -871,9 +931,9 @@ if (isset($summary)) {
 
 foreach ([
   'validDepartments', 'attPos', 'attCanEdit', 'attScoped', 'attMyProgram', 'attMyDept',
-  'evpage', 'attCanScan', 'attIsDean', 'attFacultyID', 'q', 'dept', 'course', 'view',
-  'stu', 'event', 'year', 'sa_event', 'sa_year', 'sa_events', 'sa_years',
-  'currentActiveEvent', 'ATT_OPEN_EVENTS',
+  'evpage', 'attCanScan', 'attIsDean', 'attDeptScoped', 'isAuthorizedDepartment',
+  'attFacultyID', 'q', 'dept', 'course', 'view', 'stu', 'event', 'year',
+  'sa_event', 'sa_year', 'sa_events', 'sa_years', 'currentActiveEvent', 'ATT_OPEN_EVENTS',
 ] as $gKey) {
   if (isset($$gKey)) $GLOBALS[$gKey] = $$gKey;
 }
