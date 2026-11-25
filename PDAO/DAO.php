@@ -1289,7 +1289,7 @@ $userDAO->prepareStatement("updateStudentProfileFull",
                 )
             )
         GROUP BY ST.studentID, ST.date_created, ST.last_name, ST.first_name,
-            ST.middle_name, ST.program, ST.block, EP.acad_year, EP.sem,FC.remarks,
+            ST.middle_name, ST.program, ST.block, EP.acad_year, EP.sem,
             FC.date_cleared, FC.`status`,FC.faculty_clearanceID,EP.enrollmentID,ST.studentID
         ORDER BY EP.acad_year DESC, EP.sem DESC, student_name, ST.studentID,
             FC.date_cleared;
