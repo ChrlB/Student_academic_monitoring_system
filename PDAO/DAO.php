@@ -10,7 +10,8 @@ $options = [
   PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci",
   PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true
 ];
-$db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root", "John_Chrl@2006;", $options);
+$db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root", "", $options);
+$db_connection->exec("SET time_zone = '+08:00'");
 $userDAO = new PHPDAO($db_connection);
 $clearanceDAO = new PHPDAO($db_connection);
 
@@ -1289,7 +1290,7 @@ $userDAO->prepareStatement("updateStudentProfileFull",
                 )
             )
         GROUP BY ST.studentID, ST.date_created, ST.last_name, ST.first_name,
-            ST.middle_name, ST.program, ST.block, EP.acad_year, EP.sem,
+            ST.middle_name, ST.program, ST.block, EP.acad_year, EP.sem,FC.remarks,
             FC.date_cleared, FC.`status`,FC.faculty_clearanceID,EP.enrollmentID,ST.studentID
         ORDER BY EP.acad_year DESC, EP.sem DESC, student_name, ST.studentID,
             FC.date_cleared;

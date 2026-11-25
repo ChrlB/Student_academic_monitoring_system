@@ -1,4 +1,5 @@
 <?php
+date_default_timezone_set('Asia/Manila');
 # Start session if none is active yet
 if (session_status() === PHP_SESSION_NONE) session_start();
 
