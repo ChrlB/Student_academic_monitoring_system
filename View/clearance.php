@@ -1755,9 +1755,10 @@ require_once __DIR__ . "/../PageLogic/clearance_logic.php";
                           </div>
                           <div>
                             <hr>
-                          </div>
+                          </div>        
 
                           <div class="column subject_uploaded_file_container" style="gap:20px; align-items:center" >
+                            <?php // var_dump(getUploadedFacultyRequirements($Facadyear,$_SESSION['real_userID'],  $_GET['studentID'])) ?>
                             <?php foreach(getUploadedFacultyRequirements($Facadyear,$_SESSION['real_userID'],  $_GET['studentID']) as $requirement): if ($requirement["file_name"] === null) continue;?>
                               <div  class="row uploaded_file_container"  >
                                 <div class="row" style="align-items:center;">

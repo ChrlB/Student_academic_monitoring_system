@@ -160,14 +160,17 @@ class SyllabusLogic
             $where = ' WHERE ss.facultyID = :fid';
             $params[':fid'] = $this->userID;
         } elseif ($this->isStudent) {
-            $join  = ' JOIN students st ON st.studentID = :sid AND st.program = ep.program AND st.block = ss.block';
+            // Same class-matching rule as the enrollment module: the schedule the student
+            // picked, or (when none was picked) the schedule of the student's own block.
             $where = " WHERE EXISTS (SELECT 1 FROM enrolled_subjects es
-                                      WHERE es.studentID = :sid2
+                                       JOIN students st ON st.studentID = es.studentID
+                                      WHERE es.studentID = :sid
                                         AND es.enrollmentID = ss.enrollmentID
-                                        AND es.subjectID = ss.subjectID
-                                        AND es.status = 'approved')";
-            $params[':sid']  = $this->userID;
-            $params[':sid2'] = $this->userID;
+                                        AND TRIM(es.subjectID) = TRIM(ss.subjectID)
+                                        AND (ss.schedID = es.selected_schedID
+                                             OR (es.selected_schedID IS NULL AND ss.block = st.block))
+                                        AND es.status IN ('approved','enrolled','passed','failed'))";
+            $params[':sid'] = $this->userID;
         }
 
         $rows = $this->all(
@@ -197,20 +200,19 @@ class SyllabusLogic
         return $classes[0] ?? null;
     }
 
-    /** Students enrolled (approved) in a class. */
+    /** Students enrolled (approved/enrolled, or already graded) in a class. */
     public function roster(int $schedID): array
     {
         $rows = $this->all(
-            "SELECT st.studentID, st.first_name, st.middle_name, st.last_name
+            "SELECT DISTINCT st.studentID, st.first_name, st.middle_name, st.last_name
                FROM subject_schedules ss
-               JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
-               JOIN students st ON st.program = ep.program AND st.block = ss.block
+               JOIN enrolled_subjects es ON es.enrollmentID = ss.enrollmentID
+                                        AND TRIM(es.subjectID) = TRIM(ss.subjectID)
+               JOIN students st ON st.studentID = es.studentID
               WHERE ss.schedID = :s
-                AND EXISTS (SELECT 1 FROM enrolled_subjects es
-                             WHERE es.studentID = st.studentID
-                               AND es.enrollmentID = ss.enrollmentID
-                               AND es.subjectID = ss.subjectID
-                               AND es.status = 'approved')
+                AND (ss.schedID = es.selected_schedID
+                     OR (es.selected_schedID IS NULL AND ss.block = st.block))
+                AND es.status IN ('approved','enrolled','passed','failed')
               ORDER BY st.last_name, st.first_name",
             [':s' => $schedID]
         );
