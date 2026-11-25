@@ -98,6 +98,25 @@ class GradesLogic
         return ctype_digit($raw) ? (int)$raw : 0;
     }
 
+    private function currentCoordinatorProgram(): string
+    {
+        $facultyID = (int)$this->currentUserID();
+        if ($facultyID <= 0) {
+            return '';
+        }
+
+        $rows = $this->all(
+            "SELECT TRIM(program) AS program
+             FROM faculty
+             WHERE facultyID = :facultyID
+               AND LOWER(TRIM(role)) = 'program coordinator'
+             LIMIT 1",
+            [':facultyID' => $facultyID]
+        );
+
+        return trim((string)($rows[0]['program'] ?? ''));
+    }
+
     private function currentStudentID(): int
     {
         if (($_SESSION['role'] ?? '') !== 'student') {
@@ -901,11 +920,11 @@ class GradesLogic
         $where = "gs.status = 'pending_coordinator'";
 
         if ($role === 'program coordinator') {
-            $program = trim((string)($_SESSION['program'] ?? ''));
+            $program = $this->currentCoordinatorProgram();
             if ($program === '') {
                 return [];
             }
-            $where .= " AND gs.program = :program";
+            $where .= " AND TRIM(gs.program) = :program";
             $params[':program'] = $program;
         }
 
@@ -1003,11 +1022,11 @@ class GradesLogic
         $params = [':submissionID' => $submissionID];
         $programFilter = '';
         if ($role === 'program coordinator') {
-            $program = trim((string)($_SESSION['program'] ?? ''));
+            $program = $this->currentCoordinatorProgram();
             if ($program === '') {
                 throw new RuntimeException('The coordinator account is not assigned to a program.');
             }
-            $programFilter = ' AND gs.program = :program';
+            $programFilter = ' AND TRIM(gs.program) = :program';
             $params[':program'] = $program;
         }
 
@@ -1345,8 +1364,8 @@ class GradesLogic
 
         $submission = $this->submissionForReview($submissionID, 'pending_coordinator');
         if ($role === 'program coordinator') {
-            $program = trim((string)($_SESSION['program'] ?? ''));
-            if ($program === '' || $submission['program'] !== $program) {
+            $program = $this->currentCoordinatorProgram();
+            if ($program === '' || strcasecmp(trim((string)$submission['program']), $program) !== 0) {
                 throw new RuntimeException('This grade submission belongs to another program.');
             }
         }
@@ -1499,7 +1518,7 @@ class GradesLogic
                     ':enrollmentID' => $studentEnrollmentID,
                     ':subjectID' => $submission['subjectID'],
                 ]);
-                $this->pdo->prepare("INSERT INTO student_curriculum(studentID,program,subjectID,curriculum_year,semester,units) SELECT st.studentID,p.program,TRIM(p.subjectID),p.year,p.sem_available,p.unit FROM students st JOIN prospectus p ON p.program=st.program WHERE st.studentID=? AND TRIM(p.subjectID)=TRIM(?) ON DUPLICATE KEY UPDATE units=VALUES(units)")->execute([$matched['studentID'], $submission['subjectID']]);
+                $this->pdo->prepare("INSERT INTO student_curriculum(studentID,program,subjectID,curriculum_year,semester,units) SELECT st.studentID,p.program,TRIM(p.subjectID),p.year,p.sem_available,p.unit FROM students st JOIN syllabus p ON p.program=st.program WHERE st.studentID=? AND TRIM(p.subjectID)=TRIM(?) ON DUPLICATE KEY UPDATE units=VALUES(units)")->execute([$matched['studentID'], $submission['subjectID']]);
                 $this->pdo->prepare("UPDATE student_curriculum sc SET status = CASE WHEN EXISTS (SELECT 1 FROM enrolled_subjects es WHERE es.studentID=sc.studentID AND TRIM(es.subjectID)=TRIM(sc.subjectID) AND es.status='passed') OR EXISTS (SELECT 1 FROM subject_credit_requests cr WHERE cr.studentID=sc.studentID AND TRIM(cr.subjectID)=TRIM(sc.subjectID) AND cr.status='credited') THEN 'finished' ELSE 'not_yet_taken' END WHERE sc.studentID=? AND TRIM(sc.subjectID)=TRIM(?)")->execute([$matched['studentID'], $submission['subjectID']]);
             }
 

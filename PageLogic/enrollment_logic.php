@@ -290,7 +290,7 @@ class EnrollmentLogic
         $sync = $this->pdo->prepare("
             INSERT INTO student_curriculum (studentID, program, subjectID, curriculum_year, semester, units)
             SELECT ?, sy.program, TRIM(sy.subjectID), sy.year, sy.sem_available, sy.unit
-            FROM prospectus sy
+            FROM syllabus sy
             WHERE sy.program = ?
             ON DUPLICATE KEY UPDATE
                 program = VALUES(program),
@@ -343,20 +343,11 @@ class EnrollmentLogic
         // program's current year level and semester. These remain pending so
         // the Coordinator can still review the enrollment normally.
         if (strtolower(trim((string)$this->studentType)) === 'regular') {
-            $this->pdo->exec("CREATE TABLE IF NOT EXISTS regular_enrollment_initialization (
-                enrollmentID INT NOT NULL,
-                studentID INT UNSIGNED NOT NULL,
-                initialized_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (enrollmentID, studentID)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-            $claim = $this->pdo->prepare("INSERT IGNORE INTO regular_enrollment_initialization (enrollmentID, studentID) VALUES (?, ?)");
-            $claim->execute([$enrollmentID, $this->numericID]);
-            if ($claim->rowCount() === 1) {
             $autoAdd = $this->pdo->prepare("
                 INSERT INTO enrolled_subjects
                     (enrollmentID, studentID, subjectID, selected_schedID, status)
                 SELECT ?, ?, TRIM(sy.subjectID), NULL, 'pending'
-                FROM prospectus sy
+                FROM syllabus sy
                 WHERE sy.program = ?
                   AND sy.year = ?
                   AND sy.sem_available = ?
@@ -383,7 +374,6 @@ class EnrollmentLogic
                 $enrollmentID,
                 $this->numericID
             ]);
-            }
         }
 
         $stmt = $this->pdo->prepare("
@@ -481,8 +471,12 @@ class EnrollmentLogic
                 sy.year,
                 COALESCE(sc.status, 'not_yet_taken') AS curriculum_status,
                 CASE WHEN sc.status = 'finished' THEN 1 ELSE 0 END AS finished,
-                COALESCE(sy.prerequisite, '') AS prerequisite
-            FROM prospectus sy
+                COALESCE((
+                    SELECT GROUP_CONCAT(TRIM(sp.prerequisite) ORDER BY TRIM(sp.prerequisite) SEPARATOR ', ')
+                    FROM subject_prerequisite sp
+                    WHERE TRIM(sp.subjectID) = TRIM(sy.subjectID)
+                ), '') AS prerequisite
+            FROM syllabus sy
             JOIN subjects s
                 ON TRIM(s.subjectID) = TRIM(sy.subjectID)
             LEFT JOIN student_curriculum sc
@@ -1775,7 +1769,7 @@ class EnrollmentLogic
         try {
             $stmt = $this->pdo->prepare("
                 SELECT unit
-                FROM prospectus
+                FROM syllabus
                 WHERE TRIM(subjectID) = TRIM(?)
                   AND program = ?
                   AND sem_available = ?
