@@ -1036,7 +1036,7 @@ header a.att-back svg {
 }
 .att .ev-row {
   display: grid;
-  grid-template-columns: 2.4fr 1fr 1.3fr 1fr 1fr 1fr;
+  grid-template-columns: 2.1fr 1fr 1.2fr 0.9fr 0.9fr 1.3fr 1.7fr;
   align-items: center;
   gap: calc(0.6 * var(--u));
   background: #e9e1ed;
@@ -1206,6 +1206,14 @@ header a.att-back svg {
   background: #3a3a3a;
   color: #ff6b6b;
   margin-right: auto;
+}
+.att .ev-b.force {
+  background: #3a3a3a;
+  color: #ffb454;
+  margin-right: auto;
+}
+.att .ev-b.del:has(+ .ev-b.force:not([hidden])) {
+  margin-right: 0;
 }
 .att .ev-b.rej {
   background: #8b1a1a;
@@ -1419,4 +1427,227 @@ header a.att-back svg {
 #ev-remark[readonly] {
   opacity: 0.85;
   resize: none;
+}
+
+/* ---------- event logs (per-event attendance table) ---------- */
+.att .log-count {
+  margin-left: auto;
+  align-self: flex-start;
+  font-size: calc(1.1 * var(--u));
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  opacity: 0.9;
+}
+.att .rec.logs thead th[aria-sort] {
+  padding: 0;
+}
+.att .sort-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(0.5 * var(--u));
+  padding: calc(0.9 * var(--u)) calc(0.8 * var(--u));
+  border-radius: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: center;
+  transition: background 0.12s;
+}
+.att .sort-btn:hover,
+.att .sort-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+  outline: 0;
+}
+.att .sort-ind {
+  display: inline-block;
+  width: 1.2em;
+  text-align: center;
+  font-size: 0.8em;
+}
+.att .sort-ind::after {
+  content: '\2195';
+  opacity: 0.45;
+}
+.att th[aria-sort='ascending'] .sort-ind::after {
+  content: '\25B2';
+  opacity: 1;
+}
+.att th[aria-sort='descending'] .sort-ind::after {
+  content: '\25BC';
+  opacity: 1;
+}
+
+/* ---------- print button + printable event logs ---------- */
+.att .print-only {
+  display: none;
+}
+.att .log-print-btn {
+  margin-left: auto;
+  align-self: flex-start;
+}
+.att .log-print-btn svg {
+  width: calc(1.2 * var(--u));
+  height: calc(1.2 * var(--u));
+}
+#log-print + .log-count {
+  margin-left: calc(1.2 * var(--u));
+}
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    background: #fff !important;
+  }
+  /* attendance.js tags the logs section's ancestors (print-path) and their other children (print-hide) */
+  .print-hide {
+    display: none !important;
+  }
+  .print-path {
+    display: block !important;
+    position: static !important;
+    flex: none !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  .att {
+    --u: 10px !important;
+    color: #000 !important;
+  }
+  .att .log-print-btn {
+    display: none !important;
+  }
+  .att .print-only {
+    display: block;
+    margin: 2px 0 8px;
+    font-size: 10px;
+    color: #333;
+  }
+  .att .detail-head {
+    padding: 0 0 4px;
+  }
+  .att .detail-title,
+  .att .log-count {
+    color: #000;
+    opacity: 1;
+  }
+  .att .rec-box {
+    display: block;
+    background: #fff;
+    border: 0;
+    border-radius: 0;
+    padding: 0 !important;
+    overflow: visible;
+  }
+  .att .rec-scroll {
+    overflow: visible;
+    padding: 0;
+  }
+  .att .rec {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .att .rec thead {
+    display: table-header-group;
+  }
+  .att .rec tr {
+    break-inside: avoid;
+  }
+  .att .rec thead th {
+    position: static;
+    background: #e6e6e6 !important;
+    color: #000;
+    padding: 0;
+    border: 1px solid #000 !important;
+    border-radius: 0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .att .rec tbody td {
+    background: #fff !important;
+    color: #000;
+    padding: 5px 8px;
+    border: 1px solid #000 !important;
+    border-radius: 0 !important;
+  }
+  .att .sort-btn {
+    color: #000;
+    padding: 6px 8px;
+  }
+  .att .sort-ind {
+    display: none;
+  }
+  .att .empty {
+    color: #000;
+  }
+}
+
+/* print: student attendance record - the summary cards and the Events / Year filters are not printed */
+@media print {
+  .att .summary,
+  .att .detail-toolbar {
+    display: none !important;
+  }
+}
+
+/* ---------- attendance % on event rows, Logs link beside the status, rate line on the logs panel ---------- */
+.att .ev-end-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(0.7 * var(--u));
+}
+.att .ev-logs-link {
+  padding: calc(0.25 * var(--u)) calc(0.9 * var(--u));
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.85em;
+  font-weight: 800;
+  text-decoration: none;
+  transition: filter 0.12s;
+}
+.att .ev-logs-link:hover,
+.att .ev-logs-link:focus-visible {
+  filter: brightness(1.15);
+  outline: 0;
+}
+.att .log-rate {
+  margin: 0 0 calc(0.8 * var(--u));
+  padding: 0 calc(0.4 * var(--u));
+  font-size: calc(1.1 * var(--u));
+  font-weight: 600;
+}
+@media print {
+  .att .log-rate {
+    margin: 2px 0 8px;
+    padding: 0;
+    font-size: 11px;
+    color: #000;
+  }
+  .att .ev-logs-link {
+    display: none !important;
+  }
+}
+
+/* Print button sits at the right end of the Course / Year filter row on the logs page */
+.att .detail-toolbar .log-print-btn {
+  margin-left: auto;
+  align-self: center;
 }
