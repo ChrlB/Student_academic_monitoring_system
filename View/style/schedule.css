@@ -382,6 +382,252 @@
     margin-left: auto;
 }
 
+/* ---------- Availability, weekly hours, coordinator search ---------- */
+
+.sched-search__hint {
+    margin: 8px 0 0;
+}
+
+.sched-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0 0;
+}
+
+.sched-tab {
+    padding: 6px 16px;
+    border: 1px solid var(--sp-line-soft);
+    border-radius: 999px;
+    background: var(--sp-glass);
+    color: var(--sp-ink);
+    font-size: .88rem;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.sched-tab:hover {
+    background: var(--sp-glass-hi);
+}
+
+.sched-tab.is-active {
+    border-color: var(--sp-line);
+    background: var(--sp-accent);
+}
+
+.sched-tab:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 2px;
+}
+
+.sched-tabs--days .sched-tab {
+    padding: 6px 12px;
+}
+
+.av-free-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0 0;
+}
+
+.av-wrap {
+    margin-top: 16px;
+    overflow-x: auto;
+    border: 1px solid var(--sp-line-soft);
+    border-radius: 10px;
+}
+
+.av-grid {
+    width: 100%;
+    min-width: 1100px;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: .78rem;
+}
+
+.av-grid th,
+.av-grid td {
+    height: 34px;
+    border: 1px solid rgba(255, 255, 255, .12);
+    padding: 0;
+}
+
+.av-grid thead th {
+    background: var(--sp-head);
+    font-weight: 600;
+    text-align: left;
+    padding: 6px 4px;
+}
+
+.av-grid .av-name {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 130px;
+    padding: 4px 10px;
+    background: rgba(60, 24, 70, .96);
+    text-align: left;
+}
+
+.av-name small {
+    display: block;
+    color: var(--sp-err);
+    font-size: .7rem;
+    font-weight: 400;
+}
+
+.av-free {
+    background: rgba(40, 120, 70, .18);
+}
+
+.av-lunch {
+    background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .08) 4px, transparent 4px, transparent 8px);
+}
+
+.av-off {
+    background: rgba(160, 30, 60, .15);
+}
+
+.av-busy {
+    padding: 0 6px;
+    background: rgba(170, 30, 60, .55);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.av-busy--alt {
+    background: rgba(190, 130, 20, .55);
+}
+
+.av-busy span {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.av-grid tr.is-blocked .av-name {
+    opacity: .75;
+}
+
+.av-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin: 12px 0 0;
+    padding: 0;
+    color: var(--sp-muted);
+    font-size: .82rem;
+    list-style: none;
+}
+
+.av-key {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    margin-right: 6px;
+    border: 1px solid var(--sp-line-soft);
+    border-radius: 3px;
+    vertical-align: -2px;
+}
+
+.av-key--free {
+    background: rgba(40, 120, 70, .4);
+}
+
+.av-key--busy {
+    background: rgba(170, 30, 60, .7);
+}
+
+.av-key--alt {
+    background: rgba(190, 130, 20, .7);
+}
+
+.av-key--lunch {
+    background: repeating-linear-gradient(45deg, rgba(255, 255, 255, .3), rgba(255, 255, 255, .3) 3px, transparent 3px, transparent 6px);
+}
+
+.sched-hours {
+    margin: 14px 0 0;
+    padding: 14px 16px;
+    border: 1px solid var(--sp-line-soft);
+    border-radius: 10px;
+    background: var(--sp-glass);
+}
+
+.sched-hours--inline {
+    margin-bottom: 4px;
+}
+
+.sched-hours__title {
+    margin: 0 0 4px;
+    font-size: 1rem;
+}
+
+.hours-list {
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.hours-row {
+    display: grid;
+    grid-template-columns: minmax(150px, 1.2fr) minmax(120px, 2fr) auto auto;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+}
+
+.hours-row__name {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+.hours-row__days {
+    flex-basis: 100%;
+    color: var(--sp-muted);
+    font-size: .78rem;
+}
+
+.hours-row__val {
+    color: var(--sp-muted);
+    font-size: .85rem;
+    white-space: nowrap;
+}
+
+.hours-bar {
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, .15);
+}
+
+.hours-bar > span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: rgba(190, 130, 20, .9);
+}
+
+.hours-bar > .is-full {
+    background: rgba(70, 180, 110, .95);
+}
+
+.hours-bar > .is-over {
+    background: rgba(200, 50, 80, .95);
+}
+
+@media (max-width: 640px) {
+    .hours-row {
+        grid-template-columns: 1fr;
+        gap: 4px;
+    }
+}
+
 /* ---------- Tags ---------- */
 
 .sp-tag,

@@ -26,6 +26,15 @@ class ScheduleLogic
     const FORMATS = ['onsite', 'blended_odd', 'blended_even'];
     const STATUSES = ['draft' => 'Draft', 'assigned' => 'Assigned', 'deployed' => 'Deployed'];
 
+    // Scheduling rules
+    const OPEN_TIME    = '07:00:00';   // earliest start
+    const CLOSE_TIME   = '21:00:00';   // latest end
+    const LUNCH_START  = '12:00:00';   // no class during lunch
+    const LUNCH_END    = '13:00:00';
+    const REST_MINUTES = 30;           // minimum gap between two classes of the same instructor
+    // Hours per week each subject of a block must be scheduled for (100% = the number below).
+    const WEEKLY_HOURS = ['LEC' => 4, 'GEC' => 4, 'LAB' => 4];
+
     private $pdo;
     public $role;
     public $group;    // manager | faculty | student
@@ -107,6 +116,12 @@ class ScheduleLogic
     public function isCoordinator()
     {
         return strpos($this->role, 'coordinator') !== false;
+    }
+
+    // A coordinator who types a search looks at the whole assigned program, not only their own classes.
+    public function isMonitoring($search)
+    {
+        return $this->isCoordinator() && trim((string)$search) !== '';
     }
 
     public function assignedProgram()
@@ -248,6 +263,30 @@ class ScheduleLogic
         return ucwords(strtolower(trim((string)$s)));
     }
 
+    // Time helpers
+
+    public static function minutes($t)
+    {
+        $p = explode(':', (string)$t);
+        return ((int)$p[0]) * 60 + (int)($p[1] ?? 0);
+    }
+
+    public static function fromMinutes($m)
+    {
+        $m = max(0, min(23 * 60 + 59, (int)$m));
+        return sprintf('%02d:%02d:00', intdiv($m, 60), $m % 60);
+    }
+
+    public static function fmtHours($h)
+    {
+        return rtrim(rtrim(number_format((float)$h, 2, '.', ''), '0'), '.');
+    }
+
+    public static function requiredHours($type)
+    {
+        return self::WEEKLY_HOURS[$type] ?? 4;
+    }
+
     // Lookups for dropdowns
 
     private function all($sql, array $params = [])
@@ -360,7 +399,7 @@ class ScheduleLogic
 
     public function rooms()
     {
-        return $this->all("SELECT roomID FROM rooms ORDER BY roomID");
+        return $this->all("SELECT roomID, status FROM rooms ORDER BY roomID");
     }
 
     // Schedule reads
@@ -400,8 +439,15 @@ class ScheduleLogic
         $params = [':ay' => $acad, ':sem' => $sem];
 
         if ($this->group === 'faculty') {
-            $sql .= " AND ss.facultyID = :uid";
-            $params[':uid'] = $this->userID;
+            if ($this->isMonitoring($search)) {
+                // Coordinator searching: the deployed schedule of the assigned program.
+                $mine = $this->assignedProgram();
+                $sql .= " AND ep.program = :cprog";
+                $params[':cprog'] = $mine !== '' ? $mine : '__none__';
+            } else {
+                $sql .= " AND ss.facultyID = :uid";
+                $params[':uid'] = $this->userID;
+            }
         } elseif ($this->group === 'student') {
             $sql = preg_replace('/^SELECT /', 'SELECT DISTINCT ', self::BASE_SELECT)
                  . self::STUDENT_JOIN
@@ -424,9 +470,20 @@ class ScheduleLogic
         }
 
         if ($search !== '' && !$this->isDean()) {
-            $sql .= " AND (ss.subjectID LIKE :q OR s.name LIKE :q OR ss.roomID LIKE :q OR ss.block LIKE :q
-                           OR CONCAT(f.first_name, ' ', f.last_name) LIKE :q)";
-            $params[':q'] = '%' . str_replace(['%', '_'], '', $search) . '%';
+            if ($this->isCoordinator()) {
+                // Coordinator: block ("BSCS 1A" or "1A"), instructor (either name order) or subject.
+                $sql .= " AND (CONCAT(ep.program, ss.block) LIKE :qb OR ss.block LIKE :q
+                               OR CONCAT(f.first_name, ' ', f.last_name) LIKE :q
+                               OR CONCAT(f.last_name, ' ', f.first_name) LIKE :q
+                               OR CONCAT(f.last_name, ', ', f.first_name) LIKE :q
+                               OR ss.subjectID LIKE :q OR s.name LIKE :q)";
+                $params[':q']  = '%' . str_replace(['%', '_'], '', $search) . '%';
+                $params[':qb'] = '%' . str_replace([' ', '%', '_'], '', $search) . '%';
+            } else {
+                $sql .= " AND (ss.subjectID LIKE :q OR s.name LIKE :q OR ss.roomID LIKE :q OR ss.block LIKE :q
+                               OR CONCAT(f.first_name, ' ', f.last_name) LIKE :q)";
+                $params[':q'] = '%' . str_replace(['%', '_'], '', $search) . '%';
+            }
         }
         $sql .= " ORDER BY ss.time_start, ss.schedID";
         return array_map([$this, 'decorate'], $this->all($sql, $params));
@@ -555,6 +612,167 @@ class ScheduleLogic
         return $counts;
     }
 
+    // Weekly hours per subject (100% = WEEKLY_HOURS)
+
+    // Hours per weekday of one subject of a block. The weekly hours can be spread over different days
+    // and slots (for example 2 hrs Monday + 2 hrs Wednesday, or 1 hr on four days); they are added up.
+    public function hoursByDay($acad, $sem, $program, $block, $subjectID, $excludeID = 0)
+    {
+        $rows = $this->all(
+            "SELECT ss.day, ss.time_start, ss.time_end
+             FROM subject_schedules ss
+             JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
+             WHERE ep.acad_year = :ay AND ep.sem = :sem AND ep.program = :p AND ss.block = :b
+               AND TRIM(ss.subjectID) = TRIM(:s) AND ss.schedID <> :id",
+            [':ay' => $acad, ':sem' => (int)$sem, ':p' => $program, ':b' => $block, ':s' => $subjectID, ':id' => (int)$excludeID]
+        );
+        $by = [];
+        foreach ($rows as $r) {
+            $h = (self::minutes($r['time_end']) - self::minutes($r['time_start'])) / 60;
+            foreach (self::parseDays($r['day']) as $d) $by[$d] = ($by[$d] ?? 0) + $h;
+        }
+        return $by;
+    }
+
+    public function weeklyHours($acad, $sem, $program, $block, $subjectID, $excludeID = 0)
+    {
+        return (float)array_sum($this->hoursByDay($acad, $sem, $program, $block, $subjectID, $excludeID));
+    }
+
+    // "Mon 2h · Wed 2h"
+    public static function fmtDayHours(array $by)
+    {
+        $parts = [];
+        foreach (self::WEEK as $d) {
+            if (!empty($by[$d])) $parts[] = substr($d, 0, 3) . ' ' . self::fmtHours($by[$d]) . 'h';
+        }
+        return implode(' · ', $parts);
+    }
+
+    // Hours report of one schedule row (null while it has no subject or block).
+    public function hoursFor(array $row)
+    {
+        if (trim((string)$row['subjectID']) === '' || (string)$row['block'] === '') return null;
+        $req = self::requiredHours($row['type']);
+        $by  = $this->hoursByDay($row['acad_year'], $row['sem'], $row['program'], $row['block'], $row['subjectID'], 0);
+        $got = (float)array_sum($by);
+        return [
+            'type' => $row['type'], 'required' => $req, 'scheduled' => $got, 'by_day' => $by,
+            'pct'  => (int)round($got / $req * 100), 'left' => max(0, $req - $got),
+        ];
+    }
+
+    // Every scheduled subject of one block with its hours per week.
+    public function blockHours($semKey, $program, $block)
+    {
+        list($acad, $sem) = self::splitSemester($semKey);
+        $rows = $this->all(
+            "SELECT TRIM(ss.subjectID) AS sid, s.name, ss.day, ss.time_start, ss.time_end
+             FROM subject_schedules ss
+             JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
+             LEFT JOIN subjects s ON s.subjectID = ss.subjectID
+             WHERE ep.acad_year = :ay AND ep.sem = :sem AND ep.program = :p AND ss.block = :b
+               AND ss.subjectID IS NOT NULL AND TRIM(ss.subjectID) <> ''",
+            [':ay' => $acad, ':sem' => $sem, ':p' => $program, ':b' => $block]
+        );
+        $out = [];
+        foreach ($rows as $r) {
+            $k = $r['sid'];
+            if (!isset($out[$k])) {
+                $type = self::classType($k, (string)$r['name']);
+                $out[$k] = ['subject' => $k, 'name' => (string)$r['name'], 'type' => $type,
+                            'required' => self::requiredHours($type), 'scheduled' => 0.0, 'by_day' => []];
+            }
+            $len = (self::minutes($r['time_end']) - self::minutes($r['time_start'])) / 60;
+            foreach (self::parseDays($r['day']) as $d) {
+                $out[$k]['by_day'][$d] = ($out[$k]['by_day'][$d] ?? 0) + $len;
+                $out[$k]['scheduled'] += $len;
+            }
+        }
+        ksort($out);
+        foreach ($out as &$o) {
+            $o['pct']  = (int)round($o['scheduled'] / $o['required'] * 100);
+            $o['left'] = max(0, $o['required'] - $o['scheduled']);
+        }
+        return array_values($out);
+    }
+
+    // Availability
+
+    // Rooms or instructors with their booked slots on one weekday of a semester.
+    // Rooms and instructors are shared by all departments, so every department's classes count.
+    public function availability($semKey, $day, $kind)
+    {
+        list($acad, $sem) = self::splitSemester($semKey);
+        $rows = $this->all(
+            "SELECT ss.subjectID, ss.day, ss.roomID, ss.facultyID, ss.block, ss.time_start, ss.time_end,
+                    ss.class_format, ep.program, CONCAT(f.first_name, ' ', f.last_name) AS faculty_name
+             FROM subject_schedules ss
+             JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
+             LEFT JOIN faculty f ON f.facultyID = ss.facultyID
+             WHERE ep.acad_year = :ay AND ep.sem = :sem",
+            [':ay' => $acad, ':sem' => $sem]
+        );
+
+        $ents = [];
+        if ($kind === 'instructors') {
+            foreach ($this->instructors() as $i) {
+                $ents[(string)$i['facultyID']] = [
+                    'label' => self::properName($i['last_name'] . ', ' . $i['first_name']),
+                    'note' => '', 'blocked' => false, 'busy' => [],
+                ];
+            }
+        } else {
+            foreach ($this->all("SELECT roomID, status FROM rooms ORDER BY roomID") as $r) {
+                $ok = strtolower(trim((string)$r['status'])) === 'available';
+                $ents[(string)$r['roomID']] = [
+                    'label' => 'Room ' . $r['roomID'],
+                    'note' => $ok ? '' : ucfirst(trim((string)$r['status'])),
+                    'blocked' => !$ok, 'busy' => [],
+                ];
+            }
+        }
+
+        foreach ($rows as $r) {
+            if (!in_array($day, self::parseDays($r['day']), true)) continue;
+            $key = $kind === 'instructors' ? (string)$r['facultyID'] : (string)$r['roomID'];
+            if ($key === '' || !isset($ents[$key])) continue;
+            $blk = ($r['block'] !== null && $r['block'] !== '') ? $r['program'] . ' ' . $r['block'] : $r['program'];
+            $sub = trim((string)$r['subjectID']);
+            $ents[$key]['busy'][] = [
+                'start' => $r['time_start'], 'end' => $r['time_end'],
+                'label' => ($sub !== '' ? $sub : 'Time slot') . ' • ' . $blk,
+                'who'   => $kind === 'instructors'
+                            ? 'Room ' . $r['roomID']
+                            : ($r['facultyID'] ? self::properName($r['faculty_name'] ?? '') : 'No instructor yet'),
+                'alt'   => $r['class_format'] !== 'onsite',
+                'range' => self::fmtRange($r['time_start'], $r['time_end']),
+            ];
+        }
+        foreach ($ents as &$e) {
+            usort($e['busy'], function ($a, $b) { return strcmp($a['start'], $b['start']); });
+        }
+        return $ents;
+    }
+
+    // Ids that are free for the whole range (instructors also keep the rest gap).
+    public function freeFor(array $ents, $from, $to, $kind)
+    {
+        $pad = $kind === 'instructors' ? self::REST_MINUTES : 0;
+        $a = self::minutes($from) - $pad;
+        $b = self::minutes($to) + $pad;
+        $out = [];
+        foreach ($ents as $id => $e) {
+            if ($e['blocked']) continue;
+            $free = true;
+            foreach ($e['busy'] as $x) {
+                if (self::minutes($x['start']) < $b && self::minutes($x['end']) > $a) { $free = false; break; }
+            }
+            if ($free) $out[$id] = $e['label'];
+        }
+        return $out;
+    }
+
     public function find($schedID)
     {
         $rows = $this->all(self::BASE_SELECT . " WHERE ss.schedID = :id", [':id' => (int)$schedID]);
@@ -641,6 +859,30 @@ class ScheduleLogic
                 $out[] = "$program $block already has $sub ($when).";
             }
         }
+
+        // An instructor needs a rest gap between two classes (touching or closer than REST_MINUTES).
+        if ($faculty > 0) {
+            $gs = self::fromMinutes(self::minutes($start) - self::REST_MINUTES);
+            $ge = self::fromMinutes(self::minutes($end) + self::REST_MINUTES);
+            $near = $this->all(
+                "SELECT ss.subjectID, ss.day, ss.time_start, ss.time_end
+                 FROM subject_schedules ss
+                 JOIN enrollment_period ep ON ep.enrollmentID = ss.enrollmentID
+                 WHERE ep.acad_year = :ay AND ep.sem = :sem AND ss.schedID <> :id AND ss.facultyID = :f
+                   AND ss.time_start < :ge AND ss.time_end > :gs",
+                [':ay' => $acad, ':sem' => $sem, ':id' => (int)$excludeID, ':f' => (int)$faculty, ':ge' => $ge, ':gs' => $gs]
+            );
+            foreach ($near as $r) {
+                if ($r['time_start'] < $end && $r['time_end'] > $start) continue;   // real overlap, reported above
+                $shared = array_values(array_intersect($days, self::parseDays($r['day'])));
+                if (!$shared) continue;
+                $when = implode(', ', array_map(function ($d) { return substr($d, 0, 3); }, $shared))
+                      . ' ' . self::fmtRange($r['time_start'], $r['time_end']);
+                $sub  = trim((string)$r['subjectID']) !== '' ? trim($r['subjectID']) : 'another time slot';
+                $out[] = "An instructor needs at least " . self::REST_MINUTES . " minutes between classes. This instructor teaches $sub ($when), which is too close to this time slot.";
+            }
+        }
+
         return array_values(array_unique($out));
     }
 
@@ -677,6 +919,14 @@ class ScheduleLogic
         if (!$days)                    $errors[] = 'Select at least one day.';
         if (!$start || !$end)          $errors[] = 'Select a start and end time.';
         elseif ($end <= $start)        $errors[] = 'End time must be later than start time.';
+        else {
+            if ($start < self::OPEN_TIME || $end > self::CLOSE_TIME) {
+                $errors[] = 'Classes can only be scheduled between 7:00 AM and 9:00 PM.';
+            }
+            if ($start < self::LUNCH_END && $end > self::LUNCH_START) {
+                $errors[] = 'Classes cannot be scheduled during the lunch break (12:00 PM – 1:00 PM).';
+            }
+        }
         if ($acad === '' || $sem <= 0) $errors[] = 'Select a semester.';
         if ($errors) return ['ok' => false, 'errors' => $errors];
 
@@ -691,7 +941,13 @@ class ScheduleLogic
         );
         if (!$ep) return ['ok' => false, 'errors' => ["No enrollment period exists for $program in that semester."]];
 
-        if (!$this->all("SELECT 1 FROM rooms WHERE roomID = :v", [':v' => $room])) $errors[] = 'Unknown room.';
+        $rm = $this->all("SELECT roomID, status FROM rooms WHERE roomID = :v", [':v' => $room]);
+        if (!$rm) {
+            $errors[] = 'Unknown room.';
+        } elseif (strtolower(trim((string)$rm[0]['status'])) !== 'available'
+                  && (!$current || (string)$current['roomID'] !== $room)) {
+            $errors[] = "Room $room is currently marked as " . trim((string)$rm[0]['status']) . ' and cannot be booked.';
+        }
         if ($faculty > 0 && !$this->all("SELECT 1 FROM faculty WHERE facultyID = :v", [':v' => $faculty])) {
             $errors[] = 'Unknown instructor.';
         }
@@ -712,6 +968,24 @@ class ScheduleLogic
             }
         }
         if ($errors) return ['ok' => false, 'errors' => $errors];
+
+        // Each subject of a block has a fixed number of hours per week (4 for lecture and laboratory).
+        if ($subjectID !== '' && $block !== '') {
+            $sn   = $this->all("SELECT name FROM subjects WHERE subjectID = :v", [':v' => $subjectID]);
+            $type = self::classType($subjectID, $sn[0]['name'] ?? '');
+            $need = self::requiredHours($type);
+            $by   = $this->hoursByDay($acad, $sem, $program, $block, $subjectID, (int)$id);
+            $have = (float)array_sum($by);
+            $add  = (self::minutes($end) - self::minutes($start)) / 60 * count($days);
+            if ($have + $add > $need + 0.001) {
+                return ['ok' => false, 'errors' => [sprintf(
+                    '%s for %s %s needs exactly %s hours per week (%s), spread over any days. %s hour(s) are already scheduled%s, so only %s more hour(s) fit, but this slot adds %s.',
+                    trim($subjectID), $program, $block, self::fmtHours($need), $type,
+                    self::fmtHours($have), $by ? ' (' . self::fmtDayHours($by) . ')' : '',
+                    self::fmtHours(max(0, $need - $have)), self::fmtHours($add)
+                )]];
+            }
+        }
 
         $assigned = $subjectID !== '' && $faculty > 0 && $block !== '';
         $status   = $current['status'] ?? 'draft';
@@ -768,6 +1042,17 @@ class ScheduleLogic
             if ($row['status'] === 'deployed') return 'This schedule is already deployed.';
             if (!$row['subjectID'] || !$row['facultyID'] || !$row['block']) {
                 return 'Assign a subject, instructor and block before deploying.';
+            }
+            $h = $this->hoursFor($row);
+            if ($h && abs($h['scheduled'] - $h['required']) > 0.001) {
+                return sprintf(
+                    'Cannot deploy yet: %s for %s has %s of %s required hours per week (%d%%)%s. %s',
+                    $row['subject_code'], $row['block_label'], self::fmtHours($h['scheduled']), self::fmtHours($h['required']), $h['pct'],
+                    $h['by_day'] ? ' – ' . self::fmtDayHours($h['by_day']) : '',
+                    $h['scheduled'] < $h['required']
+                        ? 'Add the remaining ' . self::fmtHours($h['left']) . ' hour(s) on any day first.'
+                        : 'Remove the extra hours first.'
+                );
             }
             $new = 'deployed';
         } else {
