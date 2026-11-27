@@ -25,7 +25,8 @@ $box = function (string $name, string $label, string $value, string $w, string $
         </select>
       <?php else: ?>
         <input type="<?= e($type) ?>" <?= $off ? 'disabled' : 'name="' . e($name) . '"' ?> value="<?= e($value) ?>"
-              <?= $type === 'date' ? 'max="' . date('Y-m-d') . '" min="1900-01-01"' : '' ?> autocomplete="off">
+              <?= $type === 'date' ? 'max="' . date('Y-m-d') . '" min="1900-01-01"' : '' ?>
+              <?= $type === 'email' ? 'maxlength="100" inputmode="email" autocapitalize="off" spellcheck="false"' : '' ?> autocomplete="off">
       <?php endif; ?>
     </label>
     <?php
@@ -77,7 +78,7 @@ $box = function (string $name, string $label, string $value, string $w, string $
         <?php $box('', 'Last Name',   $p['last_name'],   'w3', 'text', [], true); ?>
       </div>
       <div class="df-row">
-        <?php $box('email', 'Email Address', $val('email', $acct['contact']['email']), 'w6', 'text', [], false, true); ?>
+        <?php $box('email', 'Email Address', $val('email', $acct['contact']['email']), 'w6', 'email', [], false, true); ?>
         <?php $box('number', 'Contact Number', $val('number', $acct['contact']['phone']), 'w3', 'tel'); ?>
       </div>
       <div class="df-row">

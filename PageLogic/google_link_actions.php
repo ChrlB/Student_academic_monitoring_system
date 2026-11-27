@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/../Services/account_log.php';
 require_once __DIR__ . '/account_actions.php';
 require_once __DIR__ . '/../Services/google_link.php';
 
@@ -40,5 +41,6 @@ function linkGoogleAccount($post) {
         error_log('google link failed: ' . $e->getMessage());
         googleLinkJson(['ok' => false, 'message' => 'Something went wrong. Please try again.'], 500);
     }
+    accountLog($db_connection ?? null, (string)$_SESSION['userID'], '', 'updated', 'Linked Google account: ' . $email);
     googleLinkJson(['ok' => true, 'email' => $email, 'message' => 'Google account linked.']);
 }

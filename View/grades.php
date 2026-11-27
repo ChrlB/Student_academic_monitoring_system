@@ -30,6 +30,10 @@ if ($isStudentAccount) {
     $gwaSummary = $gradesLogic->studentGwaSummary();
     $semesterGwa = $gwaSummary['terms'][$semesterKey] ?? null;
     $overallGwa = $gwaSummary['overall'];
+    $studentHasFailedGrades = $gradesLogic->studentHasFailedGrades();
+    $programCoordinatorContact = $studentHasFailedGrades
+        ? $gradesLogic->studentProgramCoordinatorContact()
+        : null;
     $gradedCount = count(array_filter(
         $studentGrades,
         static function (array $grade): bool {
@@ -143,7 +147,7 @@ if ($isRegistrarAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['act
     exit;
 }
 
-if ($isProfessorAccount && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_grades') {
+if (in_array($accountRole, ['prof', 'dean'], true) && $_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'save_grades') {
     $semesterKey = $gradesLogic->selectedSemester($_POST['sem'] ?? '', $semesters);
     $semesterLabel = $gradesLogic->semesterLabelForKey($semesterKey, $semesters);
     $class = $gradesLogic->assignedClass($scheduleID, $semesterKey);
@@ -208,6 +212,9 @@ $roster = null;
 $gradeSubmissionStates = [];
 $coordinatorSubmissions = $isCoordinatorAccount && $view === 'preview'
     ? $gradesLogic->coordinatorSubmissions()
+    : [];
+$coordinatorFailedStudents = $accountRole === 'program coordinator' && $view === 'preview'
+    ? $gradesLogic->coordinatorFailedStudents()
     : [];
 $coordinatorVerification = null;
 if ($isCoordinatorAccount && $view === 'verification') {
@@ -927,6 +934,93 @@ $csrf = $gradesLogic->csrfToken();
       width: 100%;
     }
 
+    .coordinator-failed-notice {
+      margin-bottom: 14px;
+      padding: 14px 16px;
+      border: 1px solid rgba(254, 202, 202, 0.9);
+      border-radius: 12px;
+      color: #fff;
+      background: rgba(127, 29, 29, 0.94);
+    }
+
+    .coordinator-failed-notice p {
+      margin: 6px 0 0;
+    }
+
+    .coordinator-failed-review-button {
+      margin-top: 10px;
+    }
+
+    .coordinator-failed-students-panel {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.5);
+    }
+
+    .coordinator-failed-students-panel a {
+      color: #fff;
+    }
+
+    .coordinator-review-table tr.grade-failed > td {
+      color: #fff;
+      background: rgba(153, 27, 27, 0.9);
+      font-weight: 700;
+    }
+
+    .student-failure-dialog {
+      width: min(560px, calc(100% - 32px));
+      max-width: 560px;
+      padding: 0;
+      border: 1px solid rgba(255,255,255,0.72);
+      border-radius: 16px;
+      color: #fff;
+      background: #47214f;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.42);
+    }
+
+    .student-failure-dialog::backdrop {
+      background: rgba(24, 12, 28, 0.74);
+      backdrop-filter: blur(2px);
+    }
+
+    .student-failure-dialog__content {
+      padding: 24px;
+    }
+
+    .student-failure-dialog h2 {
+      margin: 0 0 12px;
+      font-size: 1.35rem;
+    }
+
+    .student-failure-dialog p {
+      margin: 0 0 12px;
+      line-height: 1.5;
+    }
+
+    .student-failure-dialog a {
+      color: #fff;
+      font-weight: 800;
+      text-decoration: underline;
+    }
+
+    .student-failure-dialog__actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    .student-failure-dialog__actions button {
+      min-height: 42px;
+      padding: 9px 16px;
+      border: 1px solid rgba(255,255,255,0.8);
+      border-radius: 9px;
+      color: #fff;
+      background: rgba(255,255,255,0.16);
+      font: inherit;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
     .verification-remark {
       display: block;
       margin-top: 12px;
@@ -1327,14 +1421,21 @@ $csrf = $gradesLogic->csrfToken();
                           $finalGrade = $grade['final_grade'] !== null
                               ? number_format((float)$grade['final_grade'], 2)
                               : '—';
-                          $semesterGrade = $grade['midterm_grade'] !== null && $grade['final_grade'] !== null
-                              ? number_format(((float)$grade['midterm_grade'] + (float)$grade['final_grade']) / 2, 2)
+                          $semesterScore = $grade['midterm_grade'] !== null && $grade['final_grade'] !== null
+                              ? ((float)$grade['midterm_grade'] + (float)$grade['final_grade']) / 2
+                              : null;
+                          $semesterGrade = $semesterScore !== null
+                              ? number_format($semesterScore, 2)
                               : '—';
-                          $remarks = $grade['final_grade'] !== null
-                              ? GradesLogic::percentageRemark((float)$grade['final_grade'])
-                              : ($grade['midterm_grade'] !== null ? 'Final grade pending' : 'Grades pending');
+                          $failedSubject = ($grade['enrollment_status'] ?? '') === 'failed'
+                              || ($semesterScore !== null && $semesterScore < 75);
+                          $remarks = $failedSubject
+                              ? 'Failed'
+                              : ($semesterScore !== null
+                                  ? 'Passed'
+                                  : ($grade['midterm_grade'] !== null ? 'Final grade pending' : 'Grades pending'));
                       ?>
-                        <tr>
+                        <tr class="<?= $failedSubject ? 'grade-failed' : '' ?>">
                           <td><?= grades_e($grade['subject_code']) ?></td>
                           <td><?= grades_e($grade['subject_name']) ?></td>
                           <td><?= grades_e($midtermGrade) ?></td>
@@ -1406,7 +1507,7 @@ $csrf = $gradesLogic->csrfToken();
                     <noscript><button class="term-btn" type="submit">Show Term</button></noscript>
                   </form>
                 <?php endif; ?>
-                <?php if ($isFacultyAccount && $accountRole !== 'dean' && $view === 'preview'): ?>
+                <?php if ($isFacultyAccount && $view === 'preview'): ?>
                   <?php
                     $gradebookParams = ['view' => 'gradebook', 'sem' => $semesterKey];
                     if (!empty($classPreview)) {
@@ -1448,15 +1549,30 @@ $csrf = $gradesLogic->csrfToken();
                       <input type="hidden" name="csrf" value="<?= grades_e($csrf) ?>">
                       <input type="hidden" name="submissionID" value="<?= (int)$coordinatorVerification['submissionID'] ?>">
                       <div class="verification-table-wrap">
-                        <table class="grade-table verification-table">
-                          <thead><tr><th>Student ID</th><th>Student</th><th>Midterm</th><th>Final</th></tr></thead>
+                        <table class="grade-table verification-table coordinator-review-table">
+                          <thead><tr><th>Student ID</th><th>Student</th><th>Midterm</th><th>Final</th><th>Semestral</th><th>GWA</th><th>Status</th></tr></thead>
                           <tbody>
                             <?php foreach ($coordinatorVerification['grades'] as $grade): ?>
-                              <tr>
+                              <?php
+                                $semestralScore = $grade['midterm'] !== null && $grade['final'] !== null
+                                    ? ((float)$grade['midterm'] + (float)$grade['final']) / 2
+                                    : null;
+                                $semestralGrade = $semestralScore !== null ? number_format($semestralScore, 2) : null;
+                                $gwaGrade = $semestralScore !== null
+                                    ? GradesLogic::percentageToGwa($semestralScore)
+                                    : null;
+                                $semestralStatus = $semestralScore !== null
+                                    ? ($semestralScore >= 75 ? 'Passed' : 'Failed')
+                                    : null;
+                              ?>
+                              <tr class="<?= $semestralStatus === 'Failed' ? 'grade-failed' : '' ?>">
                                 <td><?= grades_e($grade['display_student_id'] ?? ($grade['studentID'] ?? '')) ?></td>
                                 <td><?= grades_e($grade['student_name'] ?? ('Student ' . $grade['studentID'])) ?></td>
                                 <td><?= $grade['midterm'] === null ? '—' : grades_e(number_format((float)$grade['midterm'], 2)) ?></td>
                                 <td><?= $grade['final'] === null ? '—' : grades_e(number_format((float)$grade['final'], 2)) ?></td>
+                                <td><?= $semestralGrade === null ? '—' : grades_e($semestralGrade) ?></td>
+                                <td><?= $gwaGrade === null ? '—' : grades_e(number_format($gwaGrade, 2)) ?></td>
+                                <td><?= $semestralStatus === null ? '—' : grades_e($semestralStatus) ?></td>
                               </tr>
                             <?php endforeach; ?>
                           </tbody>
@@ -1646,14 +1762,29 @@ $csrf = $gradesLogic->csrfToken();
                             <input type="hidden" name="submissionID" value="<?= (int)$submission['submissionID'] ?>">
                             <div class="verification-table-wrap">
                               <table class="grade-table verification-table">
-                                <thead><tr><th>Student ID</th><th>Student</th><th>Midterm</th><th>Final</th></tr></thead>
+                                <thead><tr><th>Student ID</th><th>Student</th><th>Midterm</th><th>Final</th><th>Semestral</th><th>GWA</th><th>Status</th></tr></thead>
                                 <tbody>
                                   <?php foreach ($submission['grades'] as $grade): ?>
+                                    <?php
+                                      $semestralScore = $grade['midterm'] !== null && $grade['final'] !== null
+                                          ? ((float)$grade['midterm'] + (float)$grade['final']) / 2
+                                          : null;
+                                      $semestralGrade = $semestralScore !== null ? number_format($semestralScore, 2) : null;
+                                      $gwaGrade = $semestralScore !== null
+                                          ? GradesLogic::percentageToGwa($semestralScore)
+                                          : null;
+                                      $semestralStatus = $semestralScore !== null
+                                          ? ($semestralScore >= 75 ? 'Passed' : 'Failed')
+                                          : null;
+                                    ?>
                                     <tr>
                                       <td><?= grades_e($grade['display_student_id'] ?? ($grade['studentID'] ?? '')) ?></td>
                                       <td><?= grades_e($grade['student_name'] ?? ('Student ' . $grade['studentID'])) ?></td>
                                       <td><?= $grade['midterm'] === null ? '—' : grades_e(number_format((float)$grade['midterm'], 2)) ?></td>
                                       <td><?= $grade['final'] === null ? '—' : grades_e(number_format((float)$grade['final'], 2)) ?></td>
+                                      <td><?= $semestralGrade === null ? '—' : grades_e($semestralGrade) ?></td>
+                                      <td><?= $gwaGrade === null ? '—' : grades_e(number_format($gwaGrade, 2)) ?></td>
+                                      <td><?= $semestralStatus === null ? '—' : grades_e($semestralStatus) ?></td>
                                     </tr>
                                   <?php endforeach; ?>
                                 </tbody>
@@ -1836,6 +1967,56 @@ $csrf = $gradesLogic->csrfToken();
                     </div>
                   </section>
                 <?php else: ?>
+                  <?php if ($accountRole === 'program coordinator' && $coordinatorFailedStudents): ?>
+                    <section class="coordinator-failed-notice" role="status" aria-labelledby="coordinator-failed-notice-title">
+                      <strong id="coordinator-failed-notice-title">Failed grades need follow-up</strong>
+                      <p>
+                        <?= count($coordinatorFailedStudents) ?>
+                        <?= count($coordinatorFailedStudents) === 1 ? 'student has' : 'students have' ?>
+                        one or more failed subjects in your program and department. Please contact them to discuss follow-up.
+                      </p>
+                      <button class="gradebook-submit coordinator-failed-review-button" type="button"
+                              aria-expanded="false" aria-controls="coordinator-failed-students"
+                              data-coordinator-failed-review>
+                        Review affected students
+                      </button>
+                      <div class="coordinator-failed-students-panel" id="coordinator-failed-students" hidden>
+                        <div class="verification-table-wrap">
+                          <table class="grade-table verification-table">
+                            <thead>
+                              <tr><th>Student</th><th>Failed Subjects</th><th>Email</th><th>Phone</th></tr>
+                            </thead>
+                            <tbody>
+                              <?php foreach ($coordinatorFailedStudents as $failedStudent): ?>
+                                <tr>
+                                  <td>
+                                    <?= grades_e($failedStudent['student_name']) ?><br>
+                                    <small><?= grades_e($failedStudent['display_student_id']) ?></small>
+                                  </td>
+                                  <td><?= grades_e($failedStudent['failed_subjects'] ?? '') ?></td>
+                                  <td>
+                                    <a href="mailto:<?= grades_e($failedStudent['student_email']) ?>">
+                                      <?= grades_e($failedStudent['student_email']) ?>
+                                    </a>
+                                  </td>
+                                  <td>
+                                    <?php if ($failedStudent['student_phone'] !== null): ?>
+                                      <a href="tel:<?= grades_e($failedStudent['student_phone']) ?>">
+                                        <?= grades_e($failedStudent['student_phone']) ?>
+                                      </a>
+                                    <?php else: ?>
+                                      —
+                                    <?php endif; ?>
+                                  </td>
+                                </tr>
+                              <?php endforeach; ?>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </section>
+                  <?php endif; ?>
+
                   <?php if ($isCoordinatorAccount): ?>
                     <details class="coordinator-verification-preview">
                       <summary>
@@ -1907,6 +2088,74 @@ $csrf = $gradesLogic->csrfToken();
     </div>
   </div>
   <?php require_once __DIR__ . "/components/logout.php"; ?>
+  <?php if ($accountRole === 'program coordinator' && $coordinatorFailedStudents): ?>
+    <script>
+      (function () {
+        var button = document.querySelector('[data-coordinator-failed-review]');
+        var panel = document.getElementById('coordinator-failed-students');
+        if (!button || !panel) {
+          return;
+        }
+
+        button.addEventListener('click', function () {
+          var expanded = button.getAttribute('aria-expanded') === 'true';
+          button.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+          panel.hidden = expanded;
+          button.textContent = expanded ? 'Review affected students' : 'Hide affected students';
+        });
+      })();
+    </script>
+  <?php endif; ?>
+  <?php if ($isStudentAccount && $studentHasFailedGrades): ?>
+    <dialog class="student-failure-dialog" id="student-failure-dialog"
+            aria-labelledby="student-failure-dialog-title"
+            aria-describedby="student-failure-dialog-description">
+      <div class="student-failure-dialog__content">
+        <h2 id="student-failure-dialog-title">Failed grade notice</h2>
+        <p id="student-failure-dialog-description">
+          You have one or more failed subjects. Please contact your Program Coordinator immediately.
+        </p>
+        <?php if ($programCoordinatorContact): ?>
+          <p>
+            <strong><?= grades_e($programCoordinatorContact['coordinator_name']) ?></strong><br>
+            <a href="mailto:<?= grades_e($programCoordinatorContact['coordinator_email']) ?>">
+              <?= grades_e($programCoordinatorContact['coordinator_email']) ?>
+            </a>
+          </p>
+        <?php else: ?>
+          <p>No active Program Coordinator email was found for your program and department. Please contact your department office.</p>
+        <?php endif; ?>
+        <div class="student-failure-dialog__actions">
+          <button type="button" data-close-student-failure-dialog>Understood</button>
+        </div>
+      </div>
+    </dialog>
+    <script>
+      (function () {
+        var dialog = document.getElementById('student-failure-dialog');
+        var closeButton = dialog && dialog.querySelector('[data-close-student-failure-dialog]');
+        if (!dialog) {
+          return;
+        }
+
+        if (typeof dialog.showModal === 'function') {
+          dialog.showModal();
+        } else {
+          dialog.setAttribute('open', '');
+        }
+
+        if (closeButton) {
+          closeButton.addEventListener('click', function () {
+            if (typeof dialog.close === 'function') {
+              dialog.close();
+            } else {
+              dialog.removeAttribute('open');
+            }
+          });
+        }
+      })();
+    </script>
+  <?php endif; ?>
   <?php if ($isFacultyAccount && $view === 'gradebook' && $class && $roster && $roster['rows']): ?>
     <script>
       document.querySelectorAll('.grade-table tbody tr').forEach(function (row) {

@@ -11,6 +11,7 @@ $options = [
   PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true
 ];
 $db_connection = new PDO("mysql:host=localhost;port=3306;dbname=ams_db", "root", "", $options);
+$db_connection->exec("SET time_zone = '+08:00'");
 $userDAO = new PHPDAO($db_connection);
 $clearanceDAO = new PHPDAO($db_connection);
 
@@ -622,7 +623,7 @@ $userDAO->prepareStatement("updateStudentProfileFull",
                 ON FCR.faculty_clearanceID = FC.faculty_clearanceID
                 AND FCR.uploaded_by <> ?
         WHERE FC.facultyID = ?
-            AND CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ?
+            AND (CONCAT(YEAR(ST.date_created), LPAD(ST.studentID, 5, '0')) = ? )
             AND ('ALL' = ? OR CONCAT(EP.acad_year, ' ', EP.sem, 'sem') = ?)
         ORDER BY EP.acad_year DESC, EP.sem DESC, FCR.uploaded_at DESC;
     ");
@@ -1054,6 +1055,7 @@ $userDAO->prepareStatement("updateStudentProfileFull",
             SS.`time_start`,
             SS.`time_end`,
             SS.`block`,
+            IF(SS.`class_format` = 'onsite', 'F2F-class', 'Online-class') AS class_format,
             F.date_created,
             S.department,
             S.name,
@@ -1288,7 +1290,7 @@ $userDAO->prepareStatement("updateStudentProfileFull",
                 )
             )
         GROUP BY ST.studentID, ST.date_created, ST.last_name, ST.first_name,
-            ST.middle_name, ST.program, ST.block, EP.acad_year, EP.sem,
+            ST.middle_name, ST.program, ST.block, EP.acad_year, EP.sem,FC.remarks,
             FC.date_cleared, FC.`status`,FC.faculty_clearanceID,EP.enrollmentID,ST.studentID
         ORDER BY EP.acad_year DESC, EP.sem DESC, student_name, ST.studentID,
             FC.date_cleared;
@@ -1587,7 +1589,8 @@ $userDAO->prepareStatement("updateStudentProfileFull",
             SS.time_end AS time_end,
             SS.roomID AS roomID,
             CONCAT(F.last_name, ', ', F.first_name) AS prof_name,
-            CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem
+            CONCAT(EP.acad_year, ' ', EP.sem, 'sem') AS acad_year_sem,
+            if(SS.`class_format` = 'onsite','F2F-class','Online-class') AS class_format
         FROM enrolled_subjects AS ES
             INNER JOIN students AS ST
                 ON ST.studentID = ES.studentID

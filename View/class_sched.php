@@ -36,90 +36,70 @@ function sched_url($q)
     return $self . ($q ? '?' . http_build_query($q) : '');
 }
 
-// Fields shared by the Add modal and Edit page.
-function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v, $lockInstructor = false)
+function sched_time_list($v)
 {
     $times = [];
-    for ($m = 6 * 60; $m <= 22 * 60; $m += 30) {
+    for ($m = 7 * 60; $m <= 21 * 60; $m += 30) {
         $times[sprintf('%02d:%02d:00', intdiv($m, 60), $m % 60)] = date('g:i A', mktime(intdiv($m, 60), $m % 60));
     }
-    $startSel = isset($v['start_time']) ? substr($v['start_time'] . ':00', 0, 8) : '';
-    $endSel   = isset($v['end_time'])   ? substr($v['end_time'] . ':00', 0, 8)   : '';
-    foreach ([$startSel, $endSel] as $t) {              // keep legacy times (e.g. 07:15) selectable
+    $start = !empty($v['start_time']) ? substr($v['start_time'] . ':00', 0, 8) : '';
+    $end   = !empty($v['end_time'])   ? substr($v['end_time'] . ':00', 0, 8)   : '';
+    foreach ([$start, $end] as $t) {
         if ($t !== '' && !isset($times[$t])) $times[$t] = ScheduleLogic::fmtTime($t);
     }
     ksort($times);
-    $type = $v['class_type'] ?? 'LEC';
+    return [$times, $start, $end];
+}
+
+function sched_status_tag($status)
+{
+    $labels = ['draft' => 'Draft', 'assigned' => 'Assigned', 'deployed' => 'Deployed'];
+    return '<span class="sp-tag sp-tag--' . sched_e($status) . '">' . sched_e($labels[$status] ?? $status) . '</span>';
+}
+
+function sched_status_form($action, $sched, $csrf, $semKey, $label, $icon, $back, $class)
+{
+    return '<form method="post" action="' . sched_e(sched_url(['sem' => $semKey])) . '" class="sched-inline">'
+        . '<input type="hidden" name="csrf" value="' . sched_e($csrf) . '">'
+        . '<input type="hidden" name="sched_action" value="' . sched_e($action) . '">'
+        . '<input type="hidden" name="schedID" value="' . (int)$sched['schedID'] . '">'
+        . '<input type="hidden" name="semester" value="' . sched_e($semKey) . '">'
+        . '<input type="hidden" name="back" value="' . sched_e($back) . '">'
+        . '<button type="submit" class="' . sched_e($class) . '">' . sched_icon($icon) . ' ' . sched_e($label) . '</button></form>';
+}
+
+// Step 1: program, room, days, time.
+function sched_form_step1($uid, $programs, $rooms, $v, $lockProgram = false)
+{
+    list($times, $startSel, $endSel) = sched_time_list($v);
     $days = (array)($v['days'] ?? []);
-    $kind = $v['subject_kind'] ?? null;
-    if ($kind === null) {
-        $kind = 'normal';
-        foreach ($subjects as $s) {
-            if (($v['subject'] ?? null) === $s['subjectID']) { $kind = $s['kind']; break; }
-        }
-    }
+    $prog = (string)($v['program'] ?? '');
+    $delivery = ($v['delivery'] ?? 'onsite') === 'blended' ? 'blended' : 'onsite';
+    $weeks    = ($v['onsite_weeks'] ?? 'odd') === 'even' ? 'even' : 'odd';
     ob_start(); ?>
     <div class="sp-field">
-      <label for="<?= $uid ?>-block">Block / Section <span class="sp-req">*</span></label>
-      <select id="<?= $uid ?>-block" name="block" required>
-        <option value="">Select block/section</option>
-        <?php foreach ($blocks as $b): ?>
-          <option value="<?= sched_e($b['value']) ?>" <?= ($v['block'] ?? '') === $b['value'] ? 'selected' : '' ?>><?= sched_e($b['label']) ?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-
-    <div class="sp-field">
-      <span class="sp-label">Class Type <span class="sp-req">*</span></span>
-      <div class="sp-radios" role="radiogroup" aria-label="Class type">
-        <label class="sp-radio"><input type="radio" name="class_type" value="LEC" <?= $type === 'LEC' ? 'checked' : '' ?>> <span>LECTURE (LEC)</span></label>
-        <label class="sp-radio"><input type="radio" name="class_type" value="LAB" <?= $type === 'LAB' ? 'checked' : '' ?>> <span>LABORATORY (LAB)</span></label>
-        <label class="sp-radio"><input type="radio" name="class_type" value="GEC" <?= $type === 'GEC' ? 'checked' : '' ?>> <span>GENERAL EDUCATION (GEC)</span></label>
-      </div>
-    </div>
-
-    <div class="sp-field">
-      <span class="sp-label">Subject Category</span>
-      <div class="sp-radios" role="radiogroup" aria-label="Subject category">
-        <label class="sp-radio"><input type="radio" name="subject_kind" value="normal" <?= $kind === 'normal' ? 'checked' : '' ?>> <span>NORMAL SUBJECT</span></label>
-        <label class="sp-radio"><input type="radio" name="subject_kind" value="prereq" <?= $kind === 'prereq' ? 'checked' : '' ?>> <span>PREREQUISITE SUBJECT</span></label>
-      </div>
-    </div>
-
-    <div class="sp-field">
-      <label for="<?= $uid ?>-subject">Subject <span class="sp-req">*</span></label>
-      <select id="<?= $uid ?>-subject" name="subject" required>
-        <option value="">Select subject</option>
-        <?php foreach ($subjects as $s): ?>
-          <option value="<?= sched_e($s['subjectID']) ?>" data-type="<?= sched_e($s['type']) ?>" data-kind="<?= sched_e($s['kind']) ?>" data-programs="<?= sched_e($s['programs'] ? implode(',', $s['programs']) : '*') ?>"
-            <?= ($v['subject'] ?? null) === $s['subjectID'] ? 'selected' : '' ?>>
-            <?= sched_e(trim($s['subjectID']) . ' — ' . $s['name'] . ($s['requires'] ? ' (requires ' . $s['requires'] . ')' : '')) ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
-    </div>
-
-    <div class="sp-field">
-      <label for="<?= $uid ?>-instructor">Instructor <span class="sp-req">*</span></label>
-      <?php if ($lockInstructor): ?>
-  <input type="hidden" name="instructor" value="<?= (int)($v['instructor'] ?? 0) ?>">
-<?php endif; ?>
-<select id="<?= $uid ?>-instructor" <?= $lockInstructor ? 'disabled title="The instructor cannot be changed here"' : 'name="instructor" required' ?>>
-        <option value="">Select instructor</option>
-        <?php foreach ($instructors as $i): ?>
-          <option value="<?= (int)$i['facultyID'] ?>" <?= (int)($v['instructor'] ?? 0) === (int)$i['facultyID'] ? 'selected' : '' ?>>
-            <?= sched_e(ScheduleLogic::properName($i['first_name'] . ' ' . $i['last_name'])) ?>
-          </option>
-        <?php endforeach; ?>
-      </select>
+      <label for="<?= $uid ?>-program">Program <span class="sp-req">*</span></label>
+      <?php if ($lockProgram): ?>
+        <input type="hidden" name="program" value="<?= sched_e($prog) ?>">
+        <select id="<?= $uid ?>-program" disabled><option><?= sched_e($prog) ?></option></select>
+      <?php else: ?>
+        <select id="<?= $uid ?>-program" name="program" required>
+          <option value="">Select program</option>
+          <?php foreach ($programs as $p): ?>
+            <option value="<?= sched_e($p['program']) ?>" <?= $prog === $p['program'] ? 'selected' : '' ?>><?= sched_e($p['program']) ?> — <?= sched_e($p['name']) ?></option>
+          <?php endforeach; ?>
+        </select>
+      <?php endif; ?>
     </div>
 
     <div class="sp-field">
       <label for="<?= $uid ?>-room">Room <span class="sp-req">*</span></label>
       <select id="<?= $uid ?>-room" name="room" required>
         <option value="">Select room</option>
-        <?php foreach ($rooms as $r): ?>
-          <option value="<?= sched_e($r['roomID']) ?>" <?= (string)($v['room'] ?? '') === (string)$r['roomID'] ? 'selected' : '' ?>>Room <?= sched_e($r['roomID']) ?></option>
+        <?php foreach ($rooms as $r):
+            $off = strtolower(trim((string)($r['status'] ?? 'available'))) !== 'available';
+            $cur = (string)($v['room'] ?? '') === (string)$r['roomID']; ?>
+          <option value="<?= sched_e($r['roomID']) ?>" <?= $cur ? 'selected' : '' ?> <?= ($off && !$cur) ? 'disabled' : '' ?>>Room <?= sched_e($r['roomID']) ?><?= $off ? ' (' . sched_e(trim((string)$r['status'])) . ')' : '' ?></option>
         <?php endforeach; ?>
       </select>
     </div>
@@ -138,20 +118,115 @@ function sched_form_fields($uid, $blocks, $subjects, $instructors, $rooms, $v, $
       <div class="sp-time">
         <select name="start_time" aria-label="Start time" required>
           <option value="">Start time</option>
-          <?php foreach ($times as $val => $lab): ?><option value="<?= $val ?>" <?= $startSel === $val ? 'selected' : '' ?>><?= $lab ?></option><?php endforeach; ?>
+          <?php foreach ($times as $val => $lab):
+              if ($val >= ScheduleLogic::CLOSE_TIME) continue;
+              $lunch = $val >= ScheduleLogic::LUNCH_START && $val < ScheduleLogic::LUNCH_END; ?>
+            <option value="<?= $val ?>" <?= $startSel === $val ? 'selected' : '' ?> <?= $lunch ? 'disabled' : '' ?>><?= $lab ?><?= $lunch ? ' (lunch break)' : '' ?></option>
+          <?php endforeach; ?>
         </select>
         <span>to</span>
         <select name="end_time" aria-label="End time" required>
           <option value="">End time</option>
-          <?php foreach ($times as $val => $lab): ?><option value="<?= $val ?>" <?= $endSel === $val ? 'selected' : '' ?>><?= $lab ?></option><?php endforeach; ?>
+          <?php foreach ($times as $val => $lab):
+              if ($val <= ScheduleLogic::OPEN_TIME) continue;
+              $lunch = $val > ScheduleLogic::LUNCH_START && $val <= ScheduleLogic::LUNCH_END; ?>
+            <option value="<?= $val ?>" <?= $endSel === $val ? 'selected' : '' ?> <?= $lunch ? 'disabled' : '' ?>><?= $lab ?><?= $lunch ? ' (lunch break)' : '' ?></option>
+          <?php endforeach; ?>
         </select>
+      </div>
+      <p class="sp-hint">Classes run from 7:00 AM to 9:00 PM. 12:00 – 1:00 PM is the lunch break, and an instructor needs at least 30 minutes between classes.</p>
+    </div>
+    <div class="sp-field">
+      <span class="sp-label">Class Format</span>
+      <div>
+        <div class="sp-radios" role="radiogroup" aria-label="Class format">
+          <label class="sp-radio"><input type="radio" name="delivery" value="onsite" <?= $delivery === 'onsite' ? 'checked' : '' ?>> <span>FULL ONSITE</span></label>
+          <label class="sp-radio"><input type="radio" name="delivery" value="blended" <?= $delivery === 'blended' ? 'checked' : '' ?>> <span>ALTERNATING ONLINE / ONSITE</span></label>
+        </div>
+        <div class="sp-weeks" data-weeks>
+          <label for="<?= $uid ?>-weeks">Onsite on</label>
+          <select id="<?= $uid ?>-weeks" name="onsite_weeks">
+            <option value="odd" <?= $weeks === 'odd' ? 'selected' : '' ?>>Weeks 1, 3, 5,...</option>
+            <option value="even" <?= $weeks === 'even' ? 'selected' : '' ?>>Weeks 2, 4, 6,...</option>
+          </select>
+        </div>
+        <p class="sp-hint">Applies to the whole semester. The room of an alternating class is free on its online weeks, so another alternating class on the opposite weeks can use it.</p>
       </div>
     </div>
     <?php
     return ob_get_clean();
 }
 
+// Step 2: block, subject, instructor (all optional until the dean is ready to assign).
+function sched_form_step2($uid, $blocks, $subjects, $instructors, $v)
+{
+    $type = $v['class_type'] ?? 'LEC';
+    $kind = $v['subject_kind'] ?? null;
+    if ($kind === null) {
+        $kind = 'normal';
+        foreach ($subjects as $s) {
+            if (($v['subject'] ?? null) === $s['subjectID']) { $kind = $s['kind']; break; }
+        }
+    }
+    ob_start(); ?>
+    <div class="sp-field">
+      <label for="<?= $uid ?>-block">Block / Section</label>
+      <select id="<?= $uid ?>-block" name="block">
+        <option value="">No block yet</option>
+        <?php foreach ($blocks as $b): ?>
+          <option value="<?= sched_e($b['value']) ?>" <?= ($v['block'] ?? '') === $b['value'] ? 'selected' : '' ?>><?= sched_e($b['label']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+
+    <div class="sp-field">
+      <span class="sp-label">Class Type</span>
+      <div class="sp-radios" role="radiogroup" aria-label="Class type">
+        <label class="sp-radio"><input type="radio" name="class_type" value="LEC" <?= $type === 'LEC' ? 'checked' : '' ?>> <span>LECTURE (LEC)</span></label>
+        <label class="sp-radio"><input type="radio" name="class_type" value="LAB" <?= $type === 'LAB' ? 'checked' : '' ?>> <span>LABORATORY (LAB)</span></label>
+        <label class="sp-radio"><input type="radio" name="class_type" value="GEC" <?= $type === 'GEC' ? 'checked' : '' ?>> <span>GENERAL EDUCATION (GEC)</span></label>
+      </div>
+    </div>
+
+    <div class="sp-field">
+      <span class="sp-label">Subject Category</span>
+      <div class="sp-radios" role="radiogroup" aria-label="Subject category">
+        <label class="sp-radio"><input type="radio" name="subject_kind" value="normal" <?= $kind === 'normal' ? 'checked' : '' ?>> <span>NORMAL SUBJECT</span></label>
+        <label class="sp-radio"><input type="radio" name="subject_kind" value="prereq" <?= $kind === 'prereq' ? 'checked' : '' ?>> <span>PREREQUISITE SUBJECT</span></label>
+      </div>
+    </div>
+
+    <div class="sp-field">
+      <label for="<?= $uid ?>-subject">Subject</label>
+      <select id="<?= $uid ?>-subject" name="subject">
+        <option value="">No subject yet</option>
+        <?php foreach ($subjects as $s): ?>
+          <option value="<?= sched_e($s['subjectID']) ?>" data-type="<?= sched_e($s['type']) ?>" data-kind="<?= sched_e($s['kind']) ?>" data-programs="<?= sched_e($s['programs'] ? implode(',', $s['programs']) : '*') ?>"
+            <?= ($v['subject'] ?? null) === $s['subjectID'] ? 'selected' : '' ?>>
+            <?= sched_e(trim($s['subjectID']) . ' — ' . $s['name'] . ($s['requires'] ? ' (requires ' . $s['requires'] . ')' : '')) ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+
+    <div class="sp-field">
+      <label for="<?= $uid ?>-instructor">Instructor</label>
+      <select id="<?= $uid ?>-instructor" name="instructor">
+        <option value="">No instructor yet</option>
+        <?php foreach ($instructors as $i): ?>
+          <option value="<?= (int)$i['facultyID'] ?>" <?= (int)($v['instructor'] ?? 0) === (int)$i['facultyID'] ? 'selected' : '' ?>>
+            <?= sched_e(ScheduleLogic::properName($i['first_name'] . ' ' . $i['last_name'])) ?>
+          </option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <?php
+    return ob_get_clean();
+}
+
 $group     = $logic->group;
+$isDean    = $logic->isDean();
+$isCoord   = $logic->isCoordinator();
 $canManage = $logic->canManage();
 $semesters = $logic->semesters();
 $semKey    = $logic->selectedSemester($_GET['sem'] ?? '');
@@ -162,7 +237,7 @@ $csrf      = $logic->csrf();
 
 $sched = null;
 if ($view === 'class' || $view === 'edit') {
-    $sched = ($group === 'manager') ? $logic->find((int)($_GET['id'] ?? 0)) : null;
+    $sched = $isDean ? $logic->find((int)($_GET['id'] ?? 0)) : null;
     if (!$sched || !$logic->canAccess($sched) || ($view === 'edit' && !$canManage)) {
         $view = 'list';
         $sched = null;
@@ -172,31 +247,68 @@ if ($view === 'class' || $view === 'edit') {
 }
 
 $dayName = ucfirst(strtolower($_GET['d'] ?? ''));
-if ($view === 'day' && ($group === 'manager' || !in_array($dayName, ScheduleLogic::WEEK, true))) {
+if ($view === 'day' && ($isDean || !in_array($dayName, ScheduleLogic::WEEK, true))) {
+    $view = 'list';
+}
+if ($view === 'availability' && !$isDean) {
     $view = 'list';
 }
 
-$search = trim((string)($_GET['q'] ?? ''));
-$isDean = $logic->isDean();
-$departments = $programs = [];
-$deptSel = $progSel = '';
-if ($isDean) {
-    $departments = $logic->departments();
-    $programs    = $logic->programs();
-    $deptSel = array_key_exists('dept', $_GET) ? trim((string)$_GET['dept']) : $logic->ownDepartment();
-    if (!in_array($deptSel, array_column($departments, 'department'), true)) $deptSel = '';
-    $progSel = trim((string)($_GET['prog'] ?? ''));
-    $okProg  = false;
-    foreach ($programs as $pr) {
-        if ($pr['program'] === $progSel && ($deptSel === '' || $pr['department'] === $deptSel)) $okProg = true;
+$search = $isDean ? '' : trim((string)($_GET['q'] ?? ''));
+$programs = $isDean ? $logic->programs() : [];
+$fl = ['program' => '', 'block' => '', 'status' => '', 'instructor' => ''];
+if ($isDean && $view === 'list') $fl = $logic->deanFilters($_GET, $semKey);
+$filterActive = implode('', $fl) !== '';
+$scopeLabel = $isDean ? $logic->assignedDepartment() : ($isCoord ? $logic->assignedProgram() : '');
+
+// Coordinator search: blocks and instructors of the assigned program.
+$progLabel   = $isCoord ? $logic->assignedProgram() : '';
+$monitoring  = $isCoord && $logic->isMonitoring($search);
+$searchPlaceholder = 'Search subject, room or instructor';
+$searchHint  = '';
+if ($isCoord) {
+    if ($progLabel !== '') {
+        $searchPlaceholder = "Search a block (e.g., $progLabel 1A) or an instructor of $progLabel";
+        $searchHint = "Type a block (for example “$progLabel 1A” or just “1A”) or the name of an instructor assigned to $progLabel to monitor the program’s deployed schedule. Clear the search to see your own classes again.";
+    } else {
+        $searchPlaceholder = 'No program is assigned to your account';
+        $searchHint = 'Your account has no assigned program yet, so only your own classes can be shown.';
     }
-    if (!$okProg) $progSel = '';
 }
-$rows = ($view === 'list' || $view === 'day') ? $logic->schedules($semKey, $search, $deptSel, $progSel) : [];
+$rows = ($view === 'list' || $view === 'day') ? $logic->schedules($semKey, $search, $fl) : [];
 $week   = $logic->week($rows);
 
 $needForm = $canManage && ($view === 'list' || $view === 'edit');
 $blocks = $subjects = $instructors = $rooms = [];
+$filterBlocks = $filterInstructors = [];
+$statusCounts = [];
+if ($isDean && $view === 'list') {
+    $filterBlocks      = $logic->filterBlocks();
+    $filterInstructors = $logic->scheduleInstructors($semKey);
+    $statusCounts      = $logic->statusCounts($semKey, $fl);
+}
+
+// Weekly hours of the filtered block (dean list).
+$hoursReport = null;
+if ($isDean && $view === 'list' && $fl['block'] !== '' && $fl['block'] !== 'none') {
+    $bp = explode('|', $fl['block'], 2);
+    $hoursReport = $logic->blockHours($semKey, $bp[0], $bp[1] ?? '');
+}
+
+// Room / instructor availability (dean).
+$av = null; $avFree = null; $avKind = 'rooms'; $avDay = 'Monday'; $avFrom = ''; $avTo = '';
+if ($isDean && $view === 'availability') {
+    $avKind = (($_GET['t'] ?? '') === 'instructors') ? 'instructors' : 'rooms';
+    $avDay  = ucfirst(strtolower((string)($_GET['d'] ?? 'Monday')));
+    if (!in_array($avDay, ScheduleLogic::WEEK, true)) $avDay = 'Monday';
+    $av = $logic->availability($semKey, $avDay, $avKind);
+    $f = (string)($_GET['from'] ?? ''); $t = (string)($_GET['to'] ?? '');
+    if (preg_match('/^\d\d:\d\d:00$/', $f) && preg_match('/^\d\d:\d\d:00$/', $t)
+        && $f >= ScheduleLogic::OPEN_TIME && $t <= ScheduleLogic::CLOSE_TIME && $f < $t) {
+        $avFrom = $f; $avTo = $t;
+        $avFree = $logic->freeFor($av, $avFrom, $avTo, $avKind);
+    }
+}
 if ($needForm) {
     $blocks      = $logic->blocks();
     $subjects    = $logic->subjects();
@@ -232,12 +344,22 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             </div>
           <?php endif; ?>
 
-<?php /* =============================== MANAGER: LIST =============================== */ ?>
-<?php if ($group === 'manager' && $view === 'list'): ?>
+<?php /* =============================== MANAGER (DEAN): LIST =============================== */ ?>
+<?php if ($group === 'none'): ?>
+          <h2 class="sched-title">Schedule</h2>
+          <p class="sched-empty">The schedule is not available for your role.</p>
+
+<?php elseif ($isDean && $view === 'list'): ?>
           <div class="sched-toolbar">
-            <h2 class="sched-title">Teaching Schedule<?php if ($logic->isCoordinator() && $logic->assignedProgram() !== ''): ?> — <?= sched_e($logic->assignedProgram()) ?><?php endif; ?></h2>
+            <h2 class="sched-title">Teaching Schedule<?php if ($scopeLabel !== ''): ?> - <?= sched_e($scopeLabel) ?><?php endif; ?></h2>
             <form class="sched-sem" method="get" action="<?= sched_e($self) ?>">
               <?php if ($search !== ''): ?><input type="hidden" name="q" value="<?= sched_e($search) ?>"><?php endif; ?>
+              <?php if ($isDean): ?>
+                <input type="hidden" name="f_program" value="<?= sched_e($fl['program']) ?>">
+                <input type="hidden" name="f_block" value="<?= sched_e($fl['block']) ?>">
+                <input type="hidden" name="f_status" value="<?= sched_e($fl['status']) ?>">
+                <input type="hidden" name="f_instructor" value="<?= sched_e($fl['instructor']) ?>">
+              <?php endif; ?>
               <select name="sem" aria-label="Semester" onchange="this.form.submit()">
                 <?php foreach ($semesters as $s): ?>
                   <option value="<?= sched_e($s['key']) ?>" <?= $s['key'] === $semKey ? 'selected' : '' ?>><?= sched_e($s['label']) ?></option>
@@ -245,37 +367,98 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
               </select>
               <noscript><button class="sp-btn" type="submit">Go</button></noscript>
             </form>
+            <a class="sp-btn" href="<?= sched_e(sched_url(['view' => 'availability', 'sem' => $semKey])) ?>"><?= sched_icon('clock') ?> Availability</a>
             <?php if ($canManage): ?>
               <button type="button" class="sp-btn sp-btn--primary" data-open-add><?= sched_icon('plus') ?> Add Schedule</button>
             <?php endif; ?>
           </div>
 
-          <form class="sched-search" method="get" action="<?= sched_e($self) ?>" role="search">
+          <?php if ($isDean): ?>
+          <form class="sched-filters" id="dean-filters" method="get" action="<?= sched_e($self) ?>" aria-label="Filter schedules">
             <input type="hidden" name="sem" value="<?= sched_e($semKey) ?>">
-            <?php if ($isDean): ?>
-  <select name="dept" aria-label="Department" data-filter-dept>
-    <option value="">All departments</option>
-    <?php foreach ($departments as $d): ?>
-      <option value="<?= sched_e($d['department']) ?>" <?= $d['department'] === $deptSel ? 'selected' : '' ?>><?= sched_e($d['department']) ?> — <?= sched_e($d['name']) ?></option>
-    <?php endforeach; ?>
-  </select>
-  <select name="prog" aria-label="Program" data-filter-prog>
-    <option value="">All programs</option>
-    <?php foreach ($programs as $pr): ?>
-      <option value="<?= sched_e($pr['program']) ?>" data-dept="<?= sched_e($pr['department']) ?>" <?= $pr['program'] === $progSel ? 'selected' : '' ?>><?= sched_e($pr['program']) ?></option>
-    <?php endforeach; ?>
-  </select>
-<?php endif; ?>
-            <label class="sched-search__box">
-              <?= sched_icon('search') ?>
-              <input type="search" name="q" value="<?= sched_e($search) ?>" placeholder="Search block (e.g., BSCS 1A)" aria-label="Search block">
-            </label>
-            <button type="submit" class="sp-btn sp-btn--primary">Search</button>
+            <div class="sched-filter">
+              <label for="f-program">Program</label>
+              <select id="f-program" name="f_program">
+                <option value="">All programs</option>
+                <?php foreach ($programs as $p): ?>
+                  <option value="<?= sched_e($p['program']) ?>" <?= $fl['program'] === $p['program'] ? 'selected' : '' ?>><?= sched_e($p['program']) ?> — <?= sched_e($p['name']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="sched-filter">
+              <label for="f-block">Block</label>
+              <select id="f-block" name="f_block">
+                <option value="">All blocks</option>
+                <?php foreach ($filterBlocks as $b): ?>
+                  <option value="<?= sched_e($b['value']) ?>" data-program="<?= sched_e($b['program']) ?>" <?= $fl['block'] === $b['value'] ? 'selected' : '' ?>><?= sched_e($b['label']) ?></option>
+                <?php endforeach; ?>
+                <option value="none" <?= $fl['block'] === 'none' ? 'selected' : '' ?>>No block yet</option>
+              </select>
+            </div>
+            <div class="sched-filter">
+              <label for="f-status">Status</label>
+              <select id="f-status" name="f_status">
+                <option value="">All statuses</option>
+                <?php foreach (ScheduleLogic::STATUSES as $k => $lab): ?>
+                  <option value="<?= $k ?>" <?= $fl['status'] === $k ? 'selected' : '' ?>><?= $lab ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="sched-filter">
+              <label for="f-instructor">Instructor</label>
+              <select id="f-instructor" name="f_instructor">
+                <option value="">All instructors</option>
+                <?php foreach ($filterInstructors as $i): ?>
+                  <option value="<?= (int)$i['facultyID'] ?>" <?= $fl['instructor'] === (string)(int)$i['facultyID'] ? 'selected' : '' ?>><?= sched_e(ScheduleLogic::properName($i['last_name'] . ', ' . $i['first_name'])) ?></option>
+                <?php endforeach; ?>
+                <option value="none" <?= $fl['instructor'] === 'none' ? 'selected' : '' ?>>No instructor yet</option>
+              </select>
+            </div>
+            <?php if ($filterActive): ?>
+              <a class="sp-btn" href="<?= sched_e(sched_url(['sem' => $semKey, 'reset' => 1])) ?>"><?= sched_icon('close') ?> Reset filters</a>
+            <?php endif; ?>
+            <noscript><button type="submit" class="sp-btn sp-btn--primary">Apply</button></noscript>
           </form>
+          <p class="sched-summary" role="status">
+            <strong><?= count($rows) ?> class<?= count($rows) === 1 ? '' : 'es' ?></strong>
+            <?= $filterActive ? 'match the filters' : 'in ' . sched_e($semLabel ?: 'this semester') ?>
+            <span class="sched-summary__tags">
+              <?php foreach (ScheduleLogic::STATUSES as $k => $lab): ?>
+                <span class="sp-tag sp-tag--<?= $k ?>"><?= $lab ?>: <?= (int)($statusCounts[$k] ?? 0) ?></span>
+              <?php endforeach; ?>
+            </span>
+          </p>
+          <?php if ($hoursReport !== null): ?>
+            <section class="sched-hours" aria-label="Weekly hours of the block">
+              <h3 class="sched-hours__title">Weekly hours — <?= sched_e(str_replace('|', ' ', $fl['block'])) ?></h3>
+              <p class="sp-hint">Every lecture and laboratory subject needs exactly 4 hours per week (100%). The hours can be spread over different days (for example 2 hrs Monday + 2 hrs Wednesday, or 1 hr on four days). A subject can only be deployed when it reaches 100%.</p>
+              <?php if (!$hoursReport): ?>
+                <p class="sched-empty">No subject has been scheduled for this block yet.</p>
+              <?php else: ?>
+                <ul class="hours-list">
+                  <?php foreach ($hoursReport as $h): $done = abs($h['scheduled'] - $h['required']) < 0.001; ?>
+                    <li class="hours-row">
+                      <span class="hours-row__name"><strong><?= sched_e($h['subject']) ?></strong> <span class="sp-tag"><?= sched_e($h['type']) ?></span><small class="hours-row__days"><?= sched_e(ScheduleLogic::fmtDayHours($h['by_day'])) ?></small></span>
+                      <span class="hours-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= min(100, $h['pct']) ?>"><span class="<?= $h['scheduled'] > $h['required'] ? 'is-over' : ($done ? 'is-full' : '') ?>" style="width: <?= min(100, $h['pct']) ?>%"></span></span>
+                      <span class="hours-row__val"><?= ScheduleLogic::fmtHours($h['scheduled']) ?> / <?= ScheduleLogic::fmtHours($h['required']) ?> hrs · <?= $h['pct'] ?>%</span>
+                      <?php if ($done): ?><span class="sp-tag sp-tag--deployed">Complete</span>
+                      <?php elseif ($h['scheduled'] > $h['required']): ?><span class="sp-tag sp-tag--assigned">Over by <?= ScheduleLogic::fmtHours($h['scheduled'] - $h['required']) ?> hr</span>
+                      <?php else: ?><span class="sp-tag sp-tag--draft">Needs <?= ScheduleLogic::fmtHours($h['left']) ?> hr</span><?php endif; ?>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+              <?php endif; ?>
+            </section>
+          <?php endif; ?>
+          <?php endif; ?>
 
           <?php if (!$rows): ?>
             <p class="sched-empty">
-              <?= $search !== '' ? 'No classes found for “' . sched_e($search) . '”.' : 'No classes scheduled for this semester yet.' ?>
+              <?php if ($isDean && $filterActive): ?>
+                No classes match the selected filters. Try a different combination or reset the filters.
+              <?php else: ?>
+                <?= $search !== '' ? 'No classes found for “' . sched_e($search) . '”.' : 'No classes scheduled for this semester yet.' ?>
+              <?php endif; ?>
             </p>
           <?php else: ?>
             <div class="sched-week">
@@ -290,14 +473,22 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
                       <?php endif; ?>
                     <?php else: foreach ($items as $it): ?>
                       <div class="class-item">
-                        <span class="sp-tag"><?= sched_e($it['type']) ?></span>
-                        <strong class="class-item__name"><?= sched_e($it['subject_code']) ?> • <?= sched_e($it['block_label']) ?></strong>
+                        <span class="class-item__tags">
+                          <?php if ($isDean): ?><?= sched_status_tag($it['status']) ?><?php endif; ?>
+                          <?php if ($it['subject_code'] !== ''): ?><span class="sp-tag"><?= sched_e($it['type']) ?></span><?php endif; ?>
+                          <?php if ($it['class_format'] !== 'onsite'): ?><span class="sp-tag"><?= $it['class_format'] === 'blended_even' ? 'Blended - even wks' : 'Blended - odd wks' ?></span><?php endif; ?>
+                        </span>
+                        <strong class="class-item__name"><?= sched_e($it['subject_code'] !== '' ? $it['subject_code'] : 'No subject yet') ?> • <?= sched_e($it['block_label']) ?></strong>
                         <span><?= sched_e($it['range']) ?></span>
                         <span>Room <?= sched_e($it['roomID']) ?></span>
+                        <span><?= sched_e($it['faculty_name']) ?></span>
                         <div class="class-item__actions">
                           <a class="sp-btn sp-btn--grow" href="<?= sched_e(sched_url(['view' => 'class', 'id' => $it['schedID']])) ?>">View Class</a>
                           <?php if ($canManage): ?>
-                            <a class="sp-btn sp-btn--icon" href="<?= sched_e(sched_url(['view' => 'edit', 'id' => $it['schedID']])) ?>" aria-label="Edit <?= sched_e($it['subject_code']) ?>"><?= sched_icon('pencil') ?></a>
+                            <a class="sp-btn sp-btn--icon" href="<?= sched_e(sched_url(['view' => 'edit', 'id' => $it['schedID']])) ?>" aria-label="Edit schedule <?= (int)$it['schedID'] ?>"><?= sched_icon('pencil') ?></a>
+                          <?php endif; ?>
+                          <?php if ($canManage && $it['status'] === 'assigned'): ?>
+                            <?= sched_status_form('deploy', $it, $csrf, $semKey, 'Deploy', 'check', 'list', 'sp-btn sp-btn--primary') ?>
                           <?php endif; ?>
                         </div>
                       </div>
@@ -308,7 +499,134 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             </div>
           <?php endif; ?>
 
-<?php /* =============================== MANAGER: VIEW CLASS =============================== */ ?>
+<?php /* =============================== MANAGER (DEAN): AVAILABILITY =============================== */ ?>
+<?php elseif ($isDean && $view === 'availability'):
+        $avUrl = function (array $o) use ($semKey, $avKind, $avDay, $avFrom, $avTo) {
+            return sched_url(array_merge(['view' => 'availability', 'sem' => $semKey, 't' => $avKind, 'd' => $avDay, 'from' => $avFrom, 'to' => $avTo], $o));
+        };
+        list($avTimes) = sched_time_list([]);
+        $avCells = 28;   // 7:00 AM - 9:00 PM in 30-minute cells
+?>
+          <div class="sched-bar">
+            <a class="sp-btn" href="<?= sched_e(sched_url(['sem' => $semKey])) ?>"><?= sched_icon('left') ?> Back to Teaching Schedule</a>
+            <form class="sched-sem" method="get" action="<?= sched_e($self) ?>">
+              <input type="hidden" name="view" value="availability">
+              <input type="hidden" name="t" value="<?= sched_e($avKind) ?>">
+              <input type="hidden" name="d" value="<?= sched_e($avDay) ?>">
+              <select name="sem" aria-label="Semester" onchange="this.form.submit()">
+                <?php foreach ($semesters as $s): ?>
+                  <option value="<?= sched_e($s['key']) ?>" <?= $s['key'] === $semKey ? 'selected' : '' ?>><?= sched_e($s['label']) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </form>
+          </div>
+          <h2 class="sched-title">Availability</h2>
+
+          <nav class="sched-tabs" aria-label="Availability type">
+            <a class="sched-tab <?= $avKind === 'rooms' ? 'is-active' : '' ?>" href="<?= sched_e($avUrl(['t' => 'rooms'])) ?>">Rooms</a>
+            <a class="sched-tab <?= $avKind === 'instructors' ? 'is-active' : '' ?>" href="<?= sched_e($avUrl(['t' => 'instructors'])) ?>">Instructors</a>
+          </nav>
+          <nav class="sched-tabs sched-tabs--days" aria-label="Day">
+            <?php foreach (ScheduleLogic::WEEK as $d): ?>
+              <a class="sched-tab <?= $avDay === $d ? 'is-active' : '' ?>" href="<?= sched_e($avUrl(['d' => $d])) ?>"><?= substr($d, 0, 3) ?></a>
+            <?php endforeach; ?>
+          </nav>
+
+          <form class="sched-filters" method="get" action="<?= sched_e($self) ?>" aria-label="Find free <?= $avKind ?>">
+            <input type="hidden" name="view" value="availability">
+            <input type="hidden" name="sem" value="<?= sched_e($semKey) ?>">
+            <input type="hidden" name="t" value="<?= sched_e($avKind) ?>">
+            <input type="hidden" name="d" value="<?= sched_e($avDay) ?>">
+            <div class="sched-filter">
+              <label for="av-from">From</label>
+              <select id="av-from" name="from" required>
+                <option value="">Start time</option>
+                <?php foreach ($avTimes as $val => $lab): if ($val >= ScheduleLogic::CLOSE_TIME) continue; ?>
+                  <option value="<?= $val ?>" <?= $avFrom === $val ? 'selected' : '' ?>><?= $lab ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="sched-filter">
+              <label for="av-to">To</label>
+              <select id="av-to" name="to" required>
+                <option value="">End time</option>
+                <?php foreach ($avTimes as $val => $lab): if ($val <= ScheduleLogic::OPEN_TIME) continue; ?>
+                  <option value="<?= $val ?>" <?= $avTo === $val ? 'selected' : '' ?>><?= $lab ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <button type="submit" class="sp-btn sp-btn--primary"><?= sched_icon('search') ?> Find free <?= $avKind === 'rooms' ? 'rooms' : 'instructors' ?></button>
+            <?php if ($avFree !== null): ?><a class="sp-btn" href="<?= sched_e($avUrl(['from' => '', 'to' => ''])) ?>">Clear</a><?php endif; ?>
+          </form>
+
+          <?php if ($avFree !== null): ?>
+            <p class="sched-summary" role="status">
+              <strong><?= count($avFree) ?> <?= $avKind === 'rooms' ? 'room' : 'instructor' ?><?= count($avFree) === 1 ? '' : 's' ?> free</strong>
+              on <?= $avDay ?>, <?= sched_e(ScheduleLogic::fmtRange($avFrom, $avTo)) ?>
+              <?= $avKind === 'instructors' ? '(including the 30-minute rest before and after other classes)' : '' ?>
+              <?php if ($avFrom < ScheduleLogic::LUNCH_END && $avTo > ScheduleLogic::LUNCH_START): ?>
+                <span class="sp-tag sp-tag--assigned">Overlaps the 12:00 – 1:00 PM lunch break</span>
+              <?php endif; ?>
+            </p>
+            <?php if ($avFree): ?>
+              <p class="av-free-list"><?php foreach ($avFree as $name): ?><span class="sp-tag sp-tag--deployed"><?= sched_e($name) ?></span> <?php endforeach; ?></p>
+            <?php else: ?>
+              <p class="sched-empty">No <?= $avKind === 'rooms' ? 'room' : 'instructor' ?> is free for that whole time. Try a shorter range or another day.</p>
+            <?php endif; ?>
+          <?php else: ?>
+            <p class="sp-hint">Pick a day and a time range to list the <?= $avKind === 'rooms' ? 'rooms' : 'instructors' ?> that are free, or read the grid below.</p>
+          <?php endif; ?>
+
+          <?php if (!$av): ?>
+            <p class="sched-empty">No <?= $avKind === 'rooms' ? 'rooms' : 'instructors' ?> found.</p>
+          <?php else: ?>
+            <div class="av-wrap">
+              <table class="av-grid">
+                <thead>
+                  <tr>
+                    <th class="av-name" scope="col"><?= $avKind === 'rooms' ? 'Room' : 'Instructor' ?></th>
+                    <?php for ($h = 7; $h < 21; $h++): ?><th colspan="2" class="av-hour" scope="col"><?= date('g A', mktime($h, 0)) ?></th><?php endfor; ?>
+                  </tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($av as $e):
+                      $at = array_fill(0, $avCells, -1);
+                      foreach ($e['busy'] as $bi => $b) {
+                          $c0 = max(0, (int)floor((ScheduleLogic::minutes($b['start']) - 420) / 30));
+                          $c1 = min($avCells, (int)ceil((ScheduleLogic::minutes($b['end']) - 420) / 30));
+                          for ($c = $c0; $c < $c1; $c++) { if ($at[$c] < 0) $at[$c] = $bi; }
+                      } ?>
+                    <tr class="<?= $e['blocked'] ? 'is-blocked' : '' ?>">
+                      <th scope="row" class="av-name"><?= sched_e($e['label']) ?><?php if ($e['note'] !== ''): ?><small><?= sched_e($e['note']) ?></small><?php endif; ?></th>
+                      <?php
+                      for ($c = 0; $c < $avCells; ) {
+                          if ($at[$c] >= 0) {
+                              $bi = $at[$c]; $span = 1;
+                              while ($c + $span < $avCells && $at[$c + $span] === $bi) $span++;
+                              $b = $e['busy'][$bi];
+                              $tip = $b['label'] . ' — ' . $b['who'] . ' — ' . $b['range'] . ($b['alt'] ? ' (alternating online/onsite)' : '');
+                              echo '<td colspan="' . $span . '" class="av-busy' . ($b['alt'] ? ' av-busy--alt' : '') . '" title="' . sched_e($tip) . '"><span>' . sched_e($b['label']) . '</span></td>';
+                              $c += $span;
+                          } else {
+                              $m = 420 + $c * 30;
+                              echo '<td class="' . (($m >= 720 && $m < 780) ? 'av-lunch' : ($e['blocked'] ? 'av-off' : 'av-free')) . '"></td>';
+                              $c++;
+                          }
+                      } ?>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+            <ul class="av-legend" aria-label="Legend">
+              <li><i class="av-key av-key--free"></i> Free</li>
+              <li><i class="av-key av-key--busy"></i> Booked</li>
+              <li><i class="av-key av-key--alt"></i> Alternating online / onsite</li>
+              <li><i class="av-key av-key--lunch"></i> Lunch break</li>
+            </ul>
+          <?php endif; ?>
+
+<?php /* =============================== MANAGER (DEAN): VIEW CLASS =============================== */ ?>
 <?php elseif ($view === 'class' && $sched):
         $page = (int)($_GET['sp'] ?? 1);
         $sq   = trim((string)($_GET['sq'] ?? ''));
@@ -321,6 +639,11 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             <a class="sp-btn" href="<?= sched_e(sched_url(['sem' => $semKey])) ?>"><?= sched_icon('left') ?> Back to Teaching Schedule</a>
             <?php if ($canManage): ?>
               <span class="sched-bar__nav">
+                <?php if ($sched['status'] === 'assigned'): ?>
+                  <?= sched_status_form('deploy', $sched, $csrf, $semKey, 'Deploy', 'check', 'class', 'sp-btn sp-btn--primary') ?>
+                <?php elseif ($sched['status'] === 'deployed'): ?>
+                  <?= sched_status_form('undeploy', $sched, $csrf, $semKey, 'Undeploy', 'close', 'class', 'sp-btn') ?>
+                <?php endif; ?>
                 <a class="sp-btn" href="<?= sched_e(sched_url(['view' => 'edit', 'id' => $sched['schedID']])) ?>"><?= sched_icon('pencil') ?> Edit Class</a>
                 <button type="button" class="sp-btn sp-btn--danger" data-open-delete><?= sched_icon('trash') ?> Delete</button>
               </span>
@@ -330,9 +653,10 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
           <div class="class-head">
             <div class="class-head__icon"><?= str_replace('width="16" height="16"', 'width="40" height="40"', sched_icon('laptop')) ?></div>
             <div>
-              <h2 class="sched-title"><?= sched_e($sched['subject_code']) ?> &nbsp;-&nbsp; <?= sched_e($sched['block_label']) ?></h2>
+              <h2 class="sched-title"><?= sched_e($sched['subject_code'] !== '' ? $sched['subject_code'] : 'No subject yet') ?> &nbsp;-&nbsp; <?= sched_e($sched['block_label']) ?></h2>
               <p class="class-head__sub"><?= sched_e($sched['subject_name']) ?></p>
-              <span class="sp-pill"><?= sched_e(ScheduleLogic::typeLabel($sched['type'])) ?></span>
+              <?php if ($sched['subject_code'] !== ''): ?><span class="sp-pill"><?= sched_e(ScheduleLogic::typeLabel($sched['type'])) ?></span><?php endif; ?>
+              <?php if ($isDean): ?><?= sched_status_tag($sched['status']) ?><?php endif; ?>
             </div>
           </div>
 
@@ -341,7 +665,24 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             <div><dt>Room</dt><dd>Room <?= sched_e($sched['roomID']) ?></dd></div>
             <div><dt>Days</dt><dd><?= sched_e(implode(', ', $sched['days'])) ?></dd></div>
             <div><dt>Time</dt><dd><?= sched_e($sched['range']) ?></dd></div>
+            <div><dt>Format</dt><dd><?= sched_e($sched['format_label']) ?></dd></div>
           </dl>
+
+          <?php $hrs = $logic->hoursFor($sched); if ($hrs): $full = abs($hrs['scheduled'] - $hrs['required']) < 0.001; ?>
+            <section class="sched-hours sched-hours--inline" aria-label="Weekly hours">
+              <ul class="hours-list">
+                <li class="hours-row">
+                  <span class="hours-row__name"><strong>Weekly hours</strong> <span class="sp-tag"><?= sched_e($hrs['type']) ?></span></span>
+                  <span class="hours-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?= min(100, $hrs['pct']) ?>"><span class="<?= $hrs['scheduled'] > $hrs['required'] ? 'is-over' : ($full ? 'is-full' : '') ?>" style="width: <?= min(100, $hrs['pct']) ?>%"></span></span>
+                  <span class="hours-row__val"><?= ScheduleLogic::fmtHours($hrs['scheduled']) ?> / <?= ScheduleLogic::fmtHours($hrs['required']) ?> hrs · <?= $hrs['pct'] ?>%</span>
+                  <?php if ($full): ?><span class="sp-tag sp-tag--deployed">Complete</span>
+                  <?php elseif ($hrs['scheduled'] > $hrs['required']): ?><span class="sp-tag sp-tag--assigned">Over</span>
+                  <?php else: ?><span class="sp-tag sp-tag--draft">Needs <?= ScheduleLogic::fmtHours($hrs['left']) ?> hr</span><?php endif; ?>
+                </li>
+              </ul>
+              <p class="sp-hint">Counts every day and slot of <?= sched_e($sched['subject_code']) ?> for <?= sched_e($sched['block_label']) ?>: <strong><?= sched_e(ScheduleLogic::fmtDayHours($hrs['by_day'])) ?></strong>. The hours can be spread over different days, and the subject can only be deployed at 100%.</p>
+            </section>
+          <?php endif; ?>
 
           <div class="class-cols">
             <section class="sp-box">
@@ -391,11 +732,11 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             </section>
           </div>
 
-<?php /* =============================== MANAGER: EDIT CLASS =============================== */ ?>
+<?php /* =============================== MANAGER (DEAN): EDIT CLASS =============================== */ ?>
 <?php elseif ($view === 'edit' && $sched):
         $vals = $old ?: [
-            'block'      => $sched['program'] . '|' . $sched['block'],
-            'class_type' => $sched['type'],
+            'block'      => $sched['block'] ? $sched['program'] . '|' . $sched['block'] : '',
+            'class_type' => $sched['subject_code'] !== '' ? $sched['type'] : 'LEC',
             'subject'    => $sched['subjectID'],
             'instructor' => $sched['facultyID'],
             'room'       => $sched['roomID'],
@@ -403,16 +744,30 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             'start_time' => $sched['time_start'],
             'end_time'   => $sched['time_end'],
             'semester'   => $semKey,
+            'delivery'     => $sched['class_format'] === 'onsite' ? 'onsite' : 'blended',
+            'onsite_weeks' => $sched['class_format'] === 'blended_even' ? 'even' : 'odd',
         ];
+        $vals['program'] = $sched['program'];
+        $editBlocks = array_values(array_filter($blocks, function ($b) use ($sched) {
+            return $b['program'] === $sched['program'];
+        }));
 ?>
           <div class="sched-bar">
             <a class="sp-btn" href="<?= sched_e(sched_url(['view' => 'class', 'id' => $sched['schedID']])) ?>"><?= sched_icon('left') ?> Back to Class</a>
+            <span class="sched-bar__nav">
+              <?= sched_status_tag($sched['status']) ?>
+              <?php if ($sched['status'] === 'assigned'): ?>
+                <?= sched_status_form('deploy', $sched, $csrf, $semKey, 'Deploy', 'check', 'class', 'sp-btn sp-btn--primary') ?>
+              <?php elseif ($sched['status'] === 'deployed'): ?>
+                <?= sched_status_form('undeploy', $sched, $csrf, $semKey, 'Undeploy', 'close', 'class', 'sp-btn') ?>
+              <?php endif; ?>
+            </span>
           </div>
           <div class="class-head class-head--compact">
             <div class="class-head__icon"><?= sched_icon('laptop') ?></div>
             <div>
               <h2 class="sched-title">Edit Class</h2>
-              <p class="class-head__sub">Update the details for <?= sched_e($sched['subject_code']) ?> - <?= sched_e($sched['block_label']) ?></p>
+              <p class="class-head__sub">Update the details for <?= sched_e($sched['subject_code'] !== '' ? $sched['subject_code'] . ' - ' . $sched['block_label'] : $sched['program'] . ' time slot') ?></p>
             </div>
           </div>
 
@@ -420,6 +775,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             <input type="hidden" name="csrf" value="<?= sched_e($csrf) ?>">
             <input type="hidden" name="sched_action" value="update">
             <input type="hidden" name="schedID" value="<?= (int)$sched['schedID'] ?>">
+            <h3 class="sp-step">Step 1 — Day, time and room</h3>
             <div class="sp-field">
               <label for="edit-semester">Semester <span class="sp-req">*</span></label>
               <select id="edit-semester" name="semester" required>
@@ -428,7 +784,10 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
                 <?php endforeach; ?>
               </select>
             </div>
-            <?= sched_form_fields('edit', $blocks, $subjects, $instructors, $rooms, $vals, true) ?>
+            <?= sched_form_step1('edit', $programs, $rooms, $vals, true) ?>
+            <h3 class="sp-step">Step 2 — Assign block, subject and instructor</h3>
+            <?= sched_form_step2('edit', $editBlocks, $subjects, $instructors, $vals) ?>
+            <p class="sp-hint">Step 3 — <?= $sched['status'] === 'deployed' ? 'This schedule is deployed, so changes are visible to students and professors right away.' : 'Once the block, subject and instructor are set, use Deploy to make it visible.' ?></p>
             <div class="sp-form__actions">
               <button type="button" class="sp-btn sp-btn--danger" data-open-delete><?= sched_icon('trash') ?> Delete</button>
               <a class="sp-btn" href="<?= sched_e(sched_url(['view' => 'class', 'id' => $sched['schedID']])) ?>">Cancel</a>
@@ -436,7 +795,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             </div>
           </form>
 
-<?php /* =============================== FACULTY / STUDENT: DAY PAGE =============================== */ ?>
+<?php /* =============================== FACULTY / STUDENT / COORDINATOR: DAY PAGE =============================== */ ?>
 <?php elseif ($view === 'day'):
         $idx  = array_search($dayName, ScheduleLogic::WEEK, true);
         $next = ScheduleLogic::WEEK[($idx + 1) % 7];
@@ -458,8 +817,12 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
                   <h3><?= sched_e($it['subject_name']) ?></h3>
                   <div class="day-card__body day-card__body--left">
                     <p class="tile-row"><strong>Time:</strong> <?= sched_e($it['range']) ?></p>
+                    <?php if ($it['class_format'] !== 'onsite'): ?><p class="tile-row"><strong>Format:</strong> <?= sched_e($it['format_label']) ?></p><?php endif; ?>
                     <p class="tile-row"><strong>Room:</strong> <?= sched_e($it['roomID']) ?></p>
-                    <?php if ($group === 'faculty'): ?>
+                    <?php if ($isCoord): ?>
+                      <p class="tile-row"><strong>Block:</strong> <?= sched_e($it['block_label']) ?></p>
+                      <p class="tile-row"><strong>Prof:</strong> <?= sched_e($it['faculty_name']) ?></p>
+                    <?php elseif ($group === 'faculty'): ?>
                       <p class="tile-row"><strong>Grade &amp; Section:</strong> <?= sched_e($it['block_label']) ?></p>
                     <?php else: ?>
                       <p class="tile-row"><strong>Prof:</strong> <?= sched_e($it['faculty_name']) ?></p>
@@ -470,14 +833,12 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             </div>
           <?php endif; ?>
 
-<?php /* =============================== FACULTY / STUDENT: WEEK =============================== */ ?>
+<?php /* =============================== FACULTY / STUDENT / COORDINATOR: WEEK =============================== */ ?>
 <?php else: ?>
           <div class="sched-toolbar">
-            <h2 class="sched-title">My Schedule</h2>
+            <h2 class="sched-title"><?= $monitoring ? 'Program Schedule - ' . sched_e($progLabel) : 'My Schedule' ?></h2>
             <form class="sched-sem" method="get" action="<?= sched_e($self) ?>">
               <?php if ($search !== ''): ?><input type="hidden" name="q" value="<?= sched_e($search) ?>"><?php endif; ?>
-              <?php if ($isDean): ?><input type="hidden" name="dept" value="<?= sched_e($deptSel) ?>">
-              <input type="hidden" name="prog" value="<?= sched_e($progSel) ?>"><?php endif; ?>
               <select name="sem" aria-label="Semester" onchange="this.form.submit()">
                 <?php foreach ($semesters as $s): ?>
                   <option value="<?= sched_e($s['key']) ?>" <?= $s['key'] === $semKey ? 'selected' : '' ?>><?= sched_e($s['label']) ?></option>
@@ -489,14 +850,27 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
             <input type="hidden" name="sem" value="<?= sched_e($semKey) ?>">
             <label class="sched-search__box">
               <?= sched_icon('search') ?>
-              <input type="search" name="q" value="<?= sched_e($search) ?>" placeholder="Search subject, room or instructor" aria-label="Search schedule">
+              <input type="search" name="q" value="<?= sched_e($search) ?>" placeholder="<?= sched_e($searchPlaceholder) ?>" aria-label="Search schedule">
             </label>
             <button type="submit" class="sp-btn sp-btn--primary">Search</button>
             <?php if ($search !== ''): ?><a class="sp-btn" href="<?= sched_e(sched_url(['sem' => $semKey])) ?>">Clear</a><?php endif; ?>
           </form>
+          <?php if ($searchHint !== ''): ?><p class="sp-hint sched-search__hint"><?= sched_e($searchHint) ?></p><?php endif; ?>
+          <?php if ($monitoring): ?>
+            <p class="sched-summary" role="status">
+              <strong><?= count($rows) ?> deployed class<?= count($rows) === 1 ? '' : 'es' ?></strong>
+              of <?= sched_e($progLabel) ?> match “<?= sched_e($search) ?>”<?= $semLabel ? ' in ' . sched_e($semLabel) : '' ?>.
+            </p>
+          <?php endif; ?>
           <?php if (!$rows): ?>
             <p class="sched-empty">
-              <?= $search !== '' ? 'No classes found for “' . sched_e($search) . '”.' : 'No classes found for ' . sched_e($semLabel) . '. Try another semester from the dropdown.' ?>
+              <?php if ($isCoord && $search !== ''): ?>
+                No block or instructor matching “<?= sched_e($search) ?>” was found in <?= sched_e($progLabel !== '' ? $progLabel : 'your program') ?> for <?= sched_e($semLabel) ?>. Check the spelling or try a block like “<?= sched_e($progLabel) ?> 1A” or an instructor’s last name. Only deployed schedules are shown.
+              <?php elseif ($isCoord): ?>
+                You have no classes of your own for <?= sched_e($semLabel) ?>. Search for a block or an instructor of <?= sched_e($progLabel !== '' ? $progLabel : 'your program') ?> above to monitor the program’s schedule.
+              <?php else: ?>
+                <?= $search !== '' ? 'No classes found for “' . sched_e($search) . '”.' : 'No classes found for ' . sched_e($semLabel) . '. Try another semester from the dropdown.' ?>
+              <?php endif; ?>
             </p>
           <?php endif; ?>
           <div class="sched-week">
@@ -515,7 +889,7 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
                     <p class="day-card__time"><?= sched_icon('clock') ?> <?= sched_e(ScheduleLogic::fmtRange($first, $last)) ?></p>
                     <ul class="day-card__list">
                       <?php foreach ($items as $it): ?>
-                        <li><?= sched_icon('book') ?> <span><?= sched_e($it['subject_name']) ?></span></li>
+                        <li><?= sched_icon('book') ?> <span><?= sched_e($it['subject_name']) ?><?= $isCoord ? ' • ' . sched_e($it['block_label']) . ($monitoring ? ' • ' . sched_e($it['faculty_name']) : '') : '' ?></span></li>
                       <?php endforeach; ?>
                     </ul>
                   <?php endif; ?>
@@ -530,14 +904,14 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
       </main>
 
 <?php if ($canManage && $view === 'list'):
-        $addVals = $old ?: ['semester' => $semKey, 'class_type' => 'LEC']; ?>
+        $addVals = $old ?: ['semester' => $semKey, 'program' => $fl['program']]; ?>
       <dialog class="sched-modal" id="add-schedule" aria-labelledby="add-title" <?= isset($_GET['add']) ? 'data-autoopen' : '' ?>>
         <form method="post" action="<?= sched_e(sched_url(['sem' => $semKey])) ?>" class="sp-form" data-sched-form>
           <div class="sched-modal__head">
             <?= str_replace('width="16" height="16"', 'width="26" height="26"', sched_icon('calendar')) ?>
             <div>
               <h2 id="add-title">Add Schedule</h2>
-              <p>Create a new class schedule for <?= sched_e($semLabel ?: 'the selected semester') ?>.</p>
+              <p>Step 1 of 3 for <?= sched_e($semLabel ?: 'the selected semester') ?>: set the program, room, day and time. Assign the block, subject and instructor later.</p>
             </div>
             <button type="button" class="sp-btn sp-btn--icon" data-close-add aria-label="Close"><?= sched_icon('close') ?></button>
           </div>
@@ -549,10 +923,10 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
           <input type="hidden" name="csrf" value="<?= sched_e($csrf) ?>">
           <input type="hidden" name="sched_action" value="create">
           <input type="hidden" name="semester" value="<?= sched_e($semKey) ?>">
-          <?= sched_form_fields('add', $blocks, $subjects, $instructors, $rooms, $addVals) ?>
+          <?= sched_form_step1('add', $programs, $rooms, $addVals) ?>
           <div class="sp-form__actions">
             <button type="button" class="sp-btn" data-close-add>Cancel</button>
-            <button type="submit" class="sp-btn sp-btn--primary"><?= sched_icon('plus') ?> Add Schedule</button>
+            <button type="submit" class="sp-btn sp-btn--primary"><?= sched_icon('plus') ?> Add Time Slot</button>
           </div>
         </form>
       </dialog>
@@ -564,7 +938,8 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
           <input type="hidden" name="sched_action" value="delete">
           <input type="hidden" name="schedID" value="<?= (int)$sched['schedID'] ?>">
           <h2 id="delete-title"><?= sched_icon('trash') ?> Delete Schedule</h2>
-          <p>Delete <strong><?= sched_e($sched['subject_code']) ?> • <?= sched_e($sched['block_label']) ?></strong> (<?= sched_e(implode(', ', $sched['days'])) ?>, <?= sched_e($sched['range']) ?>)?<br>This cannot be undone.</p>
+          <?php $sylN = $logic->syllabusCount($sched['schedID']); ?>
+          <p>Delete <strong><?= sched_e($sched['subject_code'] !== '' ? $sched['subject_code'] : 'this time slot') ?> • <?= sched_e($sched['block_label']) ?></strong> (<?= sched_e(implode(', ', $sched['days'])) ?>, <?= sched_e($sched['range']) ?>)?<?php if ($sylN > 0): ?><br>This also deletes its <?= $sylN ?> syllabus module<?= $sylN > 1 ? 's' : '' ?>.<?php endif; ?><br>This cannot be undone.</p>
           <div class="sched-alert__actions">
             <button type="button" class="sp-btn" data-close-delete>Cancel</button>
             <button type="submit" class="sp-btn sp-btn--danger">Delete</button>
@@ -604,9 +979,21 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
 <?php if ($needForm): ?>
 <script>
 (function () {
+  document.querySelectorAll('[data-sched-form]').forEach(function (form) {
+    var weeks = form.querySelector('[data-weeks]');
+    if (!weeks) return;
+    function toggle() {
+      var c = form.querySelector('input[name="delivery"]:checked');
+      weeks.hidden = !(c && c.value === 'blended');
+    }
+    form.querySelectorAll('input[name="delivery"]').forEach(function (r) { r.addEventListener('change', toggle); });
+    toggle();
+  });
+
   // Filter subjects by class type, category and program.
   document.querySelectorAll('[data-sched-form]').forEach(function (form) {
     var subject = form.querySelector('select[name="subject"]');
+    if (!subject) return;
     var blockSel = form.querySelector('select[name="block"]');
     function val(name, fallback) {
       var c = form.querySelector('input[name="' + name + '"]:checked');
@@ -614,37 +1001,26 @@ foreach ($semesters as $s) { if ($s['key'] === $semKey) $semLabel = $s['label'];
     }
     function apply() {
       var type = val('class_type', 'LEC'), kind = val('subject_kind', 'normal');
-      var prog = blockSel && blockSel.value ? blockSel.value.split('|')[0] : '';
+      var progField = form.querySelector('[name="program"]');
+      var prog = progField && progField.value ? progField.value : (blockSel && blockSel.value ? blockSel.value.split('|')[0] : '');
+      var semField = form.querySelector('[name="semester"]');
+      var sem = semField && semField.value ? semField.value.split('|')[1] : '';
       subject.disabled = (prog === '');
-      subject.options[0].textContent = prog ? 'Select subject' : 'Select block/section first';
+      subject.options[0].textContent = prog ? 'No subject yet' : 'Program missing';
       Array.prototype.forEach.call(subject.options, function (o) {
         if (!o.value) return;
         var list = (o.dataset.programs || '*').split(',');
-        var offered = list.indexOf('*') !== -1 || list.indexOf(prog) !== -1;
+        var withSem = list.some(function (x) { return x.indexOf(':') !== -1; });
+        var offered = list.indexOf('*') !== -1 || list.indexOf(withSem ? prog + ':' + sem : prog) !== -1;
         var hide = o.dataset.type !== type || o.dataset.kind !== kind || !offered;
         o.hidden = hide; o.disabled = hide;
         if (hide && o.selected) subject.value = '';
       });
     }
-    form.querySelectorAll('input[name="class_type"], input[name="subject_kind"], select[name="block"]').forEach(function (r) { r.addEventListener('change', apply); });
+    form.querySelectorAll('input[name="class_type"], input[name="subject_kind"], select[name="block"], select[name="semester"]').forEach(function (r) { r.addEventListener('change', apply); });
     apply();
   });
   
-  var deptSel = document.querySelector('[data-filter-dept]');
-var progSel = document.querySelector('[data-filter-prog]');
-if (deptSel && progSel) {
-  function filterPrograms() {
-    Array.prototype.forEach.call(progSel.options, function (o) {
-      if (!o.value) return;
-      var hide = deptSel.value !== '' && o.dataset.dept !== deptSel.value;
-      o.hidden = hide; o.disabled = hide;
-      if (hide && o.selected) progSel.value = '';
-    });
-  }
-  filterPrograms();
-  deptSel.addEventListener('change', function () { progSel.value = ''; deptSel.form.submit(); });
-  progSel.addEventListener('change', function () { progSel.form.submit(); });
-}
   var alertDlg = document.getElementById('conflict-alert');
   var dlg = document.getElementById('add-schedule');
   function showConflict() {
@@ -667,8 +1043,33 @@ if (deptSel && progSel) {
   if (dlg.hasAttribute('data-autoopen')) dlg.showModal();
   showConflict();
 })();
-<?php endif; ?>
 </script>
+<?php endif; ?>
+<?php if ($isDean && $view === 'list'): ?>
+<script>
+(function () {
+  var form = document.getElementById('dean-filters');
+  if (!form) return;
+  var prog  = form.querySelector('[name="f_program"]');
+  var block = form.querySelector('[name="f_block"]');
+
+  // Show only the blocks of the chosen program.
+  function syncBlocks() {
+    Array.prototype.forEach.call(block.options, function (o) {
+      if (!o.dataset.program) return;
+      var hide = prog.value !== '' && o.dataset.program !== prog.value;
+      o.hidden = hide; o.disabled = hide;
+      if (hide && o.selected) block.value = '';
+    });
+  }
+  syncBlocks();
+  prog.addEventListener('change', function () { syncBlocks(); form.submit(); });
+  form.querySelectorAll('select').forEach(function (s) {
+    if (s !== prog) s.addEventListener('change', function () { form.submit(); });
+  });
+})();
+</script>
+<?php endif; ?>
 <?php require_once __DIR__ . "/components/logout.php"; ?>
 </body>
 </html>

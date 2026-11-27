@@ -11,9 +11,8 @@
  * The optional reason log lives in `account_restrictions` (see registration_migration.sql).
  */
 require_once __DIR__ . '/../Services/csrf.php';
-require_once __DIR__ . '/../Services/account_logs.php';   // accountLog(): activity log
-
-/** Roles the registrar may create: label shown in the page => [kind, value stored in faculty.role]. */
+require_once __DIR__ . '/../Services/account_log.php';   // accountLog(): activity log
+ 
 const REG_ROLES = [
     'Students'            => ['student', 'student'],
     'Dean'                => ['faculty', 'dean'],
@@ -98,8 +97,6 @@ function regCheckEmail(PDO $pdo, string $raw, string $kind, ?int $selfNum = null
     return [$v, null];
 }
 
-/* ---------------------------------------------------------------- helpers */
-
 function regTitle(string $s): string {
     return mb_convert_case(mb_strtolower($s, 'UTF-8'), MB_CASE_TITLE, 'UTF-8');
 }
@@ -125,9 +122,6 @@ function regDisplayName(array $r): string {
     return preg_replace('/\s+/', ' ', implode(', ', $parts));
 }
 
-/**
- * One row of the directory, in the shape registration.js draws.
- */
 function regAccount(string $kind, array $r, array $reasons = []): array {
     $num  = (int)($kind === 'student' ? $r['studentID'] : $r['facultyID']);
     $id   = regUserId($kind === 'student' ? 'student' : 'faculty', $num, (string)$r['date_created']);
@@ -153,8 +147,6 @@ function regAccount(string $kind, array $r, array $reasons = []): array {
         'locked' => $role === 'registrar' || strtoupper($id) === strtoupper((string)($_SESSION['userID'] ?? '')),
     ];
 }
-
-/* ------------------------------------------------------ accounts */
 
 /** A fresh directory entry for one account (used to refresh a row after a change). */
 function regLoadAccount(PDO $pdo, string $kind, int $num): ?array {
@@ -246,10 +238,6 @@ function regTempPassword(): string {
     return $pw;
 }
 
-/**
- * Department + Program/Block checks shared by Add and Edit.
- * Returns [dept, program|null, yearLevel, block]; problems are written to $errors.
- */
 function regCheckAssignment(PDO $pdo, string $kind, string $roleValue, array $post, array &$errors): array {
     $dept = strtoupper(trim((string)($post['department'] ?? '')));
 
@@ -287,8 +275,6 @@ function regCheckAssignment(PDO $pdo, string $kind, string $roleValue, array $po
     }
     return [$dept, $program, $yearLevel, $block];
 }
-
-/* -------------------------------------------------------------------- add */
 
 function registrationAdd($post) {
     regGuard($post);
@@ -383,8 +369,6 @@ function registrationAdd($post) {
     ]);
 }
 
-/* --------------------------------------------------------------- restrict */
-
 function registrationRestrict($post) {
     regGuard($post);
     $pdo = regPdo();
@@ -450,9 +434,6 @@ function registrationRestrict($post) {
         'message' => $lift ? "Restriction lifted for $id." : "$id is now restricted.",
     ]);
 }
-
-
-/* ------------------------------------------------------- edit / delete */
 
 /** Parse and look up the account an Edit / Delete is about. Answers with JSON when it cannot. */
 function regFindAccount(PDO $pdo, $rawId, bool $allowArchived = false): array {
@@ -601,9 +582,6 @@ function registrationDelete($post) {
     regJson(['ok' => true, 'id' => $id, 'message' => "$id was deleted."]);
 }
 
-
-/* ------------------------------------------------------ archive / restore */
-
 /** POST mode=archive|restore. Archiving hides the account from the active list and blocks its login (it is kept
  *  restricted while archived); nothing is deleted. Restoring puts the old status back. */
 function registrationArchive($post) {
@@ -636,13 +614,10 @@ function registrationArchive($post) {
     regJson(['ok' => true, 'account' => $acct, 'message' => $restore ? "$id was restored." : "$id was archived."]);
 }
 
-
-/* -------------------------------------------------------------------- logs */
-
 const REG_LOG_ACTIONS = [
     'created' => 'Registered', 'updated' => 'Edited', 'restricted' => 'Restricted', 'lifted' => 'Restriction lifted',
     'archived' => 'Archived', 'restored' => 'Restored', 'deleted' => 'Deleted', 'assigned' => 'Professor assigned',
-    'unassigned' => 'Professor removed', 'login' => 'Logged in', 'login_blocked' => 'Login blocked', 'login_failed' => 'Failed login',
+    'unassigned' => 'Professor removed', 'login' => 'Logged in', 'logout' => 'Logged out', 'login_blocked' => 'Login blocked', 'login_failed' => 'Failed login',
 ];
 
 /** POST q (search), action, before (log_id cursor). Newest first, 40 per page. */
@@ -679,7 +654,7 @@ function registrationLogs($post) {
     $more = count($rows) > $limit;
     $rows = array_slice($rows, 0, $limit);
     $out = array_map(fn($r) => [
-        'id' => (int)$r['log_id'], 'when' => substr((string)$r['created_at'], 0, 16),
+        'id' => (int)$r['log_id'], 'when' => date('M j, Y g:i A', (int)strtotime((string)$r['created_at'])),
         'accountId' => $r['account_id'], 'accountName' => $r['account_name'],
         'action' => $r['action'], 'label' => REG_LOG_ACTIONS[$r['action']] ?? $r['action'], 'details' => $r['details'],
         'actorId' => $r['actor_id'], 'actorName' => $r['actor_name'],

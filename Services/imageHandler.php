@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/session.php';
 require_once __DIR__ . '/csrf.php';
+require_once __DIR__ . '/account_log.php';
 
 class ImageUploadService
 {
@@ -100,7 +101,7 @@ function profileUploadDone(string $key, string $text): void {
 }
 
 function uploadProfile(){
-  global $userDAO; 
+  global $userDAO, $db_connection; 
 
   // Not logged in: nothing to save.
   if (empty($_SESSION['userID'])) {
@@ -144,7 +145,8 @@ function uploadProfile(){
       profileUploadDone('error', 'Could not save the picture. Please try again.');
   }
 
- 
+  // MySQL reports 0 changed rows when the new bytes equal the stored ones (and a too-small image column can
+  // silently cut the picture off), so do not trust $rows_affected alone: read the picture back and compare.
   $read_back = ($_SESSION['role'] ?? '') === 'student' ? 'getStudentProfile' : 'getFacultyProfile';
   try {
       $stored = $userDAO->executeQuery($read_back, [$loggedInUserId]);
@@ -160,6 +162,7 @@ function uploadProfile(){
       $storedData = stream_get_contents($storedData);
   }
   if ($storedData === $imageBinaryData) {
+      accountLog($db_connection ?? null, (string)$loggedInUserId, '', 'updated', 'Changed their profile picture');
       profileUploadDone('message', 'Profile picture saved!');
   }
   if (is_string($storedData) && $storedData !== '' && strlen($storedData) < strlen($imageBinaryData)) {
@@ -188,6 +191,9 @@ function getProfilePic(){
         $imageBinaryData = stream_get_contents($imageBinaryData);
     }
       
+    // Anything already printed in this request (a PHP warning, a stray space or blank line in an included file)
+    // would sit in front of the picture bytes and make the browser reject the image. Drop it and keep
+    // warnings off the screen for the rest of this request, so only the picture is sent.
     ini_set('display_errors', '0');
     while (ob_get_level() > 0) {
         ob_end_clean();

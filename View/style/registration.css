@@ -714,7 +714,8 @@
   background: #fff3dc;
   border-color: #f0d79c;
 }
-.lg-login {
+.lg-login,
+.lg-logout {
   color: #3a3350;
   background: #efeaf6;
   border-color: #d8cdee;

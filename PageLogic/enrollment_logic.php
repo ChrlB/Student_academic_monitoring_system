@@ -290,7 +290,7 @@ class EnrollmentLogic
         $sync = $this->pdo->prepare("
             INSERT INTO student_curriculum (studentID, program, subjectID, curriculum_year, semester, units)
             SELECT ?, sy.program, TRIM(sy.subjectID), sy.year, sy.sem_available, sy.unit
-            FROM prospectus sy
+            FROM syllabus sy
             WHERE sy.program = ?
             ON DUPLICATE KEY UPDATE
                 program = VALUES(program),
@@ -343,20 +343,11 @@ class EnrollmentLogic
         // program's current year level and semester. These remain pending so
         // the Coordinator can still review the enrollment normally.
         if (strtolower(trim((string)$this->studentType)) === 'regular') {
-            $this->pdo->exec("CREATE TABLE IF NOT EXISTS regular_enrollment_initialization (
-                enrollmentID INT NOT NULL,
-                studentID INT UNSIGNED NOT NULL,
-                initialized_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (enrollmentID, studentID)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-            $claim = $this->pdo->prepare("INSERT IGNORE INTO regular_enrollment_initialization (enrollmentID, studentID) VALUES (?, ?)");
-            $claim->execute([$enrollmentID, $this->numericID]);
-            if ($claim->rowCount() === 1) {
             $autoAdd = $this->pdo->prepare("
                 INSERT INTO enrolled_subjects
                     (enrollmentID, studentID, subjectID, selected_schedID, status)
                 SELECT ?, ?, TRIM(sy.subjectID), NULL, 'pending'
-                FROM prospectus sy
+                FROM syllabus sy
                 WHERE sy.program = ?
                   AND sy.year = ?
                   AND sy.sem_available = ?
@@ -383,7 +374,6 @@ class EnrollmentLogic
                 $enrollmentID,
                 $this->numericID
             ]);
-            }
         }
 
         $stmt = $this->pdo->prepare("
@@ -481,8 +471,12 @@ class EnrollmentLogic
                 sy.year,
                 COALESCE(sc.status, 'not_yet_taken') AS curriculum_status,
                 CASE WHEN sc.status = 'finished' THEN 1 ELSE 0 END AS finished,
-                COALESCE(sy.prerequisite, '') AS prerequisite
-            FROM prospectus sy
+                COALESCE((
+                    SELECT GROUP_CONCAT(TRIM(sp.prerequisite) ORDER BY TRIM(sp.prerequisite) SEPARATOR ', ')
+                    FROM subject_prerequisite sp
+                    WHERE TRIM(sp.subjectID) = TRIM(sy.subjectID)
+                ), '') AS prerequisite
+            FROM syllabus sy
             JOIN subjects s
                 ON TRIM(s.subjectID) = TRIM(sy.subjectID)
             LEFT JOIN student_curriculum sc
@@ -638,12 +632,14 @@ class EnrollmentLogic
         $stmt = $this->pdo->prepare("
             SELECT records.studentID, records.first_name, records.last_name,
                    records.program, records.year_level, records.block,
-                   records.student_type, records.subjectID, CASE WHEN records.status = 'approved' THEN 'enrolled' ELSE records.status END AS status,
-                   records.rejection_remarks, records.subject_name
+                   records.student_type, records.subjectID, records.status,
+                   records.rejection_remarks, records.subject_name,
+                   records.enrolled_subjectID, records.midterm_grade, records.final_grade
             FROM (
                 SELECT s.studentID, s.first_name, s.last_name, s.program,
                        s.year_level, s.block, s.student_type, es.subjectID,
-                       es.status, es.rejection_remarks, sub.name AS subject_name
+                       es.status, es.rejection_remarks, sub.name AS subject_name,
+                       es.enrolled_subjectID, es.midterm_grade, es.final_grade
                 FROM enrolled_subjects es
                 JOIN students s ON s.studentID = es.studentID
                 LEFT JOIN subjects sub ON TRIM(sub.subjectID) = TRIM(es.subjectID)
@@ -659,7 +655,8 @@ class EnrollmentLogic
                 SELECT s.studentID, s.first_name, s.last_name, s.program,
                        s.year_level, s.block, s.student_type, sc.subjectID,
                        'credited' AS status, NULL AS rejection_remarks,
-                       sub.name AS subject_name
+                       sub.name AS subject_name,
+                       NULL AS enrolled_subjectID, NULL AS midterm_grade, NULL AS final_grade
                 FROM student_curriculum sc
                 JOIN students s ON s.studentID = sc.studentID
                 LEFT JOIN subjects sub ON TRIM(sub.subjectID) = TRIM(sc.subjectID)
@@ -676,16 +673,28 @@ class EnrollmentLogic
         ");
         $stmt->execute([$periodID, $periodID]);
         $this->deanStudents = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Display only: never overwrite official grades, status or curriculum.
+        $verifiedGrades = $this->loadDeanVerifiedGrades($periodID);
+        foreach ($this->deanStudents as &$row) {
+            $row['display_status'] = self::deanGradeDisplayStatus($row, $verifiedGrades);
+        }
+        unset($row);
 
         $stmt = $this->pdo->prepare("
             SELECT ss.schedID, ss.subjectID, sub.name AS subject_name,
                    ss.day, ss.time_start, ss.time_end, ss.block, ss.roomID,
                    CONCAT(f.first_name, ' ', f.last_name) AS faculty_name,
-                   COUNT(DISTINCT CASE WHEN es.status IN ('pending','approved','enrolled') THEN es.studentID END) AS demand
+                   COUNT(DISTINCT CASE
+                       WHEN es.status IN ('pending','approved','enrolled','passed','failed')
+                        AND (es.selected_schedID = ss.schedID
+                             OR (es.selected_schedID IS NULL AND st.block = ss.block))
+                       THEN es.studentID END) AS demand
             FROM subject_schedules ss
             LEFT JOIN subjects sub ON TRIM(sub.subjectID) = TRIM(ss.subjectID)
             LEFT JOIN faculty f ON f.facultyID = ss.facultyID
-            LEFT JOIN enrolled_subjects es ON es.selected_schedID = ss.schedID AND es.enrollmentID = ss.enrollmentID
+            LEFT JOIN enrolled_subjects es ON TRIM(es.subjectID) = TRIM(ss.subjectID)
+                                          AND es.enrollmentID = ss.enrollmentID
+            LEFT JOIN students st ON st.studentID = es.studentID
             WHERE ss.enrollmentID = ?
             GROUP BY ss.schedID, ss.subjectID, sub.name, ss.day, ss.time_start, ss.time_end, ss.block, ss.roomID, f.first_name, f.last_name
             ORDER BY ss.subjectID, ss.block
@@ -718,6 +727,77 @@ class EnrollmentLogic
             GROUP BY ep.acad_year, ep.sem
             ORDER BY ep.acad_year DESC, ep.sem DESC LIMIT 12
         ")->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    // Read previously verified submissions in the selected period. edit_allowed
+    // and edit_used preserve the last approved grade while revisions are processed.
+    private function loadDeanVerifiedGrades(int $periodID): array
+    {
+        if ($periodID <= 0) return [];
+        try {
+            $stmt = $this->pdo->prepare("
+                SELECT subjectID, grade_data
+                FROM grade_submissions
+                WHERE enrollmentID = ?
+                  AND status IN ('approved', 'edit_allowed', 'edit_used')
+                  AND registrar_verified_at IS NOT NULL
+                  AND registrarID IS NOT NULL
+                ORDER BY registrar_verified_at DESC, submissionID DESC
+            ");
+            $stmt->execute([$periodID]);
+            return self::deanVerifiedGradeMap($stmt->fetchAll(PDO::FETCH_ASSOC));
+        } catch (PDOException $e) {
+            // Older installations may not yet have the Grades verification table.
+            if ($e->getCode() !== '42S02') throw $e;
+            return [];
+        }
+    }
+
+    private static function deanVerifiedGradeMap(array $submissions): array
+    {
+        $verified = [];
+        // Input is ordered newest verified submission first. Do not fall back to
+        // older grades when a newer verified entry for the same record differs.
+        foreach ($submissions as $submission) {
+            $grades = json_decode((string)$submission['grade_data'], true);
+            if (!is_array($grades)) continue;
+            foreach ($grades as $grade) {
+                if (!is_array($grade)) continue;
+                $id = (int)($grade['enrolled_subjectID'] ?? 0);
+                if ($id <= 0 || isset($verified[$id])) continue;
+                $verified[$id] = [
+                    'studentID' => (int)($grade['studentID'] ?? 0),
+                    'subjectID' => trim((string)$submission['subjectID']),
+                    'midterm' => $grade['midterm'] ?? null,
+                    'final' => $grade['final'] ?? null,
+                ];
+            }
+        }
+        return $verified;
+    }
+
+    private static function deanGradeDisplayStatus(array $row, array $verified): string
+    {
+        $status = strtolower(trim((string)$row['status']));
+        // Keep all explicit official results and non-enrolled statuses unchanged.
+        if (!in_array($status, ['approved', 'enrolled'], true)) return $status;
+        $midterm = $row['midterm_grade'] ?? null;
+        $final = $row['final_grade'] ?? null;
+        if ($midterm === null || $final === null) return 'enrolled';
+        if (!is_numeric($midterm) || !is_numeric($final)
+            || (float)$midterm < 0 || (float)$midterm > 100
+            || (float)$final < 0 || (float)$final > 100) {
+            return 'awaiting_grade_verification';
+        }
+        $grade = $verified[(int)($row['enrolled_subjectID'] ?? 0)] ?? null;
+        if (!$grade || $grade['studentID'] !== (int)$row['studentID']
+            || $grade['subjectID'] !== trim((string)$row['subjectID'])
+            || !is_numeric($grade['midterm']) || !is_numeric($grade['final'])
+            || (float)$grade['midterm'] !== (float)$midterm
+            || (float)$grade['final'] !== (float)$final) {
+            return 'awaiting_grade_verification';
+        }
+        return ((float)$midterm + (float)$final) / 2 >= 75 ? 'passed' : 'failed';
     }
 
     private function isAssignedAdviser($studentID)
@@ -1775,7 +1855,7 @@ class EnrollmentLogic
         try {
             $stmt = $this->pdo->prepare("
                 SELECT unit
-                FROM prospectus
+                FROM syllabus
                 WHERE TRIM(subjectID) = TRIM(?)
                   AND program = ?
                   AND sem_available = ?

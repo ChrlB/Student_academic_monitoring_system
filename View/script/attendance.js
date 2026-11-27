@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const modal  = document.getElementById('qrModal');
 
   /* Create and insert QR Code button next to user profile header icon */
-  // data-can-qr is "0" when the role may not scan (dean, registrar); students and scanners get "1"
+  // data-can-qr is "0" when the role may not scan (registrar); students, faculty, coordinators and deans get "1"
   const profile = header && header.querySelector('.profile_icon')?.closest('.column');
   const canQr   = !att || att.dataset.canQr !== '0';
 
@@ -284,6 +284,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (evDlg) {
     const f = id => document.getElementById(id);
     const form = f('ev-form'), fields = [...evDlg.querySelectorAll('input[type=text],input[type=date],input[type=time],select')];
+    let currentEventData = null;
 
     (() => {
       const inp = f('ev-coord'), list = f('ev-coord-list'), caret = f('ev-caret'), combo = f('ev-combo');
@@ -327,7 +328,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     /* Open event dialog in appropriate mode (add, edit, view, review) */
     const isDean = evDlg.dataset.dean === '1';
+    const editBtn = f('ev-edit');
     const openDlg = (mode, d = {}) => {
+      currentEventData = d;
+      const canEdit = d.canEdit === true || d.canEdit === '1';
       form.noValidate = false;
       f('ev-action').value = mode === 'edit' ? 'edit_event' : 'add_event';
       f('ev-id').value     = d.id || '';
@@ -344,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
       f('ev-program').value = mode === 'add' ? (evDlg.dataset.myProgram || '') : (d.program || '');
       const locked = mode === 'view' || mode === 'review';
       fields.forEach(x => { x.disabled = locked; });
-      /* Remark: coordinators/faculty must explain an edit; everyone else just reads it */
+      /* Remark: a coordinator must explain an edit; everyone else just reads it */
       const rm = f('ev-remark'), rmWrap = f('ev-remark-wrap');
       if (rm && rmWrap) {
         const asking = mode === 'edit' && !isDean;
@@ -356,25 +360,42 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!isDean) { f('ev-status').disabled = true; f('ev-coord').disabled = true; if (mode === 'edit') { f('ev-name').disabled = true; f('ev-program').disabled = true; } }
       f('ev-note').hidden    = isDean || locked;
       f('ev-ok').hidden      = locked;
+      if (editBtn) editBtn.hidden = !(mode === 'view' && canEdit);
       f('ev-approve').hidden = mode !== 'review';
       f('ev-reject').hidden  = mode !== 'review';
-      f('ev-delete').hidden  = mode !== 'edit';
-      f('ev-delete').dataset.att = d.att || 0;
+      const forceBtn = f('ev-force');
+      if (forceBtn) {
+        forceBtn.hidden = !(mode === 'edit' && d.id);
+        forceBtn.textContent = (d.forced === '1' || d.forced === 1) ? 'Undo Force Timeout' : 'Force Timeout';
+      }
       f('ev-cancel').textContent = locked ? 'Close' : 'Cancel';
       if (!evDlg.open) evDlg.showModal();
       if (!locked) (f('ev-name').disabled ? f('ev-date') : f('ev-name')).focus();
     };
 
+    if (editBtn) {
+      editBtn.addEventListener('click', () => {
+        if (currentEventData && (currentEventData.canEdit === true || currentEventData.canEdit === '1')) {
+          openDlg('edit', currentEventData);
+        }
+      });
+    }
+
     const add = f('ev-add');
     if (add) add.addEventListener('click', () => openDlg('add'));
 
-    const openRow = row => openDlg(row.dataset.review === '1' ? 'review' : (row.dataset.edit === '1' ? 'edit' : 'view'), {
+    const openRow = row => openDlg(row.dataset.review === '1' ? 'review' : 'view', {
       id: row.dataset.id, name: row.dataset.name, date: row.dataset.date, status: row.dataset.status,
-      start: row.dataset.start, end: row.dataset.end, coord: row.dataset.coord, program: row.dataset.program, att: row.dataset.att, remark: row.dataset.remark
+      start: row.dataset.start, end: row.dataset.end, coord: row.dataset.coord, program: row.dataset.program,
+      att: row.dataset.att, forced: row.dataset.forced, revert: row.dataset.revert, remark: row.dataset.remark, canEdit: row.dataset.edit === '1'
     });
     document.querySelectorAll('.ev-row').forEach(row => {
-      row.addEventListener('click', () => openRow(row));
-      row.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRow(row); } });
+      /* the Logs link beside the status is a normal link: it must not open the dialog */
+      row.addEventListener('click', e => { if (!e.target.closest('.ev-logs-link')) openRow(row); });
+      row.addEventListener('keydown', e => {
+        if (e.target.closest('.ev-logs-link')) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openRow(row); }
+      });
     });
 
     f('ev-cancel').addEventListener('click', () => evDlg.close());
@@ -387,35 +408,80 @@ document.addEventListener('DOMContentLoaded', () => {
       form.submit();
     };
     f('ev-approve').addEventListener('click', () => decide('approve_event'));
-    f('ev-reject').addEventListener('click', () => { if (confirm('Reject this event? It will be deleted.')) decide('reject_event'); });
-
-    f('ev-delete').addEventListener('click', () => {
-      const n = parseInt(f('ev-delete').dataset.att, 10) || 0;
-      const extra = n ? `\n\nThis also deletes its ${n} attendance record${n === 1 ? '' : 's'}.` : '';
-      if (!confirm('Delete this event?' + extra)) return;
-      f('ev-action').value = 'delete_event';
-      form.noValidate = true;
-      form.submit();
+    f('ev-reject').addEventListener('click', () => {
+      const reverts = currentEventData && (currentEventData.revert === '1' || currentEventData.revert === 1);
+      const msg = reverts
+        ? 'Reject this change?\n\nThe event goes back to how it was before the edit.'
+        : 'Reject this event? It will be deleted.';
+      if (confirm(msg)) decide('reject_event');
     });
+
+    const forceBtn = f('ev-force');
+    if (forceBtn) {
+      forceBtn.addEventListener('click', () => {
+        const on = currentEventData && (currentEventData.forced === '1' || currentEventData.forced === 1);
+        const msg = on
+          ? 'Close the forced time-out?\n\nThe normal rule applies again: students can time out only after 60% of the event has passed.'
+          : 'Open time-out now?\n\nStudents can time out right away (the 60% rule is skipped) until the event finishes.';
+        if (!confirm(msg)) return;
+        f('ev-action').value = 'force_timeout';
+        form.noValidate = true;
+        form.submit();
+      });
+    }
   }
 
-  /* Attendance record selection and bulk deletion toggle behavior */
-  const del = att.querySelector('.icon-btn.del');
-  if (del) {
-    att.classList.add('sel-hidden');
-    del.addEventListener('click', e => {
-      if (att.classList.contains('sel-hidden')) {
-        e.preventDefault();
-        att.classList.remove('sel-hidden');
-        return;
+  /* Print (event logs, student attendance record): browser print dialog; everything except the printable section is hidden on paper */
+  const printRoot = att.querySelector('[data-printable]');
+  if (printRoot) {
+    const origTitle = document.title;
+    const markPrint = () => {
+      const stamp = new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' });
+      printRoot.querySelectorAll('.print-stamp').forEach(n => { n.textContent = stamp; });
+      document.title = printRoot.dataset.printTitle || origTitle;   // browser header / default PDF file name
+      printRoot.querySelectorAll('.summary, .detail-toolbar').forEach(n => n.classList.add('print-hide'));   // not printed
+      let el = printRoot;
+      while (el && el !== document.body) {
+        [...el.parentNode.children].forEach(sib => { if (sib !== el) sib.classList.add('print-hide'); });
+        el.classList.add('print-path');
+        el = el.parentNode;
       }
-      const checked = att.querySelectorAll('.rd:checked').length;
-      if (!checked) {
-        e.preventDefault();
-        att.classList.add('sel-hidden');
-        return;
-      }
-      if (!confirm(`Delete ${checked} selected record${checked === 1 ? '' : 's'}?`)) e.preventDefault();
+    };
+    const unmarkPrint = () => {
+      document.title = origTitle;
+      document.querySelectorAll('.print-hide, .print-path').forEach(n => n.classList.remove('print-hide', 'print-path'));
+    };
+    window.addEventListener('beforeprint', markPrint);   // also covers Ctrl+P
+    window.addEventListener('afterprint', unmarkPrint);
+    printRoot.querySelectorAll('.js-print').forEach(b => b.addEventListener('click', () => window.print()));
+  }
+
+  /* Sortable event logs table: click a column header to sort, click again to reverse */
+  const logTable = document.getElementById('log-table');
+  if (logTable && logTable.tBodies[0]) {
+    const tbody    = logTable.tBodies[0];
+    const heads    = [...logTable.tHead.querySelectorAll('th[data-type]')];
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    [...tbody.rows].forEach((tr, i) => { tr.dataset.i = i; });   // original order, used as the tie-breaker
+
+    const sortBy = (th, dir) => {
+      const col = th.cellIndex;
+      const num = th.dataset.type === 'number';
+      const rows = [...tbody.rows].map(tr => ({ tr, i: +tr.dataset.i, v: tr.cells[col].dataset.sort ?? '' }));
+      rows.sort((a, b) => {
+        const ae = a.v === '', be = b.v === '';
+        if (ae || be) return ae && be ? a.i - b.i : (ae ? 1 : -1);   // blank values always go last
+        const c = num ? parseFloat(a.v) - parseFloat(b.v) : collator.compare(a.v, b.v);
+        return (dir === 'asc' ? c : -c) || a.i - b.i;
+      });
+      rows.forEach(r => tbody.appendChild(r.tr));
+      heads.forEach(h => h.setAttribute('aria-sort', h === th ? (dir === 'asc' ? 'ascending' : 'descending') : 'none'));
+    };
+
+    heads.forEach(th => {
+      th.querySelector('.sort-btn').addEventListener('click', () => {
+        sortBy(th, th.getAttribute('aria-sort') === 'ascending' ? 'desc' : 'asc');
+      });
     });
   }
 });

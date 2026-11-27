@@ -7,7 +7,11 @@
   border: 2px solid rgba(255, 255, 255, 0.8);
   border-radius: 22px;
   color: #fff;
-  background: linear-gradient(160deg, rgba(174, 140, 178, 0.76), rgba(38, 12, 45, 0.82));
+  background: linear-gradient(
+    160deg,
+    rgba(174, 140, 178, 0.76),
+    rgba(38, 12, 45, 0.82)
+  );
 }
 
 .student-grades-main {
@@ -235,6 +239,12 @@
   font-size: 0.87rem;
 }
 
+.student-grades__table tr.grade-failed > td {
+  color: #fff;
+  background: rgba(153, 27, 27, 0.9);
+  font-weight: 700;
+}
+
 .student-grades__empty {
   padding: 28px 16px;
   color: rgba(255, 255, 255, 0.86);
@@ -250,7 +260,11 @@
   border: 2px solid rgba(255, 255, 255, 0.8);
   border-radius: 22px;
   color: #fff;
-  background: linear-gradient(160deg, rgba(174, 140, 178, 0.76), rgba(38, 12, 45, 0.82));
+  background: linear-gradient(
+    160deg,
+    rgba(174, 140, 178, 0.76),
+    rgba(38, 12, 45, 0.82)
+  );
 }
 
 .faculty-grades .grades-add-panel {
